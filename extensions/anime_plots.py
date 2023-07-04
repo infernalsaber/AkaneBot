@@ -127,7 +127,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
 
     async with ctx.bot.rest.trigger_typing(ctx.event.channel_id):
         if len(series) == 1:
-            data = await search_it(series)
+            data = await search_it(series[0])
 
             if isinstance(data, int):
                 await ctx.respond(f"An error occurred, `code: {data}` ")
@@ -184,7 +184,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     x=data["data"][0],
                     y=data["data"][1],
                     mode="lines",
-                    name=f"Trends {series[0]}",
+                    name=f"Trends {series[0][0:15]}",
                     line={"color": "MediumTurquoise", "width": 2.5},
                 )
             )
@@ -193,7 +193,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     x=data["data"][2],
                     y=data["data"][3],
                     mode="markers",
-                    name=f"Episodes {series[0]}",
+                    name=f"Episodes {series[0][0:15]}",
                     line={"color": "DarkTurquoise", "width": 2.5},
                 )
             )
@@ -202,7 +202,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     x=data["data"][4],
                     y=data["data"][5],
                     line={"color": "DeepPink"},
-                    name=f"Scores {series[0]}",
+                    name=f"Scores {series[0][0:15]}",
                     mode="lines",
                     line_shape="spline",
                 ),
@@ -215,7 +215,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     x=data2["data"][0],
                     y=data2["data"][1],
                     mode="lines",
-                    name=f"Trends {series[1]}",
+                    name=f"Trends {series[1][0:15]}",
                     line={"color": "MediumSlateBlue", "width": 2.5},
                 )
             )
@@ -224,7 +224,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     x=data2["data"][2],
                     y=data2["data"][3],
                     mode="markers",
-                    name=f"Episodes {series[1]}",
+                    name=f"Episodes {series[1][0:15]}",
                     line={"color": "MediumSlateBlue", "width": 2.5},
                 )
             )
@@ -233,7 +233,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     x=data2["data"][4],
                     y=data2["data"][5],
                     line={"color": "DarkOrchid"},
-                    name=f"Scores {series[1]}",
+                    name=f"Scores {series[1][0:15]}",
                     mode="lines",
                     line_shape="spline",
                 ),
