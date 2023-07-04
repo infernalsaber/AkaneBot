@@ -46,12 +46,13 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
     pages = [
         hk.Embed(
             title="Akane Bot Help Menu",
-            description="A cool animanga discord bot. \n\n***Commands***",
-            colour="000000",
-            timestamp=datetime.datetime.now().astimezone()
+            description="A discord bot for animanga. \n\n***Commands***",
+            colour=0x43408A,
+            # timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("lookup", "Look up details on any anime, manga or character")
         .add_field("plot", "Make cool graph-y shit on the popularity of airing anime")
+        .add_field("top", "Find the top anime with filters for airing, upcoming series etc.")
         .set_thumbnail(
             (
                 "https://media.discordapp.net/attachments/980479966389096460"
@@ -65,15 +66,16 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "The command to search for details of any anime, manga or "
                 "character (including an easter egg for the manga lookup)."
                 "\nAlias: lu"
-                "\n\nNote: Please enter the full name of the series or character"
+                "\n\nNote: Please enter the full name of the series or character "
                 "to avoid false matches."
                 "\nEg. `-lookup anime oshi no ko` instead of `lookup anime onk`."
                 "\nOptions: \nanime (a) \nmanga (m) \ncharacter (c)"
             ),
-            colour="000000",
-            timestamp=datetime.datetime.now().astimezone()
+            colour=0x43408A,
+            # timestamp=datetime.datetime.now().astimezone()
         )
-        .set_image("https://files.catbox.moe/72cpf3.gif"),
+        # .set_image("https://files.catbox.moe/72cpf3.gif")
+        ,
 
         hk.Embed(
             title="Plot Command help",
@@ -84,11 +86,22 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\nEg. `-plot oshi no ko` or "
                 "`plot Jigokuraku vs Mashle` to compare "
             ),
-            colour="000000",
+            colour=0x43408A,
+            # timestamp=datetime.datetime.now().astimezone()
+        )
+        # .set_image("https://media.discordapp.net/attachments/1005948828484108340/1125491438801657958/image.png")
+        ,
+        hk.Embed(
+            title="Top Command help",
+            description=(
+                "Get the top MAL anime. "
+                "Can filter by airing, bypopularity, upcoming or favorite"
+                "\nEg. `-top airing` would show the top 5 airing anime"
+            ),
+            colour=0x43408A,
             timestamp=datetime.datetime.now().astimezone()
         )
-        .set_image("https://media.discordapp.net/attachments/1005948828484108340/1125491438801657958/image.png"),
-
+        ,
         hk.Embed(
             title="Utility help",
             description=(
@@ -96,8 +109,8 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\n\n**ping**: Check the bot's ping"
                 "\n**info**: Bot info"
             ),
-            colour="000000",
-            timestamp=datetime.datetime.now().astimezone()
+            colour=0x43408A,
+            # timestamp=datetime.datetime.now().astimezone()
         )
     ]
 

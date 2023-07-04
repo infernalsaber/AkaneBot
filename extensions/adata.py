@@ -25,6 +25,24 @@ al_listener = lb.Plugin(
 )
 
 pattern = re.compile(r"\b(https?:\/\/)?(www.)?anilist.co\/(anime|manga)\/(\d{1,6})")
+spoiler_str = re.compile(r"||")
+
+def parse_description(description: str) -> str:
+    description = description.replace("<br>", "").replace("~!", "||").replace("!~", "||").replace("#", "")
+    description = description.replace("<i>", "").replace("<b>", "").replace("</b>", "").replace("</i>", "")
+        
+    if len(description) > 400:
+        description = description[0:400]
+        # if len(spoiler_str.findall(description)) % 2:
+        if description.count("||") % 2:
+            description = description + "||"
+        
+        description = description + "..."
+    
+    # description = f"{description}||"
+    
+    return description
+    
 
 
 async def get_imp_info(chapters):
@@ -49,6 +67,7 @@ async def get_imp_info(chapters):
 @al_listener.listener(hk.GuildMessageCreateEvent)
 async def al_link_finder(event: hk.GuildMessageCreateEvent) -> None:
     """Check if a message contains an animanga link and display it's info"""
+    return
     if event.is_bot:
         return
     # print(event.message.content)
@@ -130,7 +149,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                 )
                 .add_field(
                     "Summary",
-                    f"{response['description'][0:250].replace('<br>', '') if len(response['description']) > 250 else response['description'].replace('<br>', '')}...",
+                    f"{parse_description(response['description'])}",
                 )
                 .set_thumbnail(response["coverImage"]["large"])
                 .set_image(response["bannerImage"])
@@ -159,7 +178,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 )
 @lb.command(
     "lookup",
-    "Look up anime/manga on anilist",
+    "Look up anime/manga/character on anilist",
     pass_options=True,
     aliases=["lu"],
     auto_defer=True,
@@ -168,9 +187,9 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 async def al_search(ctx: lb.Context, type: str, media: str) -> None:
     """Search an anime/manga/character on AL"""
 
-    query = """
+    query = ["""
 query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used (id)
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Add variables to query (id) (type: ANIME is hard-coded)
+  Media (id: $id, search: $search, type: $type) { # The sort param was POPULARITY_DESC
     id
     idMal
     title {
@@ -198,17 +217,52 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 }
 
 """
+,
+"""
+query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
+  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+    id
+    idMal
+    title {
+        english
+        romaji
+    }
+    type
+    averageScore
+    format
+    meanScore
+    chapters
+    episodes
+    startDate {
+        year
+    }
+    coverImage {
+        large
+    }
+    bannerImage
+    genres
+    status
+    description (asHtml: false)
+    siteUrl
+  }
+}
+
+"""]
+
     if type.lower() in ["anime", "manga", "m", "a"]:
         if type[0].lower() == "m":
             type = "MANGA"
+            query = query[1]
         else:
             type = "ANIME"
+            query = query[0]
+
     elif type in ["character", "c"]:
         # pass
         await search_character(ctx, media)
         return
     else:
-        await ctx.respond("Invalid media type. Please use anime(a) or manga(m)")
+        await ctx.respond("Invalid media type. Please use anime(a), manga(m) or character(c)")
         return
 
     variables = {"search": media, "type": type}
@@ -231,16 +285,8 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     no_of_items = response["chapters"] or response["episodes"] or "NA"
 
     if response["description"]:
-        response["description"] = (
-            response["description"]
-            .replace("<br>", "")
-            .replace("<i>", "")
-            .replace("<b>", "")
-            .replace("</b>", "")
-            .replace("</i>", "")
-        )
-        if len(response["description"]) > 250:
-            response["description"] = f"{response['description'][0:250]}..."
+        response["description"] = parse_description(response["description"])
+ 
     else:
         response["description"] = "NA"
 
@@ -461,16 +507,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     no_of_items = response["chapters"] or response["episodes"] or "NA"
 
     if response["description"]:
-        response["description"] = (
-            response["description"]
-            .replace("<br>", "")
-            .replace("<i>", "")
-            .replace("<b>", "")
-            .replace("</b>", "")
-            .replace("</i>", "")
-        )
-        if len(response["description"]) > 250:
-            response["description"] = f"{response['description'][0:250]}..."
+        response["description"] = parse_description(response["description"])
     else:
         response["description"] = "NA"
 
@@ -598,21 +635,21 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     #     flags=hk.MessageFlag.EPHEMERAL)
 
 
-@al_listener.command
-@lb.command("Look up manga", "Search a manga")
-@lb.implements(lb.MessageCommand)
-async def mangamenu(ctx: lb.MessageContext):
-    """Search a manga on AL"""
+# @al_listener.command
+# @lb.command("Look up manga", "Search a manga")
+# @lb.implements(lb.MessageCommand)
+# async def mangamenu(ctx: lb.MessageContext):
+#     """Search a manga on AL"""
 
-    await search_animanga(ctx, "MANGA", ctx.options["target"].content)
+#     await search_animanga(ctx, "MANGA", ctx.options["target"].content)
 
 
-@al_listener.command
-@lb.command("Look up anime", "Search an anime")
-@lb.implements(lb.MessageCommand)
-async def animemenu(ctx: lb.MessageContext):
-    """Search an anime on AL"""
-    await search_animanga(ctx, "ANIME", ctx.options["target"].content)
+# @al_listener.command
+# @lb.command("Look up anime", "Search an anime")
+# @lb.implements(lb.MessageCommand)
+# async def animemenu(ctx: lb.MessageContext):
+#     """Search an anime on AL"""
+#     await search_animanga(ctx, "ANIME", ctx.options["target"].content)
 
 
 @al_listener.command
@@ -754,14 +791,8 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
     # no_of_items = response['chapters'] or response['episodes'] or "NA"
 
     if response["description"]:
-        response["description"] = (
-            response["description"]
-            .replace("<br>", "")
-            .replace("~!", "||")
-            .replace("!~", "||")
-        )
-        if len(response["description"]) > 400:
-            response["description"] = f"{response['description'][0:400]}..."
+        response["description"] = parse_description(response["description"])
+
     else:
         response["description"] = "NA"
 

@@ -49,7 +49,7 @@ def setup_logging() -> None:
 
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
-    intents=hk.Intents.ALL,
+    intents=hk.Intents.ALL_UNPRIVILEGED | hk.Intents.MESSAGE_CONTENT,
     prefix=["-"],
     help_class=None,
     logs="DEBUG",
