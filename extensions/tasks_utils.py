@@ -1,0 +1,108 @@
+"""Plugin running the background tasks and utilities for the bot"""
+import os
+import glob
+import datetime
+
+import asyncio
+import isodate
+
+import lightbulb as lb
+from lightbulb.ext import tasks
+
+
+task_plugin = lb.Plugin("Tasks", "Background processes")
+
+
+
+
+@tasks.task(d=10)
+async def clear_pic_files():
+    """Clear image files"""
+    print("Clearing image Files")
+    files = glob.glob("./pictures/*")
+    for file in files:
+        os.remove(file)
+    print("Cleared")
+
+# @tasks.task(d=3)
+# async def clear_pic_files():
+    
+
+
+
+@task_plugin.command
+@lb.add_checks(
+    lb.owner_only
+)
+@lb.command("dir", "Upload media files from the cwd", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def directory(ctx: lb.Context) -> None:
+    """Get media files from the directory, this to be used is if a command fails
+
+    Args:
+        ctx (lb.Context): The event context (irrelevant to the user)
+    """
+    if not (guild := ctx.get_guild()):
+        await ctx.respond("This command may only be used in servers.")
+        return
+
+    embed = hk.Embed()
+    view = miru.View()
+
+    if(len(os.listdir("./pictures")) > 20):
+        await ctx.respond("Too many items. Can't list")
+        return
+
+    for i, item in enumerate(["pictures"]):
+        embed.add_field(f"`{i+1}.`", f"```ansi\n\u001b[0;35m{item} ```")
+        view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=str(item)))
+    view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
+
+    choice = await ctx.respond(embed=embed, components=view)
+
+    await view.start(choice)
+    await view.wait()
+
+    if not hasattr(view, "answer"):
+        await ctx.edit_last_response("Process timed out", embeds=[], components=[])
+        return
+
+    folder = view.answer
+
+    # view.remove_item(item)
+
+    embed2 = hk.Embed()
+    view2 = miru.View()
+
+    for i, item in enumerate(os.listdir(f"./{folder}")):
+        embed2.add_field(f"`{i+1}.`", f"```ansi\n\u001b[0;35m{item} ```")
+
+        view2.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=f"{i+1}"))
+    view2.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
+    # view.
+
+    # view.add_item(NoButton(style=hk.ButtonStyle.DANGER, label="No"))
+    choice = await ctx.edit_last_response(embed=embed2, components=view2)
+
+    await view2.start(choice)
+    await view2.wait()
+    # view.from_message(message)
+    if hasattr(view2, "answer"):  # Check if there is an answer
+        await ctx.edit_last_response(content="Here it is.", embeds=[], components=[])
+        filez = os.listdir(f"./{folder}")[int(view2.answer) - 1]
+    else:
+        await ctx.edit_last_response("Process timed out.", embeds=[], components=[])
+        return
+        # return
+    await ctx.respond(attachment=f"{folder}/{filez}")
+
+
+
+def load(bot: lb.BotApp) -> None:
+    """Load the plugin"""
+    bot.add_plugin(task_plugin)
+
+
+def unload(bot: lb.BotApp) -> None:
+    """Unload the plugin"""
+    bot.remove_plugin(task_plugin)
