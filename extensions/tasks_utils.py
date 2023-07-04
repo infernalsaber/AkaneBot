@@ -12,7 +12,9 @@ from lightbulb.ext import tasks
 
 task_plugin = lb.Plugin("Tasks", "Background processes")
 
-
+@tasks.task(d=1)
+async def remove_lookup_data():
+    task_plugin.bot.d.chapter_info = {}
 
 
 @tasks.task(d=10)

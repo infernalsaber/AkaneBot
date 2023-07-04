@@ -10,7 +10,7 @@ import miru
 from miru.ext import nav
 
 
-from functions.buttons import GenericButton
+from functions.buttons import GenericButton, PreviewButton
 from functions.errors import RequestsFailedError
 
 
@@ -56,11 +56,11 @@ async def al_link_finder(event: hk.GuildMessageCreateEvent) -> None:
     # a = hk.MessageFlag
     # print(list_of_series)
     if len(list_of_series) != 0:
-        await event.message.respond("Beep, bop. AniList link found")
-        await al_listener.bot.rest.edit_message(
-            event.channel_id, event.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
-        )
-
+        # await event.message.respond("Beep, bop. AniList link found")
+        # await al_listener.bot.rest.edit_message(
+        #     event.channel_id, event.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
+        # )
+        list_of_series = [list_of_series[0]]
         for series in list_of_series:
             # print(series)
             query = """
@@ -114,7 +114,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             no_of_items = response["chapters"] or response["episodes"] or "NA"
 
             await event.message.respond(
-                content="Here are it's details",
+                content="Here are the details of the AniList series in the link",
                 embed=hk.Embed(
                     description="\n\n",
                     color=0x2B2D42,
@@ -300,17 +300,51 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     else:
         no_of_items = f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
 
-    view = miru.View()
-    view.add_item(
-        GenericButton(
-            style=hk.ButtonStyle.SECONDARY,
-            label="Preview",
-            emoji=hk.Emoji.parse("<a:peek:1061709886712455308>"),
-        )
-    )
+    # # view = miru.View()
+    # view.add_item(
+    #     PreviewButton()
+    # )
 
-    preview = await ctx.respond(
-        embed=hk.Embed(
+    # preview = await ctx.respond(
+    #     embed=hk.Embed(
+    #         description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+    #     )
+    #     .add_field("Rating", response["averageScore"])
+    #     .add_field("Genres", ",".join(response["genres"]))
+    #     .add_field("Status", response["status"], inline=True)
+    #     .add_field(
+    #         "Chapters" if response["type"] == "MANGA" else "Episodes",
+    #         no_of_items,
+    #         inline=True,
+    #     )
+    #     .add_field("Summary", response["description"])
+    #     .set_thumbnail(response["coverImage"]["large"])
+    #     .set_image(response["bannerImage"])
+    #     .set_author(url=response["siteUrl"], name=title)
+    #     .set_footer(
+    #         text="Source: AniList",
+    #         icon="https://i.imgur.com/NYfHiuu.png",
+    #     ),
+    #     components=view,
+    # )
+    # return
+    # await view.start(preview)
+    # await view.wait()
+    # msg = ctx.previous_response.message
+    # al_listener.bot.rest.create_message(channel)
+    # if hasattr(view, "answer"):
+    #     # await ctx.respond(
+    #     #     f"Loading chapter {hk.Emoji.parse('<a:loading_:1061933696648740945>')}",
+    #     #     reply=True,
+    #     # )
+    #     print(f"\n\n{view.answer}\n\n")
+    # else:
+    #     await ctx.edit_last_response(components=[])
+    #     return
+
+    
+    pages = [
+        hk.Embed(
             description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
         )
         .add_field("Rating", response["averageScore"])
@@ -328,110 +362,44 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         .set_footer(
             text="Source: AniList",
             icon="https://i.imgur.com/NYfHiuu.png",
-        ),
-        components=view,
-    )
-    # return
-    await view.start(preview)
-    await view.wait()
-    # msg = ctx.previous_response.message
-    # al_listener.bot.rest.create_message(channel)
-    if hasattr(view, "answer"):
-        # await ctx.respond(
-        #     f"Loading chapter {hk.Emoji.parse('<a:loading_:1061933696648740945>')}",
-        #     reply=True,
-        # )
-        print(f"\n\n{view.answer}\n\n")
-    else:
-        await ctx.edit_last_response(components=[])
-        return
-
-    req = requests.get(f"{base_url}/at-home/server/{data['first']['id']}", timeout=10)
-    if not req.ok:
-        raise RequestsFailedError
-
-    r_json = req.json()
-    pages = []
+        )
+    ]
     # req = requests.Session()
     # try:
 
     # os.makedirs(f"./manga/{data['first']['id']}")
     # from pprint import pprint
     # pprint(r_json)
-    for page in r_json["chapter"]["data"]:
-        # print(f"\n\n{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}\n\n")
-        # pageResp = req.get(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
-
-        # if pageResp.ok:
-        # img = Image.open(io.BytesIO(pageResp.content))
-        # img.resize(tuple(int(0.90*i) for i in img.size), Image.LANCZOS).save(f"./manga/
-        # {data['first']['id']}/pilsave_qty95_size90.png", quality=95, optimize=True)
-        # with open(f"./manga/{data['first']['id']}/io.png", mode="wb") as f:
-        #     f.write(pageResp.content)
-        # Image.open(io.BytesIO(pageResp.content)).save(f"./manga/
-        # {data['first']['id']}/pilsave.png")
-        # Image.open(io.BytesIO(pageResp.content)).convert("RGB").save(f"./
-        # manga/{data['first']['id']}/{i}.jpg")
-        # img = Image.open(io.BytesIO(pageResp.content))
-        # img.resize(tuple(int(0.60*i) for i in img.size), Image.LANCZOS).save(f"./manga/
-        # {data['first']['id']}/pilsave_qty90_size75.png", quality=75, optimize=True)
-        # return
-        # else:
-        #     print(pageResp.content)
-        #     os.rmdir(f"./manga/{data['first']['id']}")
-        #     raise requestFailedError
-        #     return
-
-        # except FileExistsError:
-        #     print("\n\nThis series exists\n\n")
-        # await asyncio.sleep(1)
-
-        # asyncio.sleep(3)
-        # for item in sorted(os.listdir(f"./manga/{data['first']['id']}")):
-        # await ctx.respond(embed=hk.Embed().set_image(f"./manga/
-        # {data['first']['id']}/{item}")) WORKS, but meh
-        # await ctx.respond(embed=hk.Embed(description="dash"), attachment=f"./
-        # manga/{data['first']['id']}/{item}") IT WORKS but no navi
-        pages.append(
-            hk.Embed(title=title, color=0xFF6740)
-            .set_image(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
-            .set_footer(
-                "Fetched via: MangaDex",
-                icon="https://avatars.githubusercontent.com/u/100574686?s=280&v=4",
-            )
-        )
-    pages.append(
-        hk.Embed(title=title, url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1")
-        .set_image(response["coverImage"]["large"])
-        .set_author(
-            name="Click here to continue reading",
-            url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1",
-        )
-    )
+    
+    
     buttons = [
-        nav.PrevButton(
-            style=hk.ButtonStyle.SECONDARY,
-            emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
-        ),
-        nav.IndicatorButton(),
-        nav.NextButton(
-            style=hk.ButtonStyle.SECONDARY,
-            emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
-        ),
+        PreviewButton(),
+
     ]
     # await ctx.delete_last_response()
 
+    # print("\n\n", base_url, data['first']['id'], title, manga_id, "\n\n")
+    # print(ctx.bot.d.chapter_info)
     navigator = nav.NavigatorView(pages=pages, buttons=buttons)
-    
+
     # await ctx.respond(components=navigator)
 
     # await ctx.respond("ok", flags=hk.MessageFlag.EPHEMERAL)
     await navigator.send(
-        ctx.interaction,
-        ephemeral=True,
+        ctx.channel_id,
+        # ephemeral=True,
         # flags=hk.MessageFlag.EPHEMERAL
         )
-    print(navigator.ephemeral)
+    print("NavigatoID", navigator.message_id)
+    ctx.bot.d.chapter_info[navigator.message_id] = [
+        base_url, 
+        data['first']['id'], 
+        title, 
+        manga_id, 
+        response['coverImage']['large'],
+        pages
+    ] 
+    # print(navigator.ephemeral)
 
 
 
@@ -568,7 +536,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         .add_field("Genres", ",".join(response["genres"]))
         .add_field("Status", response["status"], inline=True)
         .add_field(
-            "Chapters" if response["type"] == "MANGA" else "Episodes",
+            "Chapters",
             no_of_items,
             inline=True,
         )
@@ -583,6 +551,28 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         components=view,
     )
     # print("\n\nTime is ", datetime.now().timestamp() - t1, "s\n\n")
+
+    info_page = [
+        hk.Embed(
+            description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+        )
+        .add_field("Rating", response["averageScore"])
+        .add_field("Genres", ",".join(response["genres"]))
+        .add_field("Status", response["status"], inline=True)
+        .add_field(
+            "Chapters",
+            no_of_items,
+            inline=True,
+        )
+        .add_field("Summary", response["description"])
+        .set_thumbnail(response["coverImage"]["large"])
+        .set_image(response["bannerImage"])
+        .set_author(url=response["siteUrl"], name=title)
+        .set_footer(
+            text="Source: AniList",
+            icon="https://i.imgur.com/NYfHiuu.png",
+        )
+    ]
 
     await view.start(preview)
     await view.wait()
@@ -599,41 +589,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         await ctx.edit_last_response(components=[])
         return
 
-    req = requests.get(f"{base_url}/at-home/server/{data['first']['id']}", timeout=10)
-    if not req.ok:
-        raise RequestsFailedError
-
-    r_json = req.json()
-    pages = []
-
-    for page in r_json["chapter"]["data"]:
-        pages.append(
-            hk.Embed(title=title, color=0xFF6740)
-            .set_image(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
-            .set_footer(
-                "Fetched via: MangaDex",
-                icon="https://avatars.githubusercontent.com/u/100574686?s=280&v=4",
-            )
-        )
-    pages.append(
-        hk.Embed(title=title, url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1")
-        .set_image(response["coverImage"]["large"])
-        .set_author(
-            name="Click here to continue reading",
-            url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1",
-        )
-    )
-    buttons = [
-        nav.PrevButton(
-            style=hk.ButtonStyle.SECONDARY,
-            emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
-        ),
-        nav.IndicatorButton(),
-        nav.NextButton(
-            style=hk.ButtonStyle.SECONDARY,
-            emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
-        ),
-    ]
+    ctx.bot.d.chapter_data = (base_url, data['first']['id'])
     # await ctx.respond("lul", components = view, flags=hk.MessageFlag.EPHEMERAL)
     navigator = nav.NavigatorView(pages=pages, buttons=buttons)
     await navigator.send(ctx.channel_id)
@@ -660,9 +616,13 @@ async def animemenu(ctx: lb.MessageContext):
 
 
 @al_listener.command
-@lb.option("filter", "Filter the type of anime to fetch", required=False)
+@lb.option(
+    "filter", 
+    "Filter the type of anime to fetch", 
+    choices = ["airing", "upcoming", "bypopularity", "favorite"],
+    required=False)
 @lb.command("top", "Find top anime on MAL", pass_options=True)
-@lb.implements(lb.PrefixCommand)
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
 async def topanime(ctx: lb.PrefixContext, filter: str = None):
     """Find the top anime on AL
 
@@ -675,7 +635,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
     """
 
     if filter and filter in ["airing", "upcoming", "bypopularity", "favorite"]:
-        num = 10
+        num = 5
     else:
         num = 5
         filter = "anime"

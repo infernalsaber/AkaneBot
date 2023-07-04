@@ -51,7 +51,13 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
             timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("lookup", "Look up details on any anime, manga or character")
-        .add_field("plot", "Make cool graph-y shit on the popularity of airing anime"),
+        .add_field("plot", "Make cool graph-y shit on the popularity of airing anime")
+        .set_thumbnail(
+            (
+                "https://media.discordapp.net/attachments/980479966389096460"
+                "/1125810202277597266/rubyhelp.png?width=663&height=662"
+            )
+        ),
         
         hk.Embed(
             title="Lookup Command help",
