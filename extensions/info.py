@@ -18,6 +18,8 @@ info_plugin = lb.Plugin("Info", "Get information about an entity")
 
 
 @info_plugin.command
+@lb.add_cooldown(10, 1, lb.UserBucket)
+@lb.add_cooldown(15, 2, lb.ChannelBucket)
 @lb.command("botinfo", "Get general info about the bot", aliases=["info"])
 @lb.implements(lb.PrefixCommand)
 async def botinfo(ctx: lb.Context) -> None:

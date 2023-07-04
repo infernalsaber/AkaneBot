@@ -3,7 +3,7 @@ import io
 from typing import Literal, Union, Optional
 import requests
 from PIL import Image
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
 
 
 import hikari as hk
@@ -14,7 +14,7 @@ import miru
 def preview_maker(base_url, data_id, title, manga_id, cover):
     req = requests.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
     if not req.ok:
-        raise RequestsFailedError
+        return
 
     r_json = req.json()
     pages = []
@@ -219,16 +219,26 @@ class PreviewButton(nav.NavButton):
         # await ctx.respond("Testx")
         # view = self.view
         # self.view.clear_items()
-        try:
-            print("MID: ", self.view.message_id)
-        except:
-            pass
+        # try:
+        #     print("MID: ", self.view.message_id)
+        # except:
+        #     pass
         data = ctx.bot.d.chapter_info[self.view.message_id]
-        print(data)
-        await self.view.swap_pages(ctx, preview_maker(
-            data[0], data[1], data[2], data[3], data[4]
+        # print(data)
+        try:
+            await self.view.swap_pages(ctx, preview_maker(
+                data[0], data[1], data[2], data[3], data[4]
+                )
             )
-        )
+        except:
+            await ctx.respond(
+                (
+                    f"Looks like MD doesn't have this series" 
+                    f"{hk.Emoji.parse('<:AkaneBow:1109245003823317052:a>')}."
+                    f"\nThat or some unknown error."
+                )
+            )
+            return
 
         self.view.add_item(nav.PrevButton(
             style=hk.ButtonStyle.SECONDARY,
