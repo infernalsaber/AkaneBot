@@ -50,7 +50,7 @@ def setup_logging() -> None:
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
     intents=hk.Intents.ALL,
-    prefix=["-", ";"],
+    prefix=["-"],
     help_class=None,
     logs="DEBUG",
     owner_ids=[1002964172360929343, 701090852243505212],
@@ -68,7 +68,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
 
     bot.d.aio_session = aiohttp.ClientSession()
     bot.d.timeup = datetime.datetime.now().astimezone()
-    # bot.d.members = 0
+    bot.d.chapter_info = {}
     if not os.path.exists("logs"):
         os.mkdir("logs")
         os.mkdir("pictures")
@@ -159,5 +159,5 @@ if __name__ == "__main__":
 
     bot.run(
         status=hk.Status.IDLE,
-        activity=hk.Activity(name="for the top actress spot", type=hk.ActivityType.COMPETING),
+        activity=hk.Activity(name="Competing for the top actress spot | -help", type=hk.ActivityType.CUSTOM),
     )
