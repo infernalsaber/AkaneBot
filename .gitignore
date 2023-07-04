@@ -1,0 +1,7 @@
+_under_test/
+extensions/__pycache__/
+functions/__pycache__
+logs/
+pictures/
+
+.env
