@@ -44,15 +44,15 @@ def setup_logging() -> None:
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
     # set logging level to info
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(logging.DEBUG)
 
 
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
     intents=hk.Intents.ALL_UNPRIVILEGED | hk.Intents.MESSAGE_CONTENT,
-    prefix=["-"],
+    prefix=[","],
     help_class=None,
-    logs="DEBUG",
+    logs="INFO",
     owner_ids=[1002964172360929343, 701090852243505212],
 )
 
@@ -159,5 +159,5 @@ if __name__ == "__main__":
 
     bot.run(
         status=hk.Status.IDLE,
-        activity=hk.Activity(name="Competing for the top actress spot | -help", type=hk.ActivityType.CUSTOM),
+        activity=hk.Activity(name="『Idol』 | -help", type=hk.ActivityType.LISTENING),
     )

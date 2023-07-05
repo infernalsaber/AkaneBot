@@ -1,6 +1,6 @@
 """The animanga related plugin"""
 import re
-from datetime import datetime
+import datetime
 import requests
 
 
@@ -9,15 +9,84 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
+import pprint
+import logging
 
 from functions.buttons import GenericButton, PreviewButton
 from functions.errors import RequestsFailedError
 
+import typing as t
 
-# TDL
-# 1. Change the resolution of images gotten for preview (check: shorturl.at/qwHV6)✅
-# 2. Make it refer to the original message (info embed)🌊
-# 3. Custom navigator buttons (inc. kill button) 〰
+class CustomNavi(nav.NavigatorView):
+    def __init__(
+        self, *,
+        pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
+        buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
+        timeout: t.Optional[t.Union[float, int, datetime.timedelta]] = 180.0,
+        user_id: hk.Snowflake = None,
+    ) -> None:
+        self.user_id = user_id
+        super().__init__(pages=pages, buttons=buttons, timeout=timeout)
+
+
+class TrailerButton(nav.NavButton):
+    """A custom next button class"""
+
+    def __init__(
+        self,
+        *,
+        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        label: t.Optional[str] = "Trailer",
+        custom_id: t.Optional[str] = None,
+        emoji: t.Union[hk.Emoji, str, None] = hk.Emoji.parse(
+            "<a:youtube:1074307805235920896>"
+        ),
+        row: t.Optional[int] = None,
+        trailer: str = None,
+        other_page: t.Union[hk.Embed, str] = None
+    ):
+        self.trailer = trailer
+        self.other_page = other_page
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
+        )
+
+    async def callback(self, ctx: miru.ViewContext):
+        if not ctx.author.id == self.view.user_id:
+            return
+        if self.label == "🔍":
+            await self.view.swap_pages(ctx, self.other_page)
+            self.label = "Trailer"
+            self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
+  
+            await ctx.edit_response(components=self.view)
+
+
+            # print("Items removed")
+            return
+        # await ctx.respond("Testx")
+        # view = self.view
+        # self.view.clear_items()
+        # try:
+        #     print("MID: ", self.view.message_id)
+        # except:
+        #     pass
+        # data = ctx.bot.d.chapter_info[self.view.message_id]
+        # print(data)
+        # try:
+        await self.view.swap_pages(ctx, [self.trailer])
+
+
+        self.label = "🔍"
+        self.emoji = None
+        await ctx.edit_response(components=self.view)
+        # self.view.add_item(
+
+    async def before_page_change(self) -> None:
+        ...
+    
+    async def on_timeout(self, ctx: miru.ViewContext) -> None:
+        await ctx.edit_response(components=[])
 
 
 al_listener = lb.Plugin(
@@ -137,7 +206,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                 embed=hk.Embed(
                     description="\n\n",
                     color=0x2B2D42,
-                    timestamp=datetime.now().astimezone(),
+                    timestamp=datetime.datetime.now().astimezone(),
                 )
                 .add_field("Rating", response["averageScore"])
                 .add_field("Genres", ",".join(response["genres"]))
@@ -213,6 +282,11 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     status
     description (asHtml: false)
     siteUrl
+    trailer {
+        id
+        site
+        thumbnail
+    }
   }
 }
 
@@ -291,26 +365,60 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         response["description"] = "NA"
 
     if type == "ANIME":
-        await ctx.respond(
-            embed=hk.Embed(
-                description="\n\n",
-                color=0x2B2D42,
-                timestamp=datetime.now().astimezone(),
-            )
-            .add_field("Rating", response["averageScore"])
-            .add_field("Genres", ",".join(response["genres"]))
-            .add_field("Status", response["status"], inline=True)
-            .add_field("Episodes", no_of_items, inline=True)
-            .add_field("Summary", response["description"])
-            .set_thumbnail(response["coverImage"]["large"])
-            .set_image(response["bannerImage"])
-            .set_author(url=response["siteUrl"], name=title)
-            .set_footer(
-                text="Source: AniList",
-                icon="https://i.imgur.com/NYfHiuu.png",
-            )
+        # await ctx.respond(
+        pages=[hk.Embed(
+            description="\n\n",
+            color=0x2B2D42,
+            timestamp=datetime.datetime.now().astimezone(),
         )
-        return
+        .add_field("Rating", response["averageScore"])
+        .add_field("Genres", ",".join(response["genres"]))
+        .add_field("Status", response["status"], inline=True)
+        .add_field("Episodes", no_of_items, inline=True)
+        .add_field("Summary", response["description"])
+        .set_thumbnail(response["coverImage"]["large"])
+        .set_image(response["bannerImage"])
+        .set_author(url=response["siteUrl"], name=title)
+        .set_footer(
+            text="Source: AniList",
+            icon="https://i.imgur.com/NYfHiuu.png",
+        )
+        ]
+        trailer = "Couldn't find anything."
+        
+        if response["trailer"]["site"] == 'youtube':
+            trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
+        else:
+            trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
+        
+        buttons = [
+            TrailerButton(
+                trailer=trailer, other_page=pages)
+        ]
+        navigator = CustomNavi(
+            pages=pages, 
+            buttons=buttons, 
+            timeout=180,
+            user_id=ctx.author.id)
+    # await ctx.edit_last_response("checkingx2")
+
+    # await ctx.respond(components=navigator)
+
+    # await ctx.respond("ok", flags=hk.MessageFlag.EPHEMERAL)
+        if isinstance(ctx, lb.SlashContext):
+            await navigator.send(
+            ctx.interaction,
+            # ephemeral=True,
+            # flags=hk.MessageFlag.EPHEMERAL
+            )
+        else:
+            await navigator.send(
+                ctx.channel_id,
+                # ephemeral=True,
+                # flags=hk.MessageFlag.EPHEMERAL
+                )
+            # )
+            return
 
     if type == "character":
         await search_character(ctx, media)
@@ -353,7 +461,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     # preview = await ctx.respond(
     #     embed=hk.Embed(
-    #         description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+    #         description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
     #     )
     #     .add_field("Rating", response["averageScore"])
     #     .add_field("Genres", ",".join(response["genres"]))
@@ -391,7 +499,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     
     pages = [
         hk.Embed(
-            description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+            description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("Rating", response["averageScore"])
         .add_field("Genres", ",".join(response["genres"]))
@@ -426,16 +534,30 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     # print("\n\n", base_url, data['first']['id'], title, manga_id, "\n\n")
     # print(ctx.bot.d.chapter_info)
-    navigator = nav.NavigatorView(pages=pages, buttons=buttons)
+    # await ctx.respond("checking")
+    navigator = CustomNavi(
+        pages=pages, 
+        buttons=buttons, 
+        timeout=180,
+        user_id=ctx.author.id)
+    # await ctx.edit_last_response("checkingx2")
 
     # await ctx.respond(components=navigator)
 
     # await ctx.respond("ok", flags=hk.MessageFlag.EPHEMERAL)
-    await navigator.send(
-        ctx.channel_id,
+    if isinstance(ctx, lb.SlashContext):
+        await navigator.send(
+        ctx.interaction,
         # ephemeral=True,
         # flags=hk.MessageFlag.EPHEMERAL
         )
+    else:
+        await navigator.send(
+            ctx.channel_id,
+            # ephemeral=True,
+            # flags=hk.MessageFlag.EPHEMERAL
+            )
+
     print("NavigatoID", navigator.message_id)
     ctx.bot.d.chapter_info[navigator.message_id] = [
         base_url, 
@@ -455,7 +577,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
 async def search_animanga(ctx: lb.Context, type: str, media: str):
     """Search an animanga on AL"""
-    # timenow = datetime.now().timestamp()
+    # timenow = datetime.datetime.now().timestamp()
 
     query = """
 query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used (id)
@@ -516,7 +638,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             embed=hk.Embed(
                 description="\n\n",
                 color=0x2B2D42,
-                timestamp=datetime.now().astimezone(),
+                timestamp=datetime.datetime.now().astimezone(),
             )
             .add_field("Rating", response["averageScore"])
             .add_field("Genres", ",".join(response["genres"]))
@@ -567,7 +689,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     preview = await ctx.respond(
         embed=hk.Embed(
-            description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+            description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("Rating", response["averageScore"])
         .add_field("Genres", ",".join(response["genres"]))
@@ -587,11 +709,11 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         ),
         components=view,
     )
-    # print("\n\nTime is ", datetime.now().timestamp() - t1, "s\n\n")
+    # print("\n\nTime is ", datetime.datetime.now().timestamp() - t1, "s\n\n")
 
     info_page = [
         hk.Embed(
-            description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+            description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("Rating", response["averageScore"])
         .add_field("Genres", ",".join(response["genres"]))
@@ -670,16 +792,22 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
     Raises:
         RequestsFailedError: Raised if the API call fails
     """
-
+    num = 5
     if filter and filter in ["airing", "upcoming", "bypopularity", "favorite"]:
-        num = 5
+        params = {"limit": num, "filter": filter}
     else:
-        num = 5
-        filter = "anime"
+        params = {"limit": num}
+
+    if filter in ["upcoming"]:
+        await ctx.respond(
+            f"Filter is currently broken"
+        )
+        return
 
     async with ctx.bot.d.aio_session.get(
-        "https://api.jikan.moe/v4/top/anime", params={"limit": num, "filter": filter}
+        "https://api.jikan.moe/v4/top/anime", params=params
     ) as res:
+        # pprint.pprint(res.json())
         if res.ok:
             res = await res.json()
             embed = (
@@ -690,7 +818,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
                     icon="https://i.imgur.com/deFPj7Z.png",
                 )
             )
-
+            
             for i, item in enumerate(res["data"]):
                 embed.add_field(
                     f"{i+1}.",
@@ -798,7 +926,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
 
     await ctx.respond(
         embed=hk.Embed(
-            description="\n\n", color=0x2B2D42, timestamp=datetime.now().astimezone()
+            description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("Gender", response["gender"])
         .add_field("DOB", dob, inline=True)

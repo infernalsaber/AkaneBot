@@ -102,8 +102,8 @@ plot_plugin = lb.Plugin(
 
 
 @plot_plugin.command
-@lb.add_cooldown(10, 1, lb.UserBucket)
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
+@lb.add_cooldown(3, 1, lb.GuildBucket)
 @lb.option(
     "query",
     "The names of the series(') to plot",
@@ -245,7 +245,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 yaxis_title="Trend Value",
                 template="plotly_dark",
             )
-
+        
         fig.update_yaxes(title_text="Score", secondary_y=True)
         img_bytes = fig.to_image(format="png")
         Image.open(io.BytesIO(img_bytes)).save(f"pictures/{query}.png")

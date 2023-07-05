@@ -45,7 +45,7 @@ async def botinfo(ctx: lb.Context) -> None:
 
     response = await ctx.respond(
         hk.Embed(
-            color=0x00FFFF,
+            color=0x43408A,
             description="A multi-purpose discord bot \
                 written in hikari-py.",
         )
