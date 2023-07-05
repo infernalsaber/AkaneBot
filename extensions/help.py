@@ -15,6 +15,8 @@ from typing import Optional
 import datetime
 
 from functions.buttons import KillNavButton, CustomNextButton, CustomPrevButton
+from functions.utils import CustomNavi
+
 from miru.ext import nav
 
 
@@ -99,7 +101,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\nEg. `-top airing` would show the top 5 airing anime"
             ),
             colour=0x43408A,
-            timestamp=datetime.datetime.now().astimezone()
+            # timestamp=datetime.datetime.now().astimezone()
         )
         ,
         hk.Embed(
@@ -121,7 +123,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         KillNavButton()
     ]
 
-    navigator = nav.NavigatorView(pages=pages, buttons=buttons)
+    navigator = CustomNavi(pages=pages, buttons=buttons, user_id=ctx.author.id)
     
     # print("Time is ", time.time()-timeInit)
     # await navigator.send(ctx.channel_id)
