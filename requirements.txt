@@ -9,3 +9,4 @@ aiohttp==3.8.3
 plotly==5.11.0
 isodate==0.6.1
 psutil
+pillow
