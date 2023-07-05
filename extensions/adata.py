@@ -12,81 +12,14 @@ from miru.ext import nav
 import pprint
 import logging
 
-from functions.buttons import GenericButton, PreviewButton
+from functions.buttons import GenericButton, PreviewButton, TrailerButton, KillButton
 from functions.errors import RequestsFailedError
-
-import typing as t
-
-class CustomNavi(nav.NavigatorView):
-    def __init__(
-        self, *,
-        pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
-        buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
-        timeout: t.Optional[t.Union[float, int, datetime.timedelta]] = 180.0,
-        user_id: hk.Snowflake = None,
-    ) -> None:
-        self.user_id = user_id
-        super().__init__(pages=pages, buttons=buttons, timeout=timeout)
+from functions.utils import CustomNavi
 
 
-class TrailerButton(nav.NavButton):
-    """A custom next button class"""
-
-    def __init__(
-        self,
-        *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
-        label: t.Optional[str] = "Trailer",
-        custom_id: t.Optional[str] = None,
-        emoji: t.Union[hk.Emoji, str, None] = hk.Emoji.parse(
-            "<a:youtube:1074307805235920896>"
-        ),
-        row: t.Optional[int] = None,
-        trailer: str = None,
-        other_page: t.Union[hk.Embed, str] = None
-    ):
-        self.trailer = trailer
-        self.other_page = other_page
-        super().__init__(
-            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
-        )
-
-    async def callback(self, ctx: miru.ViewContext):
-        if not ctx.author.id == self.view.user_id:
-            return
-        if self.label == "🔍":
-            await self.view.swap_pages(ctx, self.other_page)
-            self.label = "Trailer"
-            self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
-  
-            await ctx.edit_response(components=self.view)
 
 
-            # print("Items removed")
-            return
-        # await ctx.respond("Testx")
-        # view = self.view
-        # self.view.clear_items()
-        # try:
-        #     print("MID: ", self.view.message_id)
-        # except:
-        #     pass
-        # data = ctx.bot.d.chapter_info[self.view.message_id]
-        # print(data)
-        # try:
-        await self.view.swap_pages(ctx, [self.trailer])
 
-
-        self.label = "🔍"
-        self.emoji = None
-        await ctx.edit_response(components=self.view)
-        # self.view.add_item(
-
-    async def before_page_change(self) -> None:
-        ...
-    
-    async def on_timeout(self, ctx: miru.ViewContext) -> None:
-        await ctx.edit_response(components=[])
 
 
 al_listener = lb.Plugin(
@@ -195,6 +128,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                     f"Nvm 😵, error `code: {response.status_code}`"
                 )
                 return
+            print("\n\n",response.json()['data']['page']['Media'], "\n\n")
             response = response.json()["data"]["Media"]
 
             title = response["title"]["english"] or response["title"]["romaji"]
@@ -208,7 +142,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                     color=0x2B2D42,
                     timestamp=datetime.datetime.now().astimezone(),
                 )
-                .add_field("Rating", response["averageScore"])
+                .add_field("Rating", response["meanScore"])
                 .add_field("Genres", ",".join(response["genres"]))
                 .add_field("Status", response["status"], inline=True)
                 .add_field(
@@ -258,7 +192,8 @@ async def al_search(ctx: lb.Context, type: str, media: str) -> None:
 
     query = ["""
 query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used (id)
-  Media (id: $id, search: $search, type: $type) { # The sort param was POPULARITY_DESC
+  Page (perPage: 5) {
+  media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # The sort param was POPULARITY_DESC
     id
     idMal
     title {
@@ -288,40 +223,43 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         thumbnail
     }
   }
+  }
 }
 
 """
 ,
 """
 query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
-    id
-    idMal
-    title {
-        english
-        romaji
+    Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+        id
+        idMal
+        title {
+            english
+            romaji
+        }
+        type
+        averageScore
+        format
+        meanScore
+        chapters
+        episodes
+        startDate {
+            year
+        }
+        coverImage {
+            large
+        }
+        bannerImage
+        genres
+        status
+        description (asHtml: false)
+        siteUrl
     }
-    type
-    averageScore
-    format
-    meanScore
-    chapters
-    episodes
-    startDate {
-        year
     }
-    coverImage {
-        large
-    }
-    bannerImage
-    genres
-    status
-    description (asHtml: false)
-    siteUrl
-  }
-}
 
-"""]
+"""
+]
+    print("Type is", type)
 
     if type.lower() in ["anime", "manga", "m", "a"]:
         if type[0].lower() == "m":
@@ -331,10 +269,15 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             type = "ANIME"
             query = query[0]
 
-    elif type in ["character", "c"]:
+    elif type.lower() in ["character", "c"]:
         # pass
         await search_character(ctx, media)
         return
+
+    elif type.lower() in ["novel", "n"]:
+        await search_novel(ctx, media)
+        return
+
     else:
         await ctx.respond("Invalid media type. Please use anime(a), manga(m) or character(c)")
         return
@@ -346,14 +289,58 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         json={"query": query, "variables": variables},
         timeout=10,
     )
-    if response.status_code != 200:
+    
+
+    if not response.ok:
         print(response.json())
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
         return
-    response = response.json()["data"]["Media"]
 
+    if type == "ANIME":
+        view = miru.View()
+        embed = hk.Embed(title="Choose the desired anime")
+        # for item in response.json()['data']['Page']['media']:
+        # await ctx.respond("oomphie")
+        # print(response.json()['data']['Page']['media'])
+        for count, item in enumerate(response.json()['data']['Page']['media']):
+            # print("\n")
+            # print(item)
+            embed.add_field(count+1, item['title']['english'])
+            view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=f"{count+1}"))
+            # await ctx.respond("making bed")
+
+        # view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
+        # await ctx.respond("bed")
+        
+        choice = await ctx.respond(embed=embed, components=view)
+
+        await view.start(choice)
+        await view.wait()
+        num = 0
+        # view.from_message(message)
+        if hasattr(view, "answer"):  # Check if there is an answer
+            # print(type(view.answer))
+            print(f"Received an answer! It is: {view.answer}")
+            num = f"{view.answer}"
+            await ctx.delete_last_response()
+        else:
+            await ctx.edit_last_response("Process timed out.", embeds=[], views=[])
+            return
+        
+        num = int(num)-1
+    # print(isinstance(num, int))
+    # print(response.json()['data']['Page']['media'][0])
+        response = response.json()['data']['Page']['media'][num]
+    # num = int(view.answer) - 1
+    # print(type(num))
+
+    if type == "MANGA":
+        response = response.json()["data"]["Media"]
+        print(response)
+    
+    # print(isinstance(response, dict))
     title = response["title"]["english"] or response["title"]["romaji"]
 
     no_of_items = response["chapters"] or response["episodes"] or "NA"
@@ -363,7 +350,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
  
     else:
         response["description"] = "NA"
-
+    print("response parsed ig")
     if type == "ANIME":
         # await ctx.respond(
         pages=[hk.Embed(
@@ -371,7 +358,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             color=0x2B2D42,
             timestamp=datetime.datetime.now().astimezone(),
         )
-        .add_field("Rating", response["averageScore"])
+        .add_field("Rating", response["meanScore"])
         .add_field("Genres", ",".join(response["genres"]))
         .add_field("Status", response["status"], inline=True)
         .add_field("Episodes", no_of_items, inline=True)
@@ -501,7 +488,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         hk.Embed(
             description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
-        .add_field("Rating", response["averageScore"])
+        .add_field("Rating", response["meanScore"])
         .add_field("Genres", ",".join(response["genres"]))
         .add_field("Status", response["status"], inline=True)
         .add_field(
@@ -640,7 +627,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                 color=0x2B2D42,
                 timestamp=datetime.datetime.now().astimezone(),
             )
-            .add_field("Rating", response["averageScore"])
+            .add_field("Rating", response["meanScore"])
             .add_field("Genres", ",".join(response["genres"]))
             .add_field("Status", response["status"], inline=True)
             .add_field("Episodes", no_of_items, inline=True)
@@ -691,7 +678,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         embed=hk.Embed(
             description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
-        .add_field("Rating", response["averageScore"])
+        .add_field("Rating", response["meanScore"])
         .add_field("Genres", ",".join(response["genres"]))
         .add_field("Status", response["status"], inline=True)
         .add_field(
@@ -715,7 +702,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         hk.Embed(
             description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
-        .add_field("Rating", response["averageScore"])
+        .add_field("Rating", response["meanScore"])
         .add_field("Genres", ",".join(response["genres"]))
         .add_field("Status", response["status"], inline=True)
         .add_field(
@@ -941,7 +928,86 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
     )
     return
 
+async def search_novel(ctx: lb.Context, novel: str):
+    query = """
+query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
+  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC, format_in: [NOVEL]) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+    id
+    idMal
+    title {
+        english
+        romaji
+    }
+    type
+    averageScore
+    format
+    meanScore
+    chapters
+    episodes
+    startDate {
+        year
+    }
+    coverImage {
+        large
+    }
+    bannerImage
+    genres
+    status
+    description (asHtml: false)
+    siteUrl
+  }
+}
 
+"""
+    print("\n\nNOVEL SEARCH\n\n")
+    variables = {"search": novel, "type": "MANGA"}
+
+    response = requests.post(
+        "https://graphql.anilist.co",
+        json={"query": query, "variables": variables},
+        timeout=10,
+    )
+    print(response.json())
+
+    if not response.ok:
+        print(response.json())
+        await ctx.respond(
+            f"Failed to fetch data 😵, error `code: {response.status_code}`"
+        )
+        return
+    response = response.json()["data"]["Media"]
+
+    title = response["title"]["english"] or response["title"]["romaji"]
+
+    no_of_items = response["chapters"] or response["episodes"] or "NA"
+
+    if response["description"]:
+        response["description"] = parse_description(response["description"])
+ 
+    else:
+        response["description"] = "NA"
+    
+
+    await ctx.respond(embed=hk.Embed(
+            description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
+        )
+        .add_field("Rating", response["meanScore"])
+        .add_field("Genres", ",".join(response["genres"]))
+        .add_field("Status", response["status"], inline=True)
+        .add_field(
+            "Volumes",
+            no_of_items,
+            inline=True,
+        )
+        .add_field("Summary", response["description"])
+        .set_thumbnail(response["coverImage"]["large"])
+        .set_image(response["bannerImage"])
+        .set_author(url=response["siteUrl"], name=title)
+        .set_footer(
+            text="Source: AniList",
+            icon="https://i.imgur.com/NYfHiuu.png",
+        )
+    )
 # @al_listener.command
 # @lb.option("character", "character")
 # @lb.command("luc", "Search a chara", pass_options=True)

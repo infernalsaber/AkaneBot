@@ -28,6 +28,9 @@ def preview_maker(base_url, data_id, title, manga_id, cover):
                 icon="https://avatars.githubusercontent.com/u/100574686?s=280&v=4",
             )
         )
+    # Kill the process if there are no pages
+    if len(pages) == 0:
+        return
     pages.append(
         hk.Embed(title=title, url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1")
         .set_image(cover)
@@ -79,6 +82,8 @@ class KillNavButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
+        if not ctx.author.id == self.view.user_id:
+            return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
         await ctx.bot.rest.edit_message(
             ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
@@ -111,6 +116,8 @@ class CustomPrevButton(nav.NavButton):
         #     self.view.current_page = int(page)
 
     async def callback(self, ctx: miru.ViewContext):
+        if not ctx.author.id == self.view.user_id:
+            return
         if self.view.current_page == 0:
             self.view.current_page = len(self.view.pages) - 1
         else:
@@ -142,6 +149,8 @@ class CustomNextButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext):
+        if not ctx.author.id == self.view.user_id:
+            return
         if self.view.current_page == len(self.view.pages) - 1:
             self.view.current_page = 0
         else:
@@ -233,20 +242,20 @@ class PreviewButton(nav.NavButton):
         except:
             await ctx.respond(
                 (
-                    f"Looks like MD doesn't have this series" 
-                    f"{hk.Emoji.parse('<:AkaneBow:1109245003823317052:a>')}."
+                    f"Looks like MD doesn't have this series " 
+                    f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}."
                     f"\nThat or some unknown error."
                 )
             )
             return
 
-        self.view.add_item(nav.PrevButton(
+        self.view.add_item(CustomPrevButton(
             style=hk.ButtonStyle.SECONDARY,
             emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
             )
         )
         self.view.add_item(nav.IndicatorButton())
-        self.view.add_item(nav.NextButton(
+        self.view.add_item(CustomNextButton(
             style=hk.ButtonStyle.SECONDARY,
             emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
             )
@@ -267,3 +276,75 @@ class PreviewButton(nav.NavButton):
         await ctx.edit_response(components=[])
 
 
+class TrailerButton(nav.NavButton):
+    """A custom next button class"""
+
+    def __init__(
+        self,
+        *,
+        style: Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        label: Optional[str] = "Trailer",
+        custom_id: Optional[str] = None,
+        emoji: Union[hk.Emoji, str, None] = hk.Emoji.parse(
+            "<a:youtube:1074307805235920896>"
+        ),
+        row: Optional[int] = None,
+        trailer: str = None,
+        other_page: Union[hk.Embed, str] = None
+    ):
+        self.trailer = trailer
+        self.other_page = other_page
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
+        )
+
+    async def callback(self, ctx: miru.ViewContext):
+        if not ctx.author.id == self.view.user_id:
+            return
+        if self.label == "🔍":
+            await self.view.swap_pages(ctx, self.other_page)
+            self.label = "Trailer"
+            self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
+  
+            await ctx.edit_response(components=self.view)
+
+
+            # print("Items removed")
+            return
+        # await ctx.respond("Testx")
+        # view = self.view
+        # self.view.clear_items()
+        # try:
+        #     print("MID: ", self.view.message_id)
+        # except:
+        #     pass
+        # data = ctx.bot.d.chapter_info[self.view.message_id]
+        # print(data)
+        # try:
+        await self.view.swap_pages(ctx, [self.trailer])
+
+
+        self.label = "🔍"
+        self.emoji = None
+        await ctx.edit_response(components=self.view)
+        # self.view.add_item(
+
+    async def before_page_change(self) -> None:
+        ...
+    
+    async def on_timeout(self, ctx: miru.ViewContext) -> None:
+        await ctx.edit_response(components=[])
+    
+class KillButton(miru.Button):
+    """A custom next kill class"""
+
+    # Let's leave our arguments dynamic this time, instead of hard-coding them
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
+        # await ctx.bot.rest.edit_message(
+        #     ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
+        # )
+        self.view.stop()

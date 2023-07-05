@@ -74,13 +74,16 @@ async def on_starting(event: hk.StartingEvent) -> None:
         os.mkdir("pictures")
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
         pass
+    with open("ded.txt", "w+", encoding="UTF-8"):
+        pass
     setup_logging()
 
 
 @bot.listen()
 async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
-    ...
+    with open("ded.txt", "a", encoding="UTF-8") as ded:
+        ded.write(".")
 
 
 
