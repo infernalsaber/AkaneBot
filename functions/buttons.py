@@ -60,6 +60,15 @@ class GenericButton(miru.Button):
         super().__init__(*args, **kwargs)
 
     async def callback(self, ctx: miru.ViewContext) -> None:
+        if not ctx.author.id == self.view.user_id:
+            await ctx.respond(
+                (
+                    "You can't interact with this button as " 
+                    "you are not the invoker of the command."
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
+            )
+            return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
         self.view.answer = self.label
         self.view.stop()
@@ -83,6 +92,13 @@ class KillNavButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         if not ctx.author.id == self.view.user_id:
+            await ctx.respond(
+                (
+                    "You can't interact with this button as " 
+                    "you are not the invoker of the command."
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
+            )
             return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
         await ctx.bot.rest.edit_message(
@@ -117,6 +133,13 @@ class CustomPrevButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext):
         if not ctx.author.id == self.view.user_id:
+            await ctx.respond(
+                (
+                    "You can't interact with this button as " 
+                    "you are not the invoker of the command."
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
+            )
             return
         if self.view.current_page == 0:
             self.view.current_page = len(self.view.pages) - 1
@@ -150,6 +173,13 @@ class CustomNextButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext):
         if not ctx.author.id == self.view.user_id:
+            await ctx.respond(
+                (
+                    "You can't interact with this button as " 
+                    "you are not the invoker of the command."
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
+            )
             return
         if self.view.current_page == len(self.view.pages) - 1:
             self.view.current_page = 0
@@ -232,9 +262,9 @@ class PreviewButton(nav.NavButton):
         #     print("MID: ", self.view.message_id)
         # except:
         #     pass
-        data = ctx.bot.d.chapter_info[self.view.message_id]
         # print(data)
         try:
+            data = ctx.bot.d.chapter_info[self.view.message_id]
             await self.view.swap_pages(ctx, preview_maker(
                 data[0], data[1], data[2], data[3], data[4]
                 )
@@ -245,7 +275,8 @@ class PreviewButton(nav.NavButton):
                     f"Looks like MD doesn't have this series " 
                     f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}."
                     f"\nThat or some unknown error."
-                )
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
             )
             return
 
@@ -300,7 +331,15 @@ class TrailerButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext):
         if not ctx.author.id == self.view.user_id:
+            await ctx.respond(
+                (
+                    "You can't interact with this button as " 
+                    "you are not the invoker of the command."
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
+            )
             return
+
         if self.label == "🔍":
             await self.view.swap_pages(ctx, self.other_page)
             self.label = "Trailer"

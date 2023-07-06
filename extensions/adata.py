@@ -14,7 +14,7 @@ import logging
 
 from functions.buttons import GenericButton, PreviewButton, TrailerButton, KillButton
 from functions.errors import RequestsFailedError
-from functions.utils import CustomNavi
+from functions.utils import CustomNavi, CustomView
 
 
 
@@ -299,7 +299,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         return
 
     if type == "ANIME":
-        view = miru.View()
+        view = CustomView(user_id=ctx.author.id)
         embed = hk.Embed(title="Choose the desired anime")
         # for item in response.json()['data']['Page']['media']:
         # await ctx.respond("oomphie")
@@ -308,9 +308,13 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             # print("\n")
             # print(item)
             embed.add_field(count+1, item['title']['english'])
-            view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=f"{count+1}"))
+            view.add_item(GenericButton(style=hk.ButtonStyle.PRIMARY, label=f"{count+1}"))
             # await ctx.respond("making bed")
-
+        # img = hk.URL(url="https://i.imgur.com/ZhTgQbq.png")
+        try:
+            embed.set_image("https://i.imgur.com/FCxEHRN.png")
+        except Exception as e:
+            print(e)
         # view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
         # await ctx.respond("bed")
         
@@ -391,21 +395,21 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     # await ctx.respond(components=navigator)
 
-    # await ctx.respond("ok", flags=hk.MessageFlag.EPHEMERAL)
-        if isinstance(ctx, lb.SlashContext):
-            await navigator.send(
-            ctx.interaction,
+    # # await ctx.respond("ok", flags=hk.MessageFlag.EPHEMERAL)
+    #     if isinstance(ctx, lb.SlashContext):
+    #         await navigator.send(
+    #         ctx.interaction,
+    #         # ephemeral=True,
+    #         # flags=hk.MessageFlag.EPHEMERAL
+    #         )
+    #     else:
+        await navigator.send(
+            ctx.channel_id,
             # ephemeral=True,
             # flags=hk.MessageFlag.EPHEMERAL
             )
-        else:
-            await navigator.send(
-                ctx.channel_id,
-                # ephemeral=True,
-                # flags=hk.MessageFlag.EPHEMERAL
-                )
             # )
-            return
+        return
 
     if type == "character":
         await search_character(ctx, media)
@@ -417,30 +421,35 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     req = requests.get(f"{base_url}/manga", params={"title": title}, timeout=10)
 
-    manga_id = req.json()["data"][0]["id"]
+    if req.ok:
+        try:
+            manga_id = req.json()["data"][0]["id"]
 
-    # print(f"The link to the manga is: https://mangadex.org/title/{manga_id}")
+            # print(f"The link to the manga is: https://mangadex.org/title/{manga_id}")
 
-    languages = ["en"]
+            languages = ["en"]
 
-    req = requests.get(
-        f"{base_url}/manga/{manga_id}/aggregate",
-        params={"translatedLanguage[]": languages},
-        timeout=10,
-    )
-    # print(r.status_code)
-    # print(r.json())
-    # print([chapter["id"] for chapter in r.json()["data"]])
-    data = await get_imp_info(req.json())
+            req = requests.get(
+                f"{base_url}/manga/{manga_id}/aggregate",
+                params={"translatedLanguage[]": languages},
+                timeout=10,
+            )
+            # print(r.status_code)
+        # print(r.json())
+        # print([chapter["id"] for chapter in r.json()["data"]])
+            data = await get_imp_info(req.json())
 
-    if no_of_items == "NA":
-        no_of_items = (
-            f"[{data['latest']['chapter'].split('.')[0]}]("
-            f"https://cubari.moe/read/mangadex/{manga_id})"
-        )
+            if no_of_items == "NA":
+                no_of_items = (
+                    f"[{data['latest']['chapter'].split('.')[0]}]("
+                    f"https://cubari.moe/read/mangadex/{manga_id})"
+                )
+            else:
+                no_of_items = f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
+        except:
+            no_of_items = "NA"
     else:
-        no_of_items = f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
-
+        no_of_items = "NA"
     # # view = miru.View()
     # view.add_item(
     #     PreviewButton()
@@ -483,50 +492,52 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     #     await ctx.edit_last_response(components=[])
     #     return
 
-    
-    pages = [
-        hk.Embed(
-            description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
-        )
-        .add_field("Rating", response["meanScore"])
-        .add_field("Genres", ",".join(response["genres"]))
-        .add_field("Status", response["status"], inline=True)
-        .add_field(
-            "Chapters" if response["type"] == "MANGA" else "Episodes",
-            no_of_items,
-            inline=True,
-        )
-        .add_field("Summary", response["description"])
-        .set_thumbnail(response["coverImage"]["large"])
-        .set_image(response["bannerImage"])
-        .set_author(url=response["siteUrl"], name=title)
-        .set_footer(
-            text="Source: AniList",
-            icon="https://i.imgur.com/NYfHiuu.png",
-        )
-    ]
-    # req = requests.Session()
-    # try:
+    try:
+        pages = [
+            hk.Embed(
+                description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
+            )
+            .add_field("Rating", response["meanScore"] or "NA")
+            .add_field("Genres", ",".join(response["genres"]) or "NA")
+            .add_field("Status", response["status"] or "NA", inline=True)
+            .add_field(
+                "Chapters" if response["type"] == "MANGA" else "Episodes",
+                no_of_items or "NA",
+                inline=True,
+            )
+            .add_field("Summary", response["description"] or "NA")
+            .set_thumbnail(response["coverImage"]["large"])
+            .set_image(response["bannerImage"])
+            .set_author(url=response["siteUrl"], name=title)
+            .set_footer(
+                text="Source: AniList",
+                icon="https://i.imgur.com/NYfHiuu.png",
+            )
+        ]
+        # req = requests.Session()
+        # try:
 
-    # os.makedirs(f"./manga/{data['first']['id']}")
-    # from pprint import pprint
-    # pprint(r_json)
-    
-    
-    buttons = [
-        PreviewButton(),
+        # os.makedirs(f"./manga/{data['first']['id']}")
+        # from pprint import pprint
+        # pprint(r_json)
+        
+        
+        buttons = [
+            PreviewButton(),
 
-    ]
-    # await ctx.delete_last_response()
+        ]
+        # await ctx.delete_last_response()
 
-    # print("\n\n", base_url, data['first']['id'], title, manga_id, "\n\n")
-    # print(ctx.bot.d.chapter_info)
-    # await ctx.respond("checking")
-    navigator = CustomNavi(
-        pages=pages, 
-        buttons=buttons, 
-        timeout=180,
-        user_id=ctx.author.id)
+        # print("\n\n", base_url, data['first']['id'], title, manga_id, "\n\n")
+        # print(ctx.bot.d.chapter_info)
+        # await ctx.respond("checking")
+        navigator = CustomNavi(
+            pages=pages, 
+            buttons=buttons, 
+            timeout=180,
+            user_id=ctx.author.id)
+    except Exception as e:
+        print(e)
     # await ctx.edit_last_response("checkingx2")
 
     # await ctx.respond(components=navigator)
@@ -535,6 +546,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     if isinstance(ctx, lb.SlashContext):
         await navigator.send(
         ctx.interaction,
+        responded=True
         # ephemeral=True,
         # flags=hk.MessageFlag.EPHEMERAL
         )
@@ -787,7 +799,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
 
     if filter in ["upcoming"]:
         await ctx.respond(
-            f"Filter is currently broken"
+            "Filter is currently broken <a:AkaneBow:1109245003823317052>"
         )
         return
 
