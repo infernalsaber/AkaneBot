@@ -49,7 +49,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         hk.Embed(
             title="Akane Bot Help Menu",
             description="A discord bot for animanga. \n\n***Commands***",
-            colour=0x43408A,
+            colour=0x000000,
             # timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("lookup", "Look up details on any anime, manga or character")
@@ -60,49 +60,59 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "https://media.discordapp.net/attachments/980479966389096460"
                 "/1125810202277597266/rubyhelp.png?width=663&height=662"
             )
-        ),
+        )
+        .set_image("https://i.imgur.com/LJ1t4wD.png"),
         
         hk.Embed(
             title="Lookup Command help",
             description=(
-                "The command to search for details of any anime, manga or "
-                "character (including an easter egg for the manga lookup)."
+                "Search for details of any anime, manga, novel or "
+                "character."
                 "\nAlias: lu"
                 "\n\nNote: Please enter the full name of the series or character "
                 "to avoid false matches."
                 "\nEg. `-lookup anime oshi no ko` instead of `lookup anime onk`."
-                "\nOptions: \nanime (a) \nmanga (m) \ncharacter (c)"
+                "\n\n**Options** \n_anime (a)_ \n_manga (m)_ \n_novels (n)_ \n_character (c)_"
             ),
-            colour=0x43408A,
+            colour=0x000000,
             # timestamp=datetime.datetime.now().astimezone()
         )
-        # .set_image("https://files.catbox.moe/72cpf3.gif")
+        .set_image("https://i.imgur.com/2nEsM2W.png")
         ,
 
         hk.Embed(
             title="Plot Command help",
             description=(
-                "The command to plot the popularity of one anime during it's runtime"
+                "The command to plot the popularity of one anime during it's runtime "
                 "or compare between two anime in the same season."
                 "\nAlias: p"
-                "\nEg. `-plot oshi no ko` or "
-                "`plot Jigokuraku vs Mashle` to compare "
+                "\nEg."
             ),
-            colour=0x43408A,
+            colour=0x000000,
             # timestamp=datetime.datetime.now().astimezone()
         )
-        # .set_image("https://media.discordapp.net/attachments/1005948828484108340/1125491438801657958/image.png")
+        .add_field("For a single series", "`-plot oshi no ko`")
+        .add_field("To compare two series", "`-plot Jigokuraku vs Mashle`")
+        .set_image("https://i.imgur.com/dTvGa1t.png")
         ,
         hk.Embed(
             title="Top Command help",
             description=(
-                "Get the top MAL anime. "
-                "Can filter by airing, bypopularity, upcoming or favorite"
-                "\nEg. `-top airing` would show the top 5 airing anime"
+                "Get the top 5 anime on MAL. \n"
+                "Can filter the results on various parameters.\n"
+                "Eg. `-top airing` would show the top 5 airing anime\n\n"
+                "**Options**\n"
+                "_airing_: The top rated airing anime\n"
+                "_bypopularity_: The top anime by no. of members\n"
+                "_upcoming_: The top upcoming anime by members\n"
+                "_favorite_: THe most favourited anime\n"
+                
             ),
-            colour=0x43408A,
+            colour=0x000000,
             # timestamp=datetime.datetime.now().astimezone()
         )
+        .set_image("https://i.imgur.com/YdjzGB1.png")
+        
         ,
         hk.Embed(
             title="Utility help",
@@ -111,9 +121,10 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\n\n**ping**: Check the bot's ping"
                 "\n**info**: Bot info"
             ),
-            colour=0x43408A,
+            colour=0x000000,
             # timestamp=datetime.datetime.now().astimezone()
         )
+        .set_image("https://i.imgur.com/nsg3lZJ.png")
     ]
 
     buttons = [
@@ -128,19 +139,26 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
     # print("Time is ", time.time()-timeInit)
     # await navigator.send(ctx.channel_id)
         
-    
+    sendto = None
+    if isinstance(ctx, lb.SlashContext):
+        sendto = ctx.interaction
+    else:
+        sendto = ctx.channel_id
 
     if not query:
-        await navigator.send(ctx.channel_id)
+        await navigator.send(sendto)
    
     elif query in ["lookup", "lu"]:
-        await navigator.send(ctx.channel_id, start_at=1)
+        await navigator.send(sendto, start_at=1)
         
     elif query in ["plot", "p"]:
-        await navigator.send(ctx.channel_id, start_at=2)
+        await navigator.send(sendto, start_at=2)
         
+    elif query in ["top"]:
+        await navigator.send(sendto, start_at=3)
+
     elif query in ["botinfo", "info", "ping"]:
-        await navigator.send(ctx.channel_id, start_at=3)
+        await navigator.send(sendto, start_at=4)
     
     else:
         await ctx.respond("The command you want help for probably doesn't exist")
