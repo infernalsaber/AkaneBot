@@ -297,7 +297,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
         return
-
+    
     if type == "ANIME":
         view = CustomView(user_id=ctx.author.id)
         embed = hk.Embed(title="Choose the desired anime")
@@ -307,7 +307,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         for count, item in enumerate(response.json()['data']['Page']['media']):
             # print("\n")
             # print(item)
-            embed.add_field(count+1, item['title']['english'])
+            embed.add_field(count+1, item['title']['english'] or item['title']['romaji'])
             view.add_item(GenericButton(style=hk.ButtonStyle.PRIMARY, label=f"{count+1}"))
             # await ctx.respond("making bed")
         # img = hk.URL(url="https://i.imgur.com/ZhTgQbq.png")
@@ -340,6 +340,9 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     # num = int(view.answer) - 1
     # print(type(num))
 
+    # if type == "ANIME" and len(response.json()['data']['Page']['media']) == 1:
+    #     response = response.json()['data']['Page']['media'][0]
+
     if type == "MANGA":
         response = response.json()["data"]["Media"]
         print(response)
@@ -362,7 +365,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             color=0x2B2D42,
             timestamp=datetime.datetime.now().astimezone(),
         )
-        .add_field("Rating", response["meanScore"])
+        .add_field("Rating", response["meanScore"] or "NA")
         .add_field("Genres", ",".join(response["genres"]))
         .add_field("Status", response["status"], inline=True)
         .add_field("Episodes", no_of_items, inline=True)
