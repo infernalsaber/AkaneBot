@@ -177,7 +177,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     modifier=lb.commands.OptionModifier.CONSUME_REST,
 )
 @lb.option(
-    "type", "The type of media to search for", choices=["anime", "manga", "character"]
+    "type", "The type of media to search for", choices=["anime", "manga", "novel", "character"]
 )
 @lb.command(
     "lookup",
@@ -299,41 +299,43 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         return
     
     if type == "ANIME":
-        view = CustomView(user_id=ctx.author.id)
-        embed = hk.Embed(title="Choose the desired anime")
-        # for item in response.json()['data']['Page']['media']:
-        # await ctx.respond("oomphie")
-        # print(response.json()['data']['Page']['media'])
-        for count, item in enumerate(response.json()['data']['Page']['media']):
-            # print("\n")
-            # print(item)
-            embed.add_field(count+1, item['title']['english'] or item['title']['romaji'])
-            view.add_item(GenericButton(style=hk.ButtonStyle.PRIMARY, label=f"{count+1}"))
-            # await ctx.respond("making bed")
-        # img = hk.URL(url="https://i.imgur.com/ZhTgQbq.png")
-        try:
-            embed.set_image("https://i.imgur.com/FCxEHRN.png")
-        except Exception as e:
-            print(e)
-        # view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
-        # await ctx.respond("bed")
         
-        choice = await ctx.respond(embed=embed, components=view)
-
-        await view.start(choice)
-        await view.wait()
         num = 0
-        # view.from_message(message)
-        if hasattr(view, "answer"):  # Check if there is an answer
-            # print(type(view.answer))
-            print(f"Received an answer! It is: {view.answer}")
-            num = f"{view.answer}"
-            await ctx.delete_last_response()
-        else:
-            await ctx.edit_last_response("Process timed out.", embeds=[], views=[])
-            return
-        
-        num = int(num)-1
+        if not len(response.json()['data']['Page']['media']) == 1:
+            view = CustomView(user_id=ctx.author.id)
+            embed = hk.Embed(title="Choose the desired anime", color=0x43408A)
+            # for item in response.json()['data']['Page']['media']:
+            # await ctx.respond("oomphie")
+            # print(response.json()['data']['Page']['media'])
+            for count, item in enumerate(response.json()['data']['Page']['media']):
+                # print("\n")
+                # print(item)
+                embed.add_field(count+1, item['title']['english'] or item['title']['romaji'])
+                view.add_item(GenericButton(style=hk.ButtonStyle.PRIMARY, label=f"{count+1}"))
+                # await ctx.respond("making bed")
+            # img = hk.URL(url="https://i.imgur.com/ZhTgQbq.png")
+            try:
+                embed.set_image("https://i.imgur.com/FCxEHRN.png")
+            except Exception as e:
+                print(e)
+            # view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
+            # await ctx.respond("bed")
+            
+            choice = await ctx.respond(embed=embed, components=view)
+
+            await view.start(choice)
+            await view.wait()
+            # view.from_message(message)
+            if hasattr(view, "answer"):  # Check if there is an answer
+                # print(type(view.answer))
+                print(f"Received an answer! It is: {view.answer}")
+                num = f"{view.answer}"
+                await ctx.delete_last_response()
+            else:
+                await ctx.edit_last_response("Process timed out.", embeds=[], views=[])
+                return
+            
+            num = int(num)-1
     # print(isinstance(num, int))
     # print(response.json()['data']['Page']['media'][0])
         response = response.json()['data']['Page']['media'][num]
