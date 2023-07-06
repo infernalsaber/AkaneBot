@@ -273,7 +273,7 @@ class PreviewButton(nav.NavButton):
             await ctx.respond(
                 (
                     f"Looks like MD doesn't have this series " 
-                    f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}."
+                    f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}"
                     f"\nThat or some unknown error."
                 ),
                 flags = hk.MessageFlag.EPHEMERAL
