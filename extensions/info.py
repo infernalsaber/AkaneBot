@@ -9,7 +9,7 @@ import miru
 
 
 from functions.buttons import GenericButton
-
+from functions.utils import CustomView
 
 info_plugin = lb.Plugin("Info", "Get information about an entity")
 
@@ -34,7 +34,7 @@ async def botinfo(ctx: lb.Context) -> None:
         guild_obj = info_plugin.bot.cache.get_guild(guild)
         member = member + guild_obj.member_count
 
-    view = miru.View()
+    view = CustomView(user_id=ctx.author.id)
     view.add_item(
         GenericButton(
             style=hk.ButtonStyle.SECONDARY,
@@ -93,7 +93,7 @@ async def botinfo(ctx: lb.Context) -> None:
                     changes += "\n"
 
                 await ctx.respond(
-                    embed=hk.Embed(description=changes, color=0x00FFFF).set_author(
+                    embed=hk.Embed(description=changes, color=0x43408A).set_author(
                         name="Bot Changelog (Recent)"
                     ),
                     # reply = True,

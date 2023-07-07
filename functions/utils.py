@@ -4,6 +4,8 @@ import hikari as hk
 import datetime
 import miru
 
+from urllib.parse import urlparse
+
 class CustomNavi(nav.NavigatorView):
     def __init__(
         self, *,
@@ -24,3 +26,9 @@ class CustomView(miru.View):
     ) -> None:
         self.user_id = user_id
         super().__init__(autodefer=autodefer, timeout=timeout)
+
+def check_if_url(link: str) -> bool:
+    parsed = urlparse(link)
+    if parsed.scheme and parsed.netloc:
+        return True
+    return False
