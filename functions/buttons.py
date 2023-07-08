@@ -296,7 +296,7 @@ class PreviewButton(nav.NavButton):
             url=f"https://mangadex.org/title/{data[3]}"
             )
         )
-        self.view.add_item(KillNavButton())
+        # self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
         await ctx.edit_response(components=self.view)
@@ -398,8 +398,9 @@ class KillButton(miru.Button):
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
         # await ctx.bot.rest.edit_message(
         #     ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
-        # )
-        await ctx.bot.rest.edit_message(
-            ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
+        # # )
+        # view = self.view
+        # self.view.clear_items()
+        await ctx.edit_response(
+            flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
         )
-        self.view.stop()
