@@ -841,6 +841,7 @@ async def user_al(ctx: lb.PrefixContext, user: str):
 @lb.option(
     "query", 
     "The novel query", 
+    modifier=lb.commands.OptionModifier.CONSUME_REST 
 )
 @lb.command("novel", "Search a novel", pass_options=True, aliases=['novels', 'n'])
 @lb.implements(lb.PrefixCommand)
@@ -850,7 +851,8 @@ async def user_al(ctx: lb.PrefixContext, query: str):
 @al_listener.command
 @lb.option(
     "query", 
-    "The character query", 
+    "The character query",
+    modifier=lb.commands.OptionModifier.CONSUME_REST 
 )
 @lb.command("character", "Search a character", pass_options=True, aliases=['chara'])
 @lb.implements(lb.PrefixCommand)
