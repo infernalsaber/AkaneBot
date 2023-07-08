@@ -77,6 +77,12 @@ async def mangamenu(ctx: lb.MessageContext):
 
 @sauce_plugin.command
 @lb.option(
+    "service",
+    "The service to use to search for it",
+    required=False,
+    choices=["SauceNAO", "TraceMoe"]
+)
+@lb.option(
     "link",
     "The link of the image to find the sauce of",
 )
@@ -84,7 +90,7 @@ async def mangamenu(ctx: lb.MessageContext):
     "sauce", "Show ya sauce for the image", pass_options=True, auto_defer=True
 )
 @lb.implements(lb.SlashCommand)
-async def find_sauce(ctx: lb.Context, link: str) -> None:
+async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
 
     if not check_if_url(link):
         await ctx.respond("That's not a link <:AkanePoutColor:852847827826376736>")
@@ -97,37 +103,68 @@ async def find_sauce(ctx: lb.Context, link: str) -> None:
         "url": link
     }
     
-    async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params
-    ) as res:
+    if service != "TraceMoe":
+        async with ctx.bot.d.aio_session.get(
+            "https://saucenao.com/search.php?", params=params
+        ) as res:
 
-        if res.ok:
-            res = await res.json()
-            # print(res)
-            data = res['results'][0]
-            print(data)
-            sauce = "😵"
-            if 'source' in data['data'].keys():
-                if 'ext_urls' in data['data'].keys():
-                    sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
+            if res.ok:
+                res = await res.json()
+                # print(res)
+                data = res['results'][0]
+                print(data)
+                sauce = "😵"
+                if 'source' in data['data'].keys():
+                    if 'ext_urls' in data['data'].keys():
+                        sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
+                    else:
+                        sauce = data['data']['source']
                 else:
-                    sauce = data['data']['source']
-            else:
-                sauce = data['data']['ext_urls'][0]
-            await ctx.respond(
-                embed=hk.Embed(
-                    color=0x000000
-                )
-                .add_field("Similarity", data['header']['similarity'])
-                .add_field("Source", sauce)
-                .set_thumbnail(data['header']['thumbnail'])
-                .set_author(name="Search results returned the follows: ")
-                .set_footer(
-                    text="Powered by: SauceNAO",
-                    icon="https://i.imgur.com/2VRIEPR.png"
-                )
+                    sauce = data['data']['ext_urls'][0]
+                await ctx.respond(
+                    embed=hk.Embed(
+                        color=0x000000
+                    )
+                    .add_field("Similarity", data['header']['similarity'])
+                    .add_field("Source", sauce)
+                    .set_thumbnail(data['header']['thumbnail'])
+                    .set_author(name="Search results returned the follows: ")
+                    .set_footer(
+                        text="Powered by: SauceNAO",
+                        icon="https://i.imgur.com/2VRIEPR.png"
+                    )
 
-            )
+                )
+    else:
+        try:
+            async with ctx.bot.d.aio_session.get(
+                "https://api.trace.moe/search", params={"url": link}
+            ) as res:
+                if res.ok:
+                    res = (await res.json())['result']
+                    
+                    sauce = f"[{res[0]['filename']}](https://anilist.co/anime/{res[0]['anilist']})"
+                    
+                    print(res[0]['similarity']*100)# , "\n\n")
+
+                    await ctx.respond(
+                        embed=hk.Embed(
+                            color=0x000000
+                        )
+                        .add_field("Similarity", f"{round(res[0]['similarity']*100, 2)}")
+                        .add_field("Source", sauce)
+                        .set_thumbnail(res[0]['image'])
+                        .set_author(name="Search results returned the follows: ")
+                        .set_footer(
+                            text="Powered by: Trace.Moe",
+                            # icon="https://i.imgur.com/2VRIEPR.png"
+                        )
+                    )
+                else:
+                    await ctx.respond("Couldn't find it.")
+        except Exception as e:
+            print()
+            print(e)
 
 
 
