@@ -117,6 +117,7 @@ async def update_code(ctx: lb.Context) -> None:
             await ctx.respond(
                 f"Process returned with error: ```{(str(error, 'UTF-8'))}```"
             )
+            return
         else:
             await ctx.respond(
                 "Updated source."
