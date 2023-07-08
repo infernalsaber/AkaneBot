@@ -296,7 +296,7 @@ class PreviewButton(nav.NavButton):
             url=f"https://mangadex.org/title/{data[3]}"
             )
         )
-        self.view.add_item(KillNavButton())
+        # self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
         await ctx.edit_response(components=self.view)

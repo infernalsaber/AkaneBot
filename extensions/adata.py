@@ -389,7 +389,8 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         
         buttons = [
             TrailerButton(
-                trailer=trailer, other_page=pages).
+                trailer=trailer, other_page=pages
+            ),
             KillNavButton()
         ]
         navigator = CustomNavi(
@@ -1089,7 +1090,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 @lb.option("query", "The vn to search")
 @lb.command("visualnovel", "Search a vn", pass_options=True, aliases=["vn"])
 @lb.implements(lb.PrefixCommand)
-async def chara(ctx: lb.PrefixContext, query: str):
+async def lookup_vn(ctx: lb.PrefixContext, query: str):
 
     await search_vn(ctx, query)
 
