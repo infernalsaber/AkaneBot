@@ -250,6 +250,7 @@ class PreviewButton(nav.NavButton):
             view = self.view
             self.view.clear_items()
             view.add_item(self)
+            view.add_item(KillNavButton())
             await ctx.edit_response(components=view)
 
 
@@ -295,6 +296,7 @@ class PreviewButton(nav.NavButton):
             url=f"https://mangadex.org/title/{data[3]}"
             )
         )
+        self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
         await ctx.edit_response(components=self.view)
@@ -344,7 +346,7 @@ class TrailerButton(nav.NavButton):
             await self.view.swap_pages(ctx, self.other_page)
             self.label = "Trailer"
             self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
-  
+            # self.view.add_item(KillNavButton())
             await ctx.edit_response(components=self.view)
 
 
@@ -365,6 +367,7 @@ class TrailerButton(nav.NavButton):
 
         self.label = "🔍"
         self.emoji = None
+        # self.view.add_item(KillNavButton())
         await ctx.edit_response(components=self.view)
         # self.view.add_item(
 
@@ -380,10 +383,23 @@ class KillButton(miru.Button):
     # Let's leave our arguments dynamic this time, instead of hard-coding them
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        
 
     async def callback(self, ctx: miru.ViewContext) -> None:
+        if not ctx.author.id == self.view.user_id:
+            await ctx.respond(
+                (
+                    "You can't interact with this button as " 
+                    "you are not the invoker of the command."
+                ),
+                flags = hk.MessageFlag.EPHEMERAL
+            )
+            return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
         # await ctx.bot.rest.edit_message(
         #     ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
         # )
+        await ctx.bot.rest.edit_message(
+            ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
+        )
         self.view.stop()

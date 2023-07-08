@@ -2,6 +2,8 @@
 import os
 import glob
 import datetime
+import subprocess
+
 
 import asyncio
 import isodate
@@ -97,6 +99,32 @@ async def directory(ctx: lb.Context) -> None:
         return
         # return
     await ctx.respond(attachment=f"{folder}/{filez}")
+
+@task_plugin.command
+@lb.add_checks(
+    lb.owner_only
+)
+@lb.command("update", "Update the bot's source", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def update_code(ctx: lb.Context) -> None:
+
+    with subprocess.Popen(
+        ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    ) as result:
+        output, error = result.communicate(timeout=12)
+        print(output, error)
+        if error:
+            await ctx.respond(
+                f"Process returned with error: ```{(str(error, 'UTF-8'))}```"
+            )
+        else:
+            await ctx.respond(
+                "Updated source."
+            )
+
+    
+    await ctx.edit_last_response("Shutting bot down...")
+    await ctx.bot.close()
 
 
 

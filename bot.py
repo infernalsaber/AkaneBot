@@ -17,10 +17,15 @@ from lightbulb.ext import tasks
 dotenv.load_dotenv()
 
 
+def return_prefix() -> list:
+    if os.name == "nt":
+        return [","]
+    else:
+        return ["-"]
+
 # The following snippet is borrowed from:
 # https://github.com/Nereg/ARKMonitorBot/blob/
 # 1a6cedf34d531bddf0f5b11b3238344192998997/src/main.py#L14
-
 
 def setup_logging() -> None:
     """Set up the logging of the events to log.txt (for debugging) [Level-1]"""
@@ -50,7 +55,7 @@ def setup_logging() -> None:
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
     intents=hk.Intents.ALL_UNPRIVILEGED | hk.Intents.MESSAGE_CONTENT,
-    prefix=[","],
+    prefix=return_prefix(),
     help_class=None,
     logs="INFO",
     owner_ids=[1002964172360929343, 701090852243505212],
@@ -74,16 +79,16 @@ async def on_starting(event: hk.StartingEvent) -> None:
         os.mkdir("pictures")
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
         pass
-    with open("ded.txt", "w+", encoding="UTF-8"):
-        pass
+    # with open("ded.txt", "w+", encoding="UTF-8"):
+    #     pass
     setup_logging()
 
 
 @bot.listen()
 async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
-    with open("ded.txt", "a", encoding="UTF-8") as ded:
-        ded.write(".")
+    # with open("ded.txt", "a", encoding="UTF-8") as ded:
+    #     ded.write(".")
 
 
 
