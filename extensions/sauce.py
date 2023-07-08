@@ -10,7 +10,6 @@ import requests
 from functions.utils import check_if_url
 
 import dotenv
-import os
 
 dotenv.load_dotenv()
 
@@ -26,10 +25,8 @@ sauce_plugin = lb.Plugin(
 @lb.implements(lb.MessageCommand)
 async def mangamenu(ctx: lb.MessageContext):
 
-    if len(ctx.options['target'].attachments) == 0:
-        await ctx.respond("There's nothing here to find the sauce of.")
     
-    if not check_if_url(ctx.options['target'].attachments[0].url):
+    if not check_if_url(link):
         await ctx.respond("There's nothing here to find the sauce of.")
         return
 
