@@ -12,7 +12,7 @@ from miru.ext import nav
 import pprint
 import logging
 
-from functions.buttons import GenericButton, PreviewButton, TrailerButton, KillButton, KillNavButton
+from functions.buttons import GenericButton, PreviewButton, TrailerButton, KillButton, KillNavButton, CustomNextButton, CustomPrevButton
 from functions.errors import RequestsFailedError
 from functions.utils import CustomNavi, CustomView
 
@@ -558,6 +558,58 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 async def vn_search(ctx: lb.PrefixContext, query: str):
 
     await search_vntag(ctx, query)
+
+@al_listener.command
+@lb.option(
+    "code", 
+    "You know it", int
+)
+@lb.command("nh", "Search 🌚", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def nhhh(ctx: lb.PrefixContext, code: int):
+
+    if not ctx.get_channel().is_nsfw:
+        # await ctx.respond("Not nsfw")
+        return
+
+    res = await ctx.bot.d.aio_session.get(
+        f"https://cubari.moe/read/api/nhentai/series/{code}/"
+    )
+    if res.ok:
+        
+        res = await res.json()
+        # print(res)
+        buttons = [
+            CustomPrevButton(),
+            nav.IndicatorButton(),
+            CustomNextButton(),
+            KillNavButton()
+        ]
+
+        pages = []
+        for i in res['chapters']['1']['groups']['1']:
+            pages.append(
+                hk.Embed(
+                    title=res['title'], url=f"https://nhentai.net/g/{res['slug']}",
+                    description=f"Author: {res['author']} | Artist: {res['artist']}"
+                )
+                .set_image(i)
+            )
+
+
+        navigator = CustomNavi(
+            pages=pages, 
+            buttons=buttons, 
+            timeout=180,
+            user_id=ctx.author.id
+        )
+        await navigator.send(
+            ctx.channel_id,
+        )
+
+    else:
+        await ctx.respond("Didn't work")
+        print(res.json())
 
 
 async def search_character(ctx: lb.Context, character: str):
