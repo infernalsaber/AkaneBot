@@ -265,6 +265,9 @@ class PreviewButton(nav.NavButton):
         #     pass
         # print(data)
         try:
+            for item in self.view.children:
+                if not item == self:
+                    self.view.remove_item(item)
             data = ctx.bot.d.chapter_info[self.view.message_id]
             await self.view.swap_pages(ctx, preview_maker(
                 data[0], data[1], data[2], data[3], data[4]
@@ -296,7 +299,7 @@ class PreviewButton(nav.NavButton):
             url=f"https://mangadex.org/title/{data[3]}"
             )
         )
-        # self.view.add_item(KillNavButton())
+        self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
         await ctx.edit_response(components=self.view)
