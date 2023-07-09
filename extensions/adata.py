@@ -536,7 +536,11 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
 
 
 @al_listener.command
-@lb.option("query", "The vn to search")
+@lb.option(
+    "query", 
+    "The vn to search",
+    modifier=lb.commands.OptionModifier.CONSUME_REST 
+)
 @lb.command("visualnovel", "Search a vn", pass_options=True, aliases=["vn"])
 @lb.implements(lb.PrefixCommand)
 async def vn_search(ctx: lb.PrefixContext, query: str):
