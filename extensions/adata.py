@@ -143,7 +143,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                     timestamp=datetime.datetime.now().astimezone(),
                 )
                 .add_field("Rating", response["meanScore"])
-                .add_field("Genres", ",".join(response["genres"]))
+                .add_field("Genres", ", ".join(response["genres"][:4]))
                 .add_field("Status", response["status"], inline=True)
                 .add_field(
                     "Chapters" if response["type"] == "MANGA" else "ANIME",
@@ -177,7 +177,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     modifier=lb.commands.OptionModifier.CONSUME_REST,
 )
 @lb.option(
-    "type", "The type of media to search for", choices=["anime", "manga", "novel", "character"]
+    "type", "The type of media to search for", choices=["anime", "manga", "novel", "vn", "character"]
 )
 @lb.command(
     "lookup",
@@ -277,6 +277,9 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     elif type.lower() in ["novel", "n"]:
         await search_novel(ctx, media)
         return
+    
+    elif type.lower() in ["vn", "visualnovel"]:
+        await search_vn(ctx, media)
 
     else:
         await ctx.respond("Invalid media type. Please use anime(a), manga(m) or character(c)")
@@ -368,7 +371,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             timestamp=datetime.datetime.now().astimezone(),
         )
         .add_field("Rating", response["meanScore"] or "NA")
-        .add_field("Genres", ",".join(response["genres"]))
+        .add_field("Genres", ", ".join(response["genres"][:4]))
         .add_field("Status", response["status"], inline=True)
         .add_field("Episodes", no_of_items, inline=True)
         .add_field("Summary", response["description"])
@@ -505,7 +508,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                 description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
             )
             .add_field("Rating", response["meanScore"] or "NA")
-            .add_field("Genres", ",".join(response["genres"]) or "NA")
+            .add_field("Genres", ", ".join(response["genres"][:4]) or "NA")
             .add_field("Status", response["status"] or "NA", inline=True)
             .add_field(
                 "Chapters" if response["type"] == "MANGA" else "Episodes",
@@ -779,6 +782,48 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 # async def animemenu(ctx: lb.MessageContext):
 #     """Search an anime on AL"""
 #     await search_animanga(ctx, "ANIME", ctx.options["target"].content)
+def replace_bbcode_with_markdown(match):
+        url = match.group(1)
+        link_text = match.group(2)
+        markdown_link = f'[{link_text}]({url})'
+        return markdown_link
+
+def parse_vndb_desciption(description: str) -> str:
+    description = description.replace("[spoiler]", "||").replace("[/spoiler]", "||").replace("#", "")
+    description = description.replace("[i]", "").replace("[b]", "").replace("[/b]", "").replace("[/i]", "")
+    
+    if "[url=/" in description:
+        print("ok")
+    description.replace("[url=/", "[url=https://vndb.org/")
+    if "[url=/" in description:
+        print("why ")
+    
+    print(description)
+
+    pattern = r'\[url=(.*?)\](.*?)\[/url\]'
+
+    
+
+    # Replace BBCode links with Markdown links in the text
+    description = re.sub(pattern, replace_bbcode_with_markdown, description)
+
+    # return markdown_text
+
+
+    if len(description) > 300:
+        description = description[0:300]
+        # if len(spoiler_str.findall(description)) % 2:
+        if description.count("||") % 2:
+            description = description + "||"
+        
+        description = description + "..."
+    
+    # description = f"{description}||"
+    
+    return description
+
+
+
 async def search_vn(ctx: lb.Context, query: str):
     url = "https://api.vndb.org/kana/vn"
     headers = {"Content-Type": "application/json"}
@@ -793,22 +838,31 @@ async def search_vn(ctx: lb.Context, query: str):
         await ctx.respond("Couldn't find the VN you asked for.")
         return
     
-    print(req.json())
+    # print(req.json())
     try:
         req = req.json()
+        print(list(tag['name'] for tag in req['results'][0]['tags'])[:3])
+        if req['results'][0]['description']:
+            description = parse_vndb_desciption(req['results'][0]['description'])
+        else:
+            description = "NA"
         view = CustomView(user_id=ctx.author.id)
         view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
         choice = await ctx.respond(
             hk.Embed(
-                color=0x000000, timestamp=datetime.datetime.now().astimezone()
+                color=0x948782, timestamp=datetime.datetime.now().astimezone()
             )
             .add_field("Rating", req['results'][0]['rating'])
-            .add_field("Tags", ",".join(['t1']))
+            .add_field("Tags", ", ".join(list(tag['name'] for tag in req['results'][0]['tags'])[:4]))
             .add_field("Released", req['results'][0]['released'] or "Unreleased", inline=True)
-            .add_field("Est. Time", req['results'][0]['length_minutes'] or "NA", inline=True)
-            .add_field("Summary", req['results'][0]['description'][0:400] or "NA")
+            .add_field(
+                "Est. Time", 
+                f"{req['results'][0]['length_minutes']//60}h{req['results'][0]['length_minutes']%60}m" if req['results'][0]['length_minutes'] else "NA", inline=True)
+            .add_field("Summary", description)
             .set_thumbnail(req['results'][0]['image']['url'])
-            .set_author(name=req['results'][0]['title'])
+            .set_author(
+                name=req['results'][0]['title'],
+                url=f"https://vndb.org/{req['results'][0]['id']}")
             .set_footer(
                 text="Source: VNDB",
                 icon="https://files.catbox.moe/3gg4nn.jpg"
@@ -1116,7 +1170,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             description="\n\n", color=0x2B2D42, timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("Rating", response["meanScore"])
-        .add_field("Genres", ",".join(response["genres"]))
+        .add_field("Genres", ", ".join(response["genres"][:4]))
         .add_field("Status", response["status"], inline=True)
         .add_field(
             "Volumes",
