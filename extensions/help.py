@@ -50,7 +50,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
             title="Akane Bot Help Menu",
             description="A discord bot for animanga. \n\n***Commands***",
             colour=0x000000,
-            # timestamp=datetime.datetime.now().astimezone()
+            timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("lookup", "Look up details on any anime, manga or character")
         .add_field("plot", "Make cool graph-y shit on the popularity of airing anime")
@@ -73,9 +73,11 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "to avoid false matches."
                 "\nEg. `-lookup anime oshi no ko` instead of `lookup anime onk`."
                 "\n\n**Options** \n_anime (a)_ \n_manga (m)_ \n_novels (n)_ \n_character (c)_"
+                "\n_visualnovel (vn)_"
+
             ),
             colour=0x000000,
-            # timestamp=datetime.datetime.now().astimezone()
+            timestamp=datetime.datetime.now().astimezone()
         )
         .set_image("https://i.imgur.com/2nEsM2W.png")
         ,
@@ -89,7 +91,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\nEg."
             ),
             colour=0x000000,
-            # timestamp=datetime.datetime.now().astimezone()
+            timestamp=datetime.datetime.now().astimezone()
         )
         .add_field("For a single series", "`-plot oshi no ko`")
         .add_field("To compare two series", "`-plot Jigokuraku vs Mashle`")
@@ -109,7 +111,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 
             ),
             colour=0x000000,
-            # timestamp=datetime.datetime.now().astimezone()
+            timestamp=datetime.datetime.now().astimezone()
         )
         .set_image("https://i.imgur.com/YdjzGB1.png")
         
@@ -122,7 +124,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\n**info**: Bot info"
             ),
             colour=0x000000,
-            # timestamp=datetime.datetime.now().astimezone()
+            timestamp=datetime.datetime.now().astimezone()
         )
         .set_image("https://i.imgur.com/nsg3lZJ.png")
     ]
