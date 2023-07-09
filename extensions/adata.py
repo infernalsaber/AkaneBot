@@ -1183,13 +1183,13 @@ async def search_vn(ctx: lb.Context, query: str):
         else:
             description = "NA"
         view = CustomView(user_id=ctx.author.id)
-        view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+        view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
         choice = await ctx.respond(
             hk.Embed(
                 color=0x948782, timestamp=datetime.datetime.now().astimezone()
             )
-            .add_field("Rating", req['results'][0]['rating'])
-            .add_field("Tags", ", ".join(list(tag['name'] for tag in req['results'][0]['tags'])[:4]))
+            .add_field("Rating", req['results'][0]['rating'] or "NA")
+            .add_field("Tags", ", ".join(list(tag['name'] for tag in req['results'][0]['tags'])[:4]) or "NA")
             .add_field("Released", req['results'][0]['released'] or "Unreleased", inline=True)
             .add_field(
                 "Est. Time", 
@@ -1278,7 +1278,7 @@ async def search_vntag(ctx: lb.Context, query: str):
         else:
             description = "NA"
         view = CustomView(user_id=ctx.author.id)
-        view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+        view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
         choice = await ctx.respond(
             hk.Embed(
                 color=0x948782, timestamp=datetime.datetime.now().astimezone()
