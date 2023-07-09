@@ -547,6 +547,18 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 
     await search_vn(ctx, query)
 
+@al_listener.command
+@lb.option(
+    "query", 
+    "The vntag to search",
+    modifier=lb.commands.OptionModifier.CONSUME_REST 
+)
+@lb.command("vntag", "Search a vntag", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def vn_search(ctx: lb.PrefixContext, query: str):
+
+    await search_vntag(ctx, query)
+
 
 async def search_character(ctx: lb.Context, character: str):
     """Search a character on AL"""
@@ -1242,6 +1254,57 @@ def parse_vndb_desciption(description: str) -> str:
     
     return description
 
+
+async def search_vntag(ctx: lb.Context, query: str):
+    url = "https://api.vndb.org/kana/tag"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "filters": ["search", "=", query],
+        "fields": "name, aliases, description, category, vn_count"
+        # "sort": "title"
+    }
+    req = requests.post(url, headers=headers, json=data)
+    
+    if not req.ok:
+        await ctx.respond("Couldn't find the tag you asked for.")
+        return
+    
+    # print(req.json())
+    try:
+        req = req.json()
+        # print(list(tag['name'] for tag in req['results'][0]['tags'])[:3])
+        if req['results'][0]['description']:
+            description = parse_vndb_desciption(req['results'][0]['description'])
+        else:
+            description = "NA"
+        view = CustomView(user_id=ctx.author.id)
+        view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+        choice = await ctx.respond(
+            hk.Embed(
+                color=0x948782, timestamp=datetime.datetime.now().astimezone()
+            )
+            .add_field("Aliases", ", ".join(req['results'][0]['aliases']))
+            .add_field("Category", req['results'][0]['category'].upper(), inline=True)
+            .add_field(
+                "No of VNs", req['results'][0]['vn_count'], inline=True)
+            .add_field("Summary", description)
+            .set_author(
+                name=req['results'][0]['name'],
+                url=f"https://vndb.org/{req['results'][0]['id']}")
+            .set_footer(
+                text="Source: VNDB",
+                icon="https://files.catbox.moe/3gg4nn.jpg"
+            ), components=view
+        )
+        await view.start(choice)
+        await view.wait()
+        # view.from_message(message)
+        if hasattr(view, "answer"):  # Check if there is an answer
+            print(f"Received an answer! It is: {view.answer}")
+        else:
+            await ctx.edit_last_response(components=[])
+    except Exception as e:
+        print(e)
 
 
 @al_search.set_error_handler
