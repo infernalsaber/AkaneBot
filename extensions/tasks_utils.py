@@ -12,6 +12,8 @@ import hikari as hk
 import lightbulb as lb
 from lightbulb.ext import tasks
 
+from functions.utils import CustomNavi
+from functions.buttons import KillNavButton, CustomNextButton, CustomPrevButton
 
 task_plugin = lb.Plugin("Tasks", "Background processes")
 
@@ -137,16 +139,36 @@ async def update_code(ctx: lb.Context) -> None:
 @lb.implements(lb.PrefixCommand)
 async def guilds(ctx: lb.Context) -> None:
 
-    # try:
+    try:
 
         # for i in :
-    embed = hk.Embed(color=0x000000)
-    for gld in list([guild for guild in ctx.bot.cache.get_guilds_view().values()]):
-        embed.add_field(gld.name, f"{gld.member_count}, {gld.owner_id}")
-    
-    await ctx.respond(embed=embed)
-    # except Exception as e:
-    #     print(e)
+        # embed = hk.Embed(color=0x000000)
+        pages = []
+        buttons = [CustomPrevButton(), KillNavButton(), CustomNextButton()]
+        for gld in list([guild for guild in ctx.bot.cache.get_guilds_view().values()]):
+            pages.append(hk.Embed(
+                color=0xF4EAE9,  
+                title=f"Server: {gld.name}",
+                description=f"Server ID: `{gld.id}`",
+                timestamp=datetime.datetime.now().astimezone(),
+            )
+            .add_field("Owner", await gld.fetch_owner(), inline=True)
+            .add_field(
+                "Server Created", f"<t:{int(gld.created_at.timestamp())}:R>", inline=True
+            )
+            .add_field("Member Count", gld.member_count)
+            .add_field("Boosts", gld.premium_subscription_count or "NA", inline=True)
+            .add_field("Boost Level", gld.premium_tier or "NA", inline=True)
+            .set_thumbnail(gld.icon_url)
+            .set_image(gld.banner_url)
+        )
+            # embed.add_field(gld.name, f"{gld.member_count}, {await gld.fetch_owner()}")
+        
+        navigator = CustomNavi(pages=pages, buttons=buttons, user_id=ctx.author.id)
+        await navigator.send(ctx.channel_id)
+        # await ctx.respond(embed=embed)
+    except Exception as e:
+        print(e)
 
 
 def load(bot: lb.BotApp) -> None:
