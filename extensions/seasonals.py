@@ -28,7 +28,7 @@ async def get_anime_updates() -> list:
     magnet_feed = "https://subsplease.org/rss/?r=1080"
     link_feed = "https://subsplease.org/rss/?t&r=1080"
     
-    items = requests.get(link, params={"url": magnet_feed})
+    items = requests.get(link, params={"url": link_feed})
     if not items.ok:
         return []
     items = items.json()
@@ -85,7 +85,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                 embed=hk.Embed(
                     color=0x7DF9FF,
                     description=update['file'],
-                    timestamp=parser.parse(i['date_published'])
+                    timestamp=update['timestamp']
                 )
                 # .add_field("Filler", "This is some random filler text to take the space")
                 # .add_field("🧲", f"```{update['url']}```")
