@@ -459,7 +459,7 @@ async def user_al(ctx: lb.PrefixContext, user: str):
     "The novel query", 
     modifier=lb.commands.OptionModifier.CONSUME_REST 
 )
-@lb.command("novel", "Search a novel", pass_options=True, aliases=['novels', 'n'])
+@lb.command("novel", "Search a novel", pass_options=True, aliases=['novels', 'n', 'ln'])
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, query: str):
     await search_novel(ctx, query)
@@ -1329,13 +1329,16 @@ async def search_vntag(ctx: lb.Context, query: str):
             description = parse_vndb_desciption(req['results'][0]['description'])
         else:
             description = "NA"
+
+        tags = ", ".join(req['results'][0]['aliases']) or "NA"
+
         view = CustomView(user_id=ctx.author.id)
         view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
         choice = await ctx.respond(
             hk.Embed(
                 color=0x948782, timestamp=datetime.datetime.now().astimezone()
             )
-            .add_field("Aliases", ", ".join(req['results'][0]['aliases']))
+            .add_field("Aliases", tags)
             .add_field("Category", req['results'][0]['category'].upper(), inline=True)
             .add_field(
                 "No of VNs", req['results'][0]['vn_count'], inline=True)
