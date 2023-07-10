@@ -4,10 +4,13 @@
 import hikari as hk
 import lightbulb as lb
 
+import miru
 
 import requests
 
 from functions.utils import check_if_url
+
+from functions.buttons import GenericButton
 
 import dotenv
 import os
@@ -111,30 +114,94 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
             if res.ok:
                 res = await res.json()
                 # print(res)
+                # try:
                 data = res['results'][0]
                 print(data)
                 sauce = "😵"
-                if 'source' in data['data'].keys():
-                    if 'ext_urls' in data['data'].keys():
-                        sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
-                    else:
-                        sauce = data['data']['source']
-                else:
-                    sauce = data['data']['ext_urls'][0]
-                await ctx.respond(
-                    embed=hk.Embed(
-                        color=0x000000
+                if "MangaDex" in data['header']['index_name']:
+                
+                    # try:
+                    view = miru.View()
+                    # al_url = await al_from_mal(data['data']['mal_id'])
+                    # al_url = al_url['siteUrl']
+                    view.add_item(GenericButton(
+                        style=hk.ButtonStyle.LINK, 
+                        emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                        url = (await al_from_mal(data['data']['mal_id']))['siteUrl'])
                     )
-                    .add_field("Similarity", data['header']['similarity'])
-                    .add_field("Source", sauce)
-                    .set_thumbnail(data['header']['thumbnail'])
-                    .set_author(name="Search results returned the follows: ")
-                    .set_footer(
-                        text="Powered by: SauceNAO",
-                        icon="https://i.imgur.com/2VRIEPR.png"
+                    view.add_item(GenericButton(
+                        style=hk.ButtonStyle.LINK, 
+                        emoji=hk.Emoji.parse("<:mangadex:1128015134426677318>"),
+                        url = data['data']['ext_urls'][0])
                     )
+                    await ctx.respond(
+                        embed=hk.Embed(
+                            color=0x000000,
+                        )
+                        .add_field("Similarity", data['header']['similarity'])
+                        .add_field("Source", f"{data['data']['source']} {data['data']['part']}")
+                        .set_thumbnail(data['header']['thumbnail'])
+                        .set_author(name="Search results returned the follows: ")
+                        .set_footer(
+                            text="Powered by: SauceNAO",
+                            icon="https://i.imgur.com/2VRIEPR.png"
+                        )
+                        , components=view
+                    )
+                    # except Exception as e:
+                    #     print(e)
 
-                )
+                elif "Anime" in data['header']['index_name']:
+                
+                    try:
+                        view = miru.View()
+                        if len(data['data']['ext_urls']) > 1:
+                            view.add_item(GenericButton(
+                                style=hk.ButtonStyle.LINK, 
+                                emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                                url = data['data']['ext_urls'][2])
+                            )
+                        await ctx.respond(
+                            embed=hk.Embed(
+                                color=0x000000,
+                            )
+                            .add_field("Similarity", data['header']['similarity'])
+                            .add_field("Source", f"{data['data']['source']} {data['data']['part']}")
+                            .set_thumbnail(data['header']['thumbnail'])
+                            .set_author(name="Search results returned the follows: ")
+                            .set_footer(
+                                text="Powered by: SauceNAO",
+                                icon="https://i.imgur.com/2VRIEPR.png"
+                            )
+                            , 
+                            components=view
+                        )
+                    except Exception as e:
+                        print(e)
+
+
+                else:
+                    if 'source' in data['data'].keys():
+                        if 'ext_urls' in data['data'].keys():
+                            sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
+                        else:
+                            sauce = data['data']['source']
+                    else:
+                        sauce = data['data']['ext_urls'][0]
+                    await ctx.respond(
+                        embed=hk.Embed(
+                            color=0x000000
+                        )
+                        .add_field("Similarity", data['header']['similarity'])
+                        .add_field("Source", sauce)
+                        .set_thumbnail(data['header']['thumbnail'])
+                        .set_author(name="Search results returned the follows: ")
+                        .set_footer(
+                            text="Powered by: SauceNAO",
+                            icon="https://i.imgur.com/2VRIEPR.png"
+                        )
+
+                    )
     else:
         try:
             async with ctx.bot.d.aio_session.get(
@@ -192,6 +259,25 @@ async def pingu(ctx: lb.Context, link: str) -> None:
             f"The site `{link}` is either down or has blocked the client ❌"
         )
 
+
+async def al_from_mal(mal_id: int, type: str = None) -> str:
+    query = """
+  query ($mal_id: Int) { # Define which variables will be used (id)
+    Media (idMal: $mal_id, type: MANGA) {
+      siteUrl
+    }
+  }
+
+  """
+
+    variables = {"mal_id": mal_id}
+
+    return requests.post(
+    "https://graphql.anilist.co",
+    json={"query": query, "variables": variables},
+    timeout=10,
+    ).json()['data']['Media']
+#   print(a.json())
 
 def load(bot: lb.BotApp) -> None:
     """Load the plugin"""

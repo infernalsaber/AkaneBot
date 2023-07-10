@@ -14,10 +14,10 @@ import miru
 
 import asyncio
 
-from functions.utils import CustomNavi
+from functions.utils import CustomNavi, rss2json
 from functions.buttons import GenericButton
 
-
+import json
 
 aniupdates = lb.Plugin("Anime Updates", "Keep a track of seasonal anime")
 
@@ -28,26 +28,44 @@ async def get_anime_updates() -> list:
     magnet_feed = "https://subsplease.org/rss/?r=1080"
     link_feed = "https://subsplease.org/rss/?t&r=1080"
     
-    items = requests.get(link, params={"url": link_feed})
-    if not items.ok:
+    items = rss2json(link_feed)
+    items = json.loads(items)
+    if not items['data']['status'] == 'ok':
         return []
-    items = items.json()
+    # print(items)
 
     updates = []
 
-    for i in items['items']:
+    # print(items.keys())
+    for i in items['feeds']:
         item_dict = {}
-        if int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])).total_seconds()) > 900:
+        if not '1080' in i['title']:
             continue
-        item_dict['timestamp'] = parser.parse(i['date_published'])
-        item_dict['url'] = i['url']
+        # print("\n")
+        print(datetime.datetime.now(datetime.timezone.utc))
+        print(i['title'])
+        print(i['published'])
+        # print(parser.parse(i['date_published']))
+        # print((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])))
+        # print(int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])).total_seconds()) )
+        
+        # try:
+        if int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['published'])).total_seconds()) > 1800:
+            print("short")
+            continue
+        item_dict['timestamp'] = parser.parse(i['published'])
+        item_dict['link'] = i['link']
         item_dict['file']  = i['title']
         item_dict['data'] = {}
         item_dict['data'] = return_anime_info(i['title'][13:-13].split('(')[0][:-6])
         if not item_dict['data']:
+            print("Not on AL")
             continue
+        print(item_dict)
         updates.append(item_dict)
-    
+
+        # except Exception as e:
+        #     print(e)
     return updates
 
 
@@ -70,7 +88,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                 style=hk.ButtonStyle.LINK, 
                 # label = "Nyaa",
                 emoji=hk.Emoji.parse("<:nyaasi:1127717935968952440>"),
-                url = update['url'])
+                url = update['link'])
             )
             view.add_item(GenericButton(
                 style=hk.ButtonStyle.LINK, 
@@ -80,7 +98,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
             )
             
             await aniupdates.bot.rest.create_message(
-                channel=980479966389096460,
+                channel=1127609035374461070,
                 # content=update,
                 embed=hk.Embed(
                     color=0x7DF9FF,
@@ -96,7 +114,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                 .set_thumbnail(update['data']['coverImage']['large']),
                 components=view
             )
-        await asyncio.sleep(900)
+        await asyncio.sleep(1800)
 
 
 

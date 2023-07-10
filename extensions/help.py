@@ -64,16 +64,14 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         .set_image("https://i.imgur.com/LJ1t4wD.png"),
         
         hk.Embed(
-            title="Lookup Command help",
+            title="Lookup Commands help",
             description=(
-                "Search for details of any anime, manga, novel or "
-                "character."
-                "\nAlias: lu"
-                "\n\nNote: Please enter the full name of the series or character "
+                "Search for details of any anime, manga, character etc."
+                "\n\nEnter the full name of the entity "
                 "to avoid false matches."
-                "\nEg. `-lookup anime oshi no ko` instead of `lookup anime onk`."
-                "\n\n**Options** \n_anime (a)_ \n_manga (m)_ \n_novels (n)_ \n_character (c)_"
-                "\n_visualnovel (vn)_"
+                "\nEg. `-anime oshi no ko` instead of `-anime onk`."
+                "\n\n**Options** \n_`anime`/`a`_ \n_`manga`/`m`_" 
+                "\n_`novels`/`n`_ \n_`character`/`c`_ \n_`visualnovel`/`vn`_"
 
             ),
             colour=0x000000,
