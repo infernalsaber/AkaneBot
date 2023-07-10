@@ -58,44 +58,45 @@ async def get_anime_updates() -> list:
 async def on_starting(event: hk.StartedEvent) -> None:
     """Event fired on start of bot"""
     
-    print("Getting anime updates")
-    updates = await get_anime_updates()
-    if not updates:
-        print("\n\nNOTHING\n\n")
-    print(updates)
-    for update in updates:
-        view = miru.View()
-        view.add_item(GenericButton(
-            style=hk.ButtonStyle.LINK, 
-            # label = "Nyaa",
-            emoji=hk.Emoji.parse("<:nyaasi:1127717935968952440>"),
-            url = update['url'])
-        )
-        view.add_item(GenericButton(
-            style=hk.ButtonStyle.LINK, 
-            # label = "Anilist",
-            emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
-            url = update['data']['siteUrl'])
-        )
-        
-        await aniupdates.bot.rest.create_message(
-            channel=980479966389096460,
-            # content=update,
-            embed=hk.Embed(
-                color=0x7DF9FF,
-                description=update['file'],
-                timestamp=parser.parse(i['date_published'])
+    while True:
+        print("Getting anime updates")
+        updates = await get_anime_updates()
+        if not updates:
+            print("\n\nNOTHING\n\n")
+        print(updates)
+        for update in updates:
+            view = miru.View()
+            view.add_item(GenericButton(
+                style=hk.ButtonStyle.LINK, 
+                # label = "Nyaa",
+                emoji=hk.Emoji.parse("<:nyaasi:1127717935968952440>"),
+                url = update['url'])
             )
-            # .add_field("Filler", "This is some random filler text to take the space")
-            # .add_field("🧲", f"```{update['url']}```")
-            .set_author(
-                name=f"New Episode of {update['data']['title']['romaji']} out",
-                url=update['data']['siteUrl']
+            view.add_item(GenericButton(
+                style=hk.ButtonStyle.LINK, 
+                # label = "Anilist",
+                emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                url = update['data']['siteUrl'])
             )
-            .set_thumbnail(update['data']['coverImage']['large']),
-            components=view
-        )
-    await asyncio.sleep(900)
+            
+            await aniupdates.bot.rest.create_message(
+                channel=980479966389096460,
+                # content=update,
+                embed=hk.Embed(
+                    color=0x7DF9FF,
+                    description=update['file'],
+                    timestamp=parser.parse(i['date_published'])
+                )
+                # .add_field("Filler", "This is some random filler text to take the space")
+                # .add_field("🧲", f"```{update['url']}```")
+                .set_author(
+                    name=f"New Episode of {update['data']['title']['romaji']} out",
+                    url=update['data']['siteUrl']
+                )
+                .set_thumbnail(update['data']['coverImage']['large']),
+                components=view
+            )
+        await asyncio.sleep(900)
 
 
 

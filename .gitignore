@@ -7,5 +7,4 @@ pictures/
 .env
 nohup.out
 ded.txt
-extensions/subs.py
 manga_database.db
