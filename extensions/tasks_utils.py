@@ -8,6 +8,7 @@ import subprocess
 import asyncio
 import isodate
 
+import hikari as hk
 import lightbulb as lb
 from lightbulb.ext import tasks
 
@@ -127,6 +128,25 @@ async def update_code(ctx: lb.Context) -> None:
     await ctx.edit_last_response("Shutting bot down...")
     await ctx.bot.close()
 
+
+@task_plugin.command
+@lb.add_checks(
+    lb.owner_only
+)
+@lb.command("guilds", "Update the bot's source")
+@lb.implements(lb.PrefixCommand)
+async def guilds(ctx: lb.Context) -> None:
+
+    # try:
+
+        # for i in :
+    embed = hk.Embed(color=0x000000)
+    for gld in list([guild for guild in ctx.bot.cache.get_guilds_view().values()]):
+        embed.add_field(gld.name, f"{gld.member_count}, {gld.owner_id}")
+    
+    await ctx.respond(embed=embed)
+    # except Exception as e:
+    #     print(e)
 
 
 def load(bot: lb.BotApp) -> None:
