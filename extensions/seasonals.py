@@ -111,7 +111,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                     name=f"New Episode of {update['data']['title']['romaji']} out",
                     url=update['data']['siteUrl']
                 )
-                .set_thumbnail(update['data']['coverImage']['large']),
+                .set_image(update['data']['coverImage']['large']),
                 components=view
             )
         await asyncio.sleep(1800)

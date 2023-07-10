@@ -230,7 +230,7 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
                 else:
                     await ctx.respond("Couldn't find it.")
         except Exception as e:
-            print()
+            # print()
             print(e)
 
 
