@@ -252,13 +252,14 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
         # img_bytes = fig.to_image(format="png")
         # Image.open(io.BytesIO(img_bytes)).save(f"pictures/{query}.png")
         fig.write_image(f"pictures/{query}.png")
+        image_to_send = hk.File(f"pictures/{query}.png")
         try:
             await ctx.respond(
                 embed=hk.Embed(
                     title=embed_title,
                     color=0x7DF9FF
                 )
-                .set_image(f"./pictures/{query}.png")
+                .set_image(image_to_send)
                 , attachments = None
             )
         except Exception as e:
