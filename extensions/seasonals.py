@@ -50,7 +50,7 @@ async def get_anime_updates() -> list:
         # print(int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])).total_seconds()) )
         
         # try:
-        if int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['published'])).total_seconds()) > 1800:
+        if int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['published'])).total_seconds()) > 600:
             print("short")
             continue
         item_dict['timestamp'] = parser.parse(i['published'])
@@ -75,13 +75,24 @@ async def get_anime_updates() -> list:
 @aniupdates.listener(hk.StartedEvent)
 async def on_starting(event: hk.StartedEvent) -> None:
     """Event fired on start of bot"""
+    conn = sqlite3.connect('akane_db.db')
+    cursor = conn.cursor()
+    aniupdates.bot.d.con = conn
     
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS aniupdates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_channel INTEGER,
+    )
+''')
+
+
     while True:
         print("Getting anime updates")
         updates = await get_anime_updates()
         if not updates:
             print("\n\nNOTHING\n\n")
-        print(updates)
+        # print(updates)
         for update in updates:
             view = miru.View()
             view.add_item(GenericButton(
@@ -96,25 +107,28 @@ async def on_starting(event: hk.StartedEvent) -> None:
                 emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
                 url = update['data']['siteUrl'])
             )
-            
-            await aniupdates.bot.rest.create_message(
-                channel=1127609035374461070,
-                # content=update,
-                embed=hk.Embed(
-                    color=0x7DF9FF,
-                    description=update['file'],
-                    timestamp=update['timestamp']
+            for channel in aniupdates.bot.d.update_channels:
+                await aniupdates.bot.rest.create_message(
+                    channel=channel,
+                    # content=update,
+                    embed=hk.Embed(
+                        color=0x7DF9FF,
+                        description=update['file'],
+                        timestamp=update['timestamp'],
+                        title=f"New Episode of {update['data']['title']['romaji']} out",
+                        url=update['link']
+                    )
+                    .add_field("Episode", get_episode_number(update['file']))
+                    # .add_field("Filler", "This is some random filler text to take the space")
+                    # .add_field("🧲", f"```{update['url']}```")
+                    # .set_author(
+                    #     name=f"New Episode of {update['data']['title']['romaji']} out",
+                    #     url=update['data']['siteUrl']
+                    # )
+                    .set_thumbnail(update['data']['coverImage']['extraLarge']),
+                    components=view
                 )
-                # .add_field("Filler", "This is some random filler text to take the space")
-                # .add_field("🧲", f"```{update['url']}```")
-                .set_author(
-                    name=f"New Episode of {update['data']['title']['romaji']} out",
-                    url=update['data']['siteUrl']
-                )
-                .set_image(update['data']['coverImage']['large']),
-                components=view
-            )
-        await asyncio.sleep(1800)
+        await asyncio.sleep(600)
 
 
 
@@ -131,7 +145,7 @@ def return_anime_info(anime):
           romaji
       }
       coverImage {
-          large
+          extraLarge
       }
       description (asHtml: false)
       siteUrl
@@ -149,7 +163,13 @@ def return_anime_info(anime):
   ).json()['data']['Media']
 
 
-
+def get_episode_number(name):
+    num = name[13:-23].split("-")[-1].strip()
+    try:
+        num = int(num)
+    except:
+        num = 1
+    return num
 
 
 def load(bot: lb.BotApp) -> None:

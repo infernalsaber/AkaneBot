@@ -10,3 +10,6 @@ plotly==5.11.0
 isodate==0.6.1
 psutil
 pillow
+tabulate
+feedparser
+kaleido==0.2.1

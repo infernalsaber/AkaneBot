@@ -166,11 +166,12 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 secondary_y=True,
             )
             fig.update_layout(
-                title=f'Series Trends: {data["name"]}',
+                # title=f'Series Trends: {data["name"]}',
                 xaxis_title="Dates",
                 yaxis_title="Trend Value",
                 template="plotly_dark",
             )
+            embed_title = f'Popularity Trends: {data["name"]}'
         else:    
             data = await search_it(series[0])
             # from pprint import pprint
@@ -240,19 +241,32 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 secondary_y=True,
             )
             fig.update_layout(
-                title=f'Trends Comparision: {data["name"]} vs {data2["name"]}',
+                # title=f'Trends Comparision: {data["name"]} vs {data2["name"]}',
                 xaxis_title="Dates",
                 yaxis_title="Trend Value",
                 template="plotly_dark",
             )
+            embed_title = f'Popularity Comparision: {data["name"]} vs {data2["name"]}'
         
         fig.update_yaxes(title_text="Score", secondary_y=True)
-        img_bytes = fig.to_image(format="png")
-        Image.open(io.BytesIO(img_bytes)).save(f"pictures/{query}.png")
-        await ctx.respond(
-            content=hk.Emoji.parse("<:nerd2:1060639499505377320>"),
-            attachment=f"pictures/{query}.png",
-        )
+        # img_bytes = fig.to_image(format="png")
+        # Image.open(io.BytesIO(img_bytes)).save(f"pictures/{query}.png")
+        fig.write_image(f"pictures/{query}.png")
+        try:
+            await ctx.respond(
+                embed=hk.Embed(
+                    title=embed_title,
+                    color=0x7DF9FF
+                )
+                .set_image(f"./pictures/{query}.png")
+                , attachments = None
+            )
+        except Exception as e:
+            print(e)
+        # await ctx.respond(
+        #     content=hk.Emoji.parse("<:nerd2:1060639499505377320>"),
+        #     attachment=f"pictures/{query}.png",
+        # )
 
 
 

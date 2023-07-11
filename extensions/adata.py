@@ -561,6 +561,18 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 
 @al_listener.command
 @lb.option(
+    "query", 
+    "The vnchara to search",
+    modifier=lb.commands.OptionModifier.CONSUME_REST 
+)
+@lb.command("vnc", "Search a vn character", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def vn_search(ctx: lb.PrefixContext, query: str):
+
+    await search_vnchara(ctx, query)
+
+@al_listener.command
+@lb.option(
     "code", 
     "You know it", int
 )
@@ -1306,6 +1318,57 @@ def parse_vndb_desciption(description: str) -> str:
     
     return description
 
+async def search_vnchara(ctx: lb.Context, query:str):
+    url = "https://api.vndb.org/kana/character"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "filters": ["search", "=", "Ushiromiya"],
+        "fields": "name, description, age, sex,  image.url, traits.name"
+    }
+
+    req = requests.post(url, headers=headers, json=data)
+    
+    if not req.ok:
+        await ctx.respond("Couldn't find the tag you asked for.")
+        return
+
+    req = req.json()
+        # print(list(tag['name'] for tag in req['results'][0]['tags'])[:3])
+    try:    
+        if req['results'][0]['description']:
+            description = parse_vndb_desciption(req['results'][0]['description'])
+        else:
+            description = "NA"
+
+        view = CustomView(user_id=ctx.author.id)
+        view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
+
+        choice = await ctx.respond(
+            hk.Embed(
+                color=0x948782, timestamp=datetime.datetime.now().astimezone()
+            )
+            .add_field("Sex", req['results'][0]['sex'][0].upper() or "NA", inline=True)
+            .add_field("Age", req['results'][0]['age'] or "NA", inline=True)
+            .add_field("Traits", ", ".join(list(trait['name'] for trait in req['results'][0]['traits'])[:4]) or "NA")
+            .add_field("Summary", description)
+            .set_thumbnail(req['results'][0]['image']['url'])
+            .set_author(
+                name=req['results'][0]['name'],
+                url=f"https://vndb.org/{req['results'][0]['id']}")
+            .set_footer(
+                text="Source: VNDB",
+                icon="https://files.catbox.moe/3gg4nn.jpg"
+            ), components=view
+        )
+        await view.start(choice)
+        await view.wait()
+            # view.from_message(message)
+        if hasattr(view, "answer"):  # Check if there is an answer
+            print(f"Received an answer! It is: {view.answer}")
+        else:
+            await ctx.edit_last_response(components=[])
+    except Exception as e:
+        print(e)
 
 async def search_vntag(ctx: lb.Context, query: str):
     url = "https://api.vndb.org/kana/tag"
