@@ -21,7 +21,10 @@ def preview_maker(base_url, data_id, title, manga_id, cover):
 
     for page in r_json["chapter"]["data"]:
         pages.append(
-            hk.Embed(title=title, color=0xFF6740)
+            hk.Embed(
+                title=title, color=0xFF6740,
+                url=f"https://mangadex.org/title/{manga_id}"
+            )
             .set_image(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
             .set_footer(
                 "Fetched via: MangaDex",
@@ -101,10 +104,11 @@ class KillNavButton(nav.NavButton):
             )
             return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
-        await ctx.bot.rest.edit_message(
-            ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
-        )
-        self.view.stop()
+        await self.view.message.delete()
+        # await ctx.bot.rest.edit_message(
+        #     ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
+        # )
+        # self.view.stop()
 
     async def before_page_change(self) -> None:
         ...
@@ -295,10 +299,10 @@ class PreviewButton(nav.NavButton):
             emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
             )
         )
-        self.view.add_item(NavLinkButton(
-            url=f"https://mangadex.org/title/{data[3]}"
-            )
-        )
+        # self.view.add_item(NavLinkButton(
+        #     url=f"https://mangadex.org/title/{data[3]}"
+        #     )
+        # )
         self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
@@ -404,6 +408,7 @@ class KillButton(miru.Button):
         # # )
         # view = self.view
         # self.view.clear_items()
-        await ctx.edit_response(
-            flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
-        )
+        await self.view.message.delete()
+        # await ctx.edit_response(
+        #     flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
+        # )
