@@ -1322,7 +1322,7 @@ async def search_vnchara(ctx: lb.Context, query:str):
     url = "https://api.vndb.org/kana/character"
     headers = {"Content-Type": "application/json"}
     data = {
-        "filters": ["search", "=", "Ushiromiya"],
+        "filters": ["search", "=", query],
         "fields": "name, description, age, sex,  image.url, traits.name"
     }
 

@@ -50,7 +50,7 @@ async def get_anime_updates() -> list:
         # print(int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])).total_seconds()) )
         
         # try:
-        if int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['published'])).total_seconds()) > 600:
+        if int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['published'])).total_seconds()) > 720:
             print("short")
             continue
         item_dict['timestamp'] = parser.parse(i['published'])
@@ -79,12 +79,12 @@ async def on_starting(event: hk.StartedEvent) -> None:
     cursor = conn.cursor()
     aniupdates.bot.d.con = conn
     
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS aniupdates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        guild_channel INTEGER,
-    )
-''')
+#     cursor.execute('''
+#     CREATE TABLE IF NOT EXISTS aniupdates (
+#         id INTEGER PRIMARY KEY AUTOINCREMENT,
+#         guild_channel INTEGER,
+#     )
+# ''')
 
 
     while True:
@@ -128,7 +128,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                     .set_thumbnail(update['data']['coverImage']['extraLarge']),
                     components=view
                 )
-        await asyncio.sleep(600)
+        await asyncio.sleep(720)
 
 
 
