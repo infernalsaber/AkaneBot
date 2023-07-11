@@ -74,6 +74,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.aio_session = aiohttp.ClientSession()
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
+    bot.d.update_channels = ["1061609065844838420"]
     if not os.path.exists("logs"):
         os.mkdir("logs")
         os.mkdir("pictures")

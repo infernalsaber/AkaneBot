@@ -70,17 +70,20 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\n\nEnter the full name of the entity "
                 "to avoid false matches."
                 "\nEg. `-anime oshi no ko` instead of `-anime onk`."
-                "\n\n**Options** \n_`anime`/`a`_ \n_`manga`/`m`_" 
-                "\n_`novels`/`n`_ \n_`character`/`c`_ \n_`visualnovel`/`vn`_"
-
+                "\n\n**Commands** "
+                "\n**-anime/-a** : for anime"
+                "\n**-manga/-m** : for manga"
+                "\n**-novel/-n/-ln** : for novels"
+                "\n**-visualnovel/-vn** : for vns"
+                "\n**-character/-c** : for characters"
             ),
             colour=0x000000,
             timestamp=datetime.datetime.now().astimezone()
         )
         .set_image("https://i.imgur.com/2nEsM2W.png")
-        ,
 
-        hk.Embed(
+        ,
+                hk.Embed(
             title="Plot Command help",
             description=(
                 "The command to plot the popularity of one anime during it's runtime "
@@ -112,7 +115,21 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
             timestamp=datetime.datetime.now().astimezone()
         )
         .set_image("https://i.imgur.com/YdjzGB1.png")
-        
+        ,
+        hk.Embed(
+            title="Sauce Command help",
+            description=(
+                "Find the source of a manga panel/anime ss or fanart."
+                "\nImplemented as a Menu Command and a Slash Command."
+            ),
+            colour=0x000000,
+            timestamp=datetime.datetime.now().astimezone()
+        )
+        .add_field("Menu Command", "Right Click on an image and check the sauce option in apps")
+        .add_field(
+            "Slash Command", 
+            "Normal Slash Command with option for SauceNao/Trace.Moe. Trace works better for anime")
+        .set_image("https://i.imgur.com/dTvGa1t.png")
         ,
         hk.Embed(
             title="Utility help",
@@ -157,11 +174,16 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
     elif query in ["top"]:
         await navigator.send(sendto, start_at=3)
 
-    elif query in ["botinfo", "info", "ping"]:
+    elif query in ["sauce", "source"]:
         await navigator.send(sendto, start_at=4)
+
+    elif query in ["botinfo", "info", "ping"]:
+        await navigator.send(sendto, start_at=5)
     
     else:
-        await ctx.respond("The command you want help for probably doesn't exist")
+        await ctx.respond(
+            "The command you want help for doesn't exist or is undocumented"
+        )
 
     
 

@@ -7,4 +7,4 @@ pictures/
 .env
 nohup.out
 ded.txt
-manga_database.db
+akane_db.db
