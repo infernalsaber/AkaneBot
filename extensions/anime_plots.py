@@ -1,17 +1,13 @@
 """Make cool plot charts"""
-import io
-from PIL import Image
+import os
 
 import hikari as hk
 import lightbulb as lb
-
-
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import plotly.io as pio
+from plotly.subplots import make_subplots
 
 from functions.fetch_trends import search_it
-
 
 plot_plugin = lb.Plugin(
     "plot", "A set of commands that are used to plot anime's trends"
@@ -120,6 +116,18 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
         query (str): The name of the two anime (seperated by "vs")
     """
 
+    # print(os.listdir("./pictures/"))
+    print("\n\n\n")
+    if f"{query}.png" in os.listdir("./pictures/"):
+        # await ctx.respond("Found")
+        await ctx.respond(
+            embed=hk.Embed(
+                title=f"Popularity Chart: {query}", color=0x7DF9FF
+            ).set_image(hk.File(f"pictures/{query.upper()}.png"))
+            # , attachments = None
+        )
+
+        return
     series = query.split("vs")
     if not len(series) in [1, 2]:
         await ctx.respond("The command only works for one or two series.")
@@ -172,11 +180,10 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 template="plotly_dark",
             )
             embed_title = f'Popularity Trends: {data["name"]}'
-        else:    
+        else:
             data = await search_it(series[0])
             # from pprint import pprint
             data2 = await search_it(series[1])
-
 
             pio.renderers.default = "notebook"
             fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -247,28 +254,23 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 template="plotly_dark",
             )
             embed_title = f'Popularity Comparision: {data["name"]} vs {data2["name"]}'
-        
+
         fig.update_yaxes(title_text="Score", secondary_y=True)
         # img_bytes = fig.to_image(format="png")
         # Image.open(io.BytesIO(img_bytes)).save(f"pictures/{query}.png")
         fig.write_image(f"pictures/{query}.png")
-        image_to_send = hk.File(f"pictures/{query}.png")
-        try:
-            await ctx.respond(
-                embed=hk.Embed(
-                    title=embed_title,
-                    color=0x7DF9FF
-                )
-                .set_image(image_to_send)
-                , attachments = None
+        # image_to_send = hk.File(f"pictures/{query}.png")
+        await ctx.respond(
+            embed=hk.Embed(title=embed_title, color=0x7DF9FF).set_image(
+                hk.File(f"pictures/{query}.png")
             )
-        except Exception as e:
-            print(e)
+            # , attachments = None
+        )
+
         # await ctx.respond(
         #     content=hk.Emoji.parse("<:nerd2:1060639499505377320>"),
         #     attachment=f"pictures/{query}.png",
         # )
-
 
 
 def load(bot: lb.BotApp) -> None:

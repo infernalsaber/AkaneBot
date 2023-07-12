@@ -1,20 +1,13 @@
 """Get information about a role, server, user, bot etc."""
-from datetime import datetime
-from typing import Optional
-import psutil
 
 import hikari as hk
 import lightbulb as lb
-import miru
-
+import psutil
 
 from functions.buttons import GenericButton
 from functions.utils import CustomView
 
 info_plugin = lb.Plugin("Info", "Get information about an entity")
-
-
-
 
 
 @info_plugin.command
@@ -105,9 +98,6 @@ async def botinfo(ctx: lb.Context) -> None:
                     reply=True,
                     flags=hk.MessageFlag.EPHEMERAL,
                 )
-
-
-
 
 
 def load(bot: lb.BotApp) -> None:

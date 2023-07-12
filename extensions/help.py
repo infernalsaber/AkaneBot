@@ -31,7 +31,7 @@ help_plugin = lb.Plugin(
     "query",
     "The command to ask help for",
     str,
-    choices = ["lookup", "plot", "info"],
+    choices = ["lookup", "plot", "info", "sauce", "top"],
     required=False
 )
 @lb.command(
@@ -54,6 +54,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         )
         .add_field("lookup", "Look up details on any anime, manga or character")
         .add_field("plot", "Make cool graph-y shit on the popularity of airing anime")
+        .add_field("sauce", "Find the source of an anime image")
         .add_field("top", "Find the top anime with filters for airing, upcoming series etc.")
         .set_thumbnail(
             (
@@ -70,7 +71,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
                 "\n\nEnter the full name of the entity "
                 "to avoid false matches."
                 "\nEg. `-anime oshi no ko` instead of `-anime onk`."
-                "\n\n**Commands** "
+                "\n\n**Commands:** \n"
                 "\n**-anime/-a** : for anime"
                 "\n**-manga/-m** : for manga"
                 "\n**-novel/-n/-ln** : for novels"
@@ -83,7 +84,7 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         .set_image("https://i.imgur.com/2nEsM2W.png")
 
         ,
-                hk.Embed(
+        hk.Embed(
             title="Plot Command help",
             description=(
                 "The command to plot the popularity of one anime during it's runtime "
@@ -119,17 +120,27 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         hk.Embed(
             title="Sauce Command help",
             description=(
-                "Find the source of a manga panel/anime ss or fanart."
-                "\nImplemented as a Menu Command and a Slash Command."
+                "Find the source of a manga panel/anime ss or fanart (preferably not cropped)"
             ),
             colour=0x000000,
             timestamp=datetime.datetime.now().astimezone()
         )
-        .add_field("Menu Command", "Right Click on an image and check the sauce option in apps")
+        .add_field(
+            "Menu Command", 
+            (
+                "Right Click on an image and check the sauce option in apps."
+                "\nWill not work for images embedded via links"
+            )
+        )
         .add_field(
             "Slash Command", 
-            "Normal Slash Command with option for SauceNao/Trace.Moe. Trace works better for anime")
-        .set_image("https://i.imgur.com/dTvGa1t.png")
+            ("Slash Command with option for SauceNao/Trace.Moe "
+            "(Trace works better for anime) \n\n"
+            "**Note**: The slash command is an experimental implementation and "
+            "should it fail, you should use the menu command."
+            )
+        )
+        .set_image("https://i.imgur.com/YxvyvaF.png")
         ,
         hk.Embed(
             title="Utility help",

@@ -1,7 +1,6 @@
 """Load, unload or reload a plugin"""
 import lightbulb as lb
 
-
 reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins")
 
 

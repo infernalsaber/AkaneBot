@@ -1,18 +1,15 @@
 """The main file of the bot, basically sets up and starts the bot """
-import os
 import asyncio
 import datetime
-import sqlite3
 import logging
+import os
 
 import aiohttp
 import dotenv
-
 import hikari as hk
 import lightbulb as lb
 import miru
 from lightbulb.ext import tasks
-
 
 dotenv.load_dotenv()
 
@@ -23,9 +20,11 @@ def return_prefix() -> list:
     else:
         return ["-"]
 
+
 # The following snippet is borrowed from:
 # https://github.com/Nereg/ARKMonitorBot/blob/
 # 1a6cedf34d531bddf0f5b11b3238344192998997/src/main.py#L14
+
 
 def setup_logging() -> None:
     """Set up the logging of the events to log.txt (for debugging) [Level-1]"""
@@ -90,7 +89,6 @@ async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
     # with open("ded.txt", "a", encoding="UTF-8") as ded:
     #     ded.write(".")
-
 
 
 @bot.command
