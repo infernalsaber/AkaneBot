@@ -288,7 +288,7 @@ class PreviewButton(nav.NavButton):
         except:
             await ctx.respond(
                 (
-                    f"Looks like MD doesn't have this series "
+                    f"Looks like MangaDex doesn't have this series "
                     f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}"
                     f"\nThat or some unknown error."
                 ),
