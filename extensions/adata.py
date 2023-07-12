@@ -965,7 +965,10 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         else:
             trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
 
-    buttons = [TrailerButton(trailer=trailer, other_page=pages), KillNavButton()]
+        buttons = [TrailerButton(trailer=trailer, other_page=pages), KillNavButton()]
+    else:
+        buttons = [KillNavButton()]
+
     navigator = CustomNavi(
         pages=pages, buttons=buttons, timeout=180, user_id=ctx.author.id
     )
