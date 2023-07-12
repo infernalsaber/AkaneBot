@@ -1,12 +1,14 @@
 """The extension which fetches the AL data for the plot function"""
-from operator import itemgetter
 import datetime
+from operator import itemgetter
+
 import requests
 
+import requests_cache
 
-
-
-
+requests_cache.install_cache(
+    "my_cache", expire_after=3600
+)
 
 async def search_it(search_query: str) -> dict | int:
     """Search for the anime"""
@@ -154,8 +156,6 @@ query ($id: Int, $search: String) {
             scores.append(value["averageScore"])
 
     # Sending the data back
-
-
 
     return {
         "name": name,

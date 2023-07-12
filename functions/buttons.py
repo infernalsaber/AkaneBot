@@ -1,18 +1,24 @@
 """Commonly used functions to ease utility"""
-import io
-from typing import Literal, Union, Optional
-import requests
-from PIL import Image
-# from bs4 import BeautifulSoup
-
+from typing import Optional, Union
 
 import hikari as hk
-from miru.ext import nav
 import miru
+import requests
+from miru.ext import nav
+
+# from bs4 import BeautifulSoup
+
+import requests_cache
+
+requests_cache.install_cache(
+    "my_cache", expire_after=3600
+)  # Cache expires after 1 hour (3600 seconds)
 
 
 def preview_maker(base_url, data_id, title, manga_id, cover):
     req = requests.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
+    if req.from_cache:
+        print("Cache works!!!\n\n")
     if not req.ok:
         return
 
@@ -22,8 +28,9 @@ def preview_maker(base_url, data_id, title, manga_id, cover):
     for page in r_json["chapter"]["data"]:
         pages.append(
             hk.Embed(
-                title=title, color=0xFF6740,
-                url=f"https://mangadex.org/title/{manga_id}"
+                title=title,
+                color=0xFF6740,
+                url=f"https://mangadex.org/title/{manga_id}",
             )
             .set_image(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
             .set_footer(
@@ -55,6 +62,7 @@ def preview_maker(base_url, data_id, title, manga_id, cover):
     # ]
     return pages
 
+
 class GenericButton(miru.Button):
     """A custom next general class"""
 
@@ -66,15 +74,16 @@ class GenericButton(miru.Button):
         if not ctx.author.id == self.view.user_id:
             await ctx.respond(
                 (
-                    "You can't interact with this button as " 
+                    "You can't interact with this button as "
                     "you are not the invoker of the command."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
         self.view.answer = self.label
         self.view.stop()
+
 
 class KillNavButton(nav.NavButton):
     """A custom next kill class"""
@@ -97,10 +106,10 @@ class KillNavButton(nav.NavButton):
         if not ctx.author.id == self.view.user_id:
             await ctx.respond(
                 (
-                    "You can't interact with this button as " 
+                    "You can't interact with this button as "
                     "you are not the invoker of the command."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
@@ -112,6 +121,7 @@ class KillNavButton(nav.NavButton):
 
     async def before_page_change(self) -> None:
         ...
+
 
 class CustomPrevButton(nav.NavButton):
     """A custom previous button class"""
@@ -139,10 +149,10 @@ class CustomPrevButton(nav.NavButton):
         if not ctx.author.id == self.view.user_id:
             await ctx.respond(
                 (
-                    "You can't interact with this button as " 
+                    "You can't interact with this button as "
                     "you are not the invoker of the command."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
         if self.view.current_page == 0:
@@ -153,9 +163,7 @@ class CustomPrevButton(nav.NavButton):
 
     async def before_page_change(self) -> None:
         ...
-    
 
-        
 
 class CustomNextButton(nav.NavButton):
     """A custom next button class"""
@@ -179,10 +187,10 @@ class CustomNextButton(nav.NavButton):
         if not ctx.author.id == self.view.user_id:
             await ctx.respond(
                 (
-                    "You can't interact with this button as " 
+                    "You can't interact with this button as "
                     "you are not the invoker of the command."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
         if self.view.current_page == len(self.view.pages) - 1:
@@ -193,6 +201,7 @@ class CustomNextButton(nav.NavButton):
 
     async def before_page_change(self) -> None:
         ...
+
 
 class NavLinkButton(nav.NavButton):
     """A custom next button class"""
@@ -205,7 +214,7 @@ class NavLinkButton(nav.NavButton):
         custom_id: Optional[str] = None,
         emoji: Union[hk.Emoji, str, None] = None,
         row: Optional[int] = None,
-        url: Optional[str] = None
+        url: Optional[str] = None,
     ):
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row, url=url
@@ -243,12 +252,13 @@ class PreviewButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext):
         if self.label == "🔍":
-            await self.view.swap_pages(ctx, ctx.bot.d.chapter_info[self.view.message_id][5])
+            await self.view.swap_pages(
+                ctx, ctx.bot.d.chapter_info[self.view.message_id][5]
+            )
             self.label = "Preview"
             self.emoji = hk.Emoji.parse("<a:peek:1061709886712455308>")
             print(self.view.children)
             for item in self.view.children:
-
                 if not item == self:
                     self.view.remove_item(item)
             view = self.view
@@ -256,7 +266,6 @@ class PreviewButton(nav.NavButton):
             view.add_item(self)
             view.add_item(KillNavButton())
             await ctx.edit_response(components=view)
-
 
             print("Items removed")
             return
@@ -273,30 +282,31 @@ class PreviewButton(nav.NavButton):
                 if not item == self:
                     self.view.remove_item(item)
             data = ctx.bot.d.chapter_info[self.view.message_id]
-            await self.view.swap_pages(ctx, preview_maker(
-                data[0], data[1], data[2], data[3], data[4]
-                )
+            await self.view.swap_pages(
+                ctx, preview_maker(data[0], data[1], data[2], data[3], data[4])
             )
         except:
             await ctx.respond(
                 (
-                    f"Looks like MD doesn't have this series " 
+                    f"Looks like MD doesn't have this series "
                     f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}"
                     f"\nThat or some unknown error."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
 
-        self.view.add_item(CustomPrevButton(
-            style=hk.ButtonStyle.SECONDARY,
-            emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
+        self.view.add_item(
+            CustomPrevButton(
+                style=hk.ButtonStyle.SECONDARY,
+                emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
             )
         )
         self.view.add_item(nav.IndicatorButton())
-        self.view.add_item(CustomNextButton(
-            style=hk.ButtonStyle.SECONDARY,
-            emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
+        self.view.add_item(
+            CustomNextButton(
+                style=hk.ButtonStyle.SECONDARY,
+                emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
             )
         )
         # self.view.add_item(NavLinkButton(
@@ -311,7 +321,7 @@ class PreviewButton(nav.NavButton):
 
     async def before_page_change(self) -> None:
         ...
-    
+
     async def on_timeout(self, ctx: miru.ViewContext) -> None:
         await ctx.edit_response(components=[])
 
@@ -330,7 +340,7 @@ class TrailerButton(nav.NavButton):
         ),
         row: Optional[int] = None,
         trailer: str = None,
-        other_page: Union[hk.Embed, str] = None
+        other_page: Union[hk.Embed, str] = None,
     ):
         self.trailer = trailer
         self.other_page = other_page
@@ -342,10 +352,10 @@ class TrailerButton(nav.NavButton):
         if not ctx.author.id == self.view.user_id:
             await ctx.respond(
                 (
-                    "You can't interact with this button as " 
+                    "You can't interact with this button as "
                     "you are not the invoker of the command."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
 
@@ -355,7 +365,6 @@ class TrailerButton(nav.NavButton):
             self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
             # self.view.add_item(KillNavButton())
             await ctx.edit_response(components=self.view)
-
 
             # print("Items removed")
             return
@@ -371,7 +380,6 @@ class TrailerButton(nav.NavButton):
         # try:
         await self.view.swap_pages(ctx, [self.trailer])
 
-
         self.label = "🔍"
         self.emoji = None
         # self.view.add_item(KillNavButton())
@@ -380,26 +388,26 @@ class TrailerButton(nav.NavButton):
 
     async def before_page_change(self) -> None:
         ...
-    
+
     async def on_timeout(self, ctx: miru.ViewContext) -> None:
         await ctx.edit_response(components=[])
-    
+
+
 class KillButton(miru.Button):
     """A custom next kill class"""
 
     # Let's leave our arguments dynamic this time, instead of hard-coding them
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         if not ctx.author.id == self.view.user_id:
             await ctx.respond(
                 (
-                    "You can't interact with this button as " 
+                    "You can't interact with this button as "
                     "you are not the invoker of the command."
                 ),
-                flags = hk.MessageFlag.EPHEMERAL
+                flags=hk.MessageFlag.EPHEMERAL,
             )
             return
         # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
