@@ -17,7 +17,7 @@ info_plugin = lb.Plugin("Info", "Get information about an entity")
 @lb.implements(lb.PrefixCommand)
 async def botinfo(ctx: lb.Context) -> None:
     """Get info about the bot"""
-
+    ctx.bot.d.ncom += 1
     user = info_plugin.bot.get_me()
     data = await info_plugin.bot.rest.fetch_application()
     guilds = list(await info_plugin.bot.rest.fetch_my_guilds())
@@ -45,7 +45,7 @@ async def botinfo(ctx: lb.Context) -> None:
         .add_field("Name", user)
         .add_field("No of Servers", len(guilds), inline=True)
         .add_field("No of Members", member, inline=True)
-        .add_field("Version", "v0.0.1")
+        .add_field("Version", "v0.3.1")
         .add_field(
             "Alive since", f"<t:{int(user.created_at.timestamp())}:R>", inline=True
         )

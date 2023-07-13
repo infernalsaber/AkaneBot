@@ -73,6 +73,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.aio_session = aiohttp.ClientSession()
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
+    bot.d.ncom = 0
     bot.d.update_channels = ["1127609035374461070"]
     if not os.path.exists("logs"):
         os.mkdir("logs")
@@ -84,11 +85,33 @@ async def on_starting(event: hk.StartingEvent) -> None:
     setup_logging()
 
 
+def verbose_timedelta(delta):
+    d = delta.days
+    h, s = divmod(delta.seconds, 3600)
+    m, s = divmod(s, 60)
+    labels = ["day", "hour", "minute", "second"]
+    dhms = [
+        "%s %s%s" % (i, lbl, "s" if i != 1 else "")
+        for i, lbl in zip([d, h, m, s], labels)
+    ]
+    for start in range(len(dhms)):
+        if not dhms[start].startswith("0"):
+            break
+    for end in range(len(dhms) - 1, -1, -1):
+        if not dhms[end].startswith("0"):
+            break
+    return ", ".join(dhms[start : end + 1])
+
+
 @bot.listen()
 async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
     # with open("ded.txt", "a", encoding="UTF-8") as ded:
     #     ded.write(".")
+    await bot.rest.create_message(
+        1129030476695343174,
+        f"Bot closed with {bot.d.ncom} commands and {verbose_timedelta(datetime.datetime.now().astimezone()-bot.d.timeup)} uptime",
+    )
 
 
 @bot.command
@@ -101,6 +124,7 @@ async def ping(ctx: lb.Context) -> None:
         ctx (lb.Context): The event context (irrelevant to the user)
     """
     await ctx.respond(f"Pong! Latency: {bot.heartbeat_latency*1000:.2f}ms")
+    bot.d.ncom += 1
 
 
 @bot.listen(lb.CommandErrorEvent)

@@ -116,6 +116,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
         query (str): The name of the two anime (seperated by "vs")
     """
 
+    ctx.bot.d.ncom += 1
     # print(os.listdir("./pictures/"))
     print("\n\n\n")
     if f"{query}.png" in os.listdir("./pictures/"):

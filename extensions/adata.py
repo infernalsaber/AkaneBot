@@ -199,6 +199,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 async def al_search(ctx: lb.Context, type: str, media: str) -> None:
     """Search an anime/manga/character on AL"""
 
+    ctx.bot.d.ncom += 1
     print("Type is", type)
 
     if type.lower() in ["anime", "manga", "m", "a"]:
@@ -437,6 +438,7 @@ async def al_search(ctx: lb.Context, type: str, media: str) -> None:
 @lb.command("anime", "Search a anime", pass_options=True, aliases=["ani", "a"])
 @lb.implements(lb.PrefixCommand)
 async def anime_search(ctx: lb.PrefixContext, query: str):
+    ctx.bot.d.ncom += 1
     await search_anime(ctx, query)
 
 
@@ -445,6 +447,7 @@ async def anime_search(ctx: lb.PrefixContext, query: str):
 @lb.command("manga", "Search a manga", pass_options=True, aliases=["m"])
 @lb.implements(lb.PrefixCommand)
 async def manga_search(ctx: lb.PrefixContext, query: str):
+    ctx.bot.d.ncom += 1
     await search_manga(ctx, query)
 
 
@@ -457,6 +460,7 @@ async def manga_search(ctx: lb.PrefixContext, query: str):
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, user: str):
     await ctx.respond(f"https://anilist.co/user/{user}")
+    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -465,6 +469,7 @@ async def user_al(ctx: lb.PrefixContext, user: str):
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, query: str):
     await search_novel(ctx, query)
+    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -477,6 +482,7 @@ async def user_al(ctx: lb.PrefixContext, query: str):
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, query: str):
     await search_character(ctx, query)
+    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -498,6 +504,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
     Raises:
         RequestsFailedError: Raised if the API call fails
     """
+    ctx.bot.d.ncom += 1
     num = 5
     if filter and filter in ["airing", "upcoming", "bypopularity", "favorite"]:
         params = {"limit": num, "filter": filter}
@@ -542,6 +549,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
 @lb.implements(lb.PrefixCommand)
 async def vn_search(ctx: lb.PrefixContext, query: str):
     await search_vn(ctx, query)
+    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -552,6 +560,7 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 @lb.implements(lb.PrefixCommand)
 async def vn_search(ctx: lb.PrefixContext, query: str):
     await search_vntag(ctx, query)
+    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -569,6 +578,8 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 @lb.command("nh", "Search 🌚", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def nhhh(ctx: lb.PrefixContext, code: int):
+    ctx.bot.d.ncom += 1
+
     if not ctx.get_channel().is_nsfw:
         # await ctx.respond("Not nsfw")
         return
@@ -1324,7 +1335,7 @@ async def search_vnchara(ctx: lb.Context, query: str):
 
     req = req.json()
     # print(list(tag['name'] for tag in req['results'][0]['tags'])[:3])
-    
+
     if req["results"][0]["description"]:
         description = parse_vndb_desciption(req["results"][0]["description"])
     else:
@@ -1339,9 +1350,7 @@ async def search_vnchara(ctx: lb.Context, query: str):
         .add_field("Age", req["results"][0]["age"] or "NA", inline=True)
         .add_field(
             "Traits",
-            ", ".join(
-                list(trait["name"] for trait in req["results"][0]["traits"])[:4]
-            )
+            ", ".join(list(trait["name"] for trait in req["results"][0]["traits"])[:4])
             or "NA",
         )
         .add_field("Summary", description)
@@ -1350,9 +1359,7 @@ async def search_vnchara(ctx: lb.Context, query: str):
             name=req["results"][0]["name"],
             url=f"https://vndb.org/{req['results'][0]['id']}",
         )
-        .set_footer(
-            text="Source: VNDB", icon="https://files.catbox.moe/3gg4nn.jpg"
-        ),
+        .set_footer(text="Source: VNDB", icon="https://files.catbox.moe/3gg4nn.jpg"),
         components=view,
     )
     await view.start(choice)
@@ -1362,7 +1369,6 @@ async def search_vnchara(ctx: lb.Context, query: str):
         print(f"Received an answer! It is: {view.answer}")
     else:
         await ctx.edit_last_response(components=[])
-
 
 
 async def search_vntag(ctx: lb.Context, query: str):
@@ -1402,9 +1408,7 @@ async def search_vntag(ctx: lb.Context, query: str):
             name=req["results"][0]["name"],
             url=f"https://vndb.org/{req['results'][0]['id']}",
         )
-        .set_footer(
-            text="Source: VNDB", icon="https://files.catbox.moe/3gg4nn.jpg"
-        ),
+        .set_footer(text="Source: VNDB", icon="https://files.catbox.moe/3gg4nn.jpg"),
         components=view,
     )
     await view.start(choice)
@@ -1414,7 +1418,6 @@ async def search_vntag(ctx: lb.Context, query: str):
         print(f"Received an answer! It is: {view.answer}")
     else:
         await ctx.edit_last_response(components=[])
-
 
 
 @al_search.set_error_handler
