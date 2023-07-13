@@ -25,6 +25,8 @@ sauce_plugin = lb.Plugin(
 @lb.command("Find the Sauce", "Search the sauce of the image")
 @lb.implements(lb.MessageCommand)
 async def mangamenu(ctx: lb.MessageContext):
+    ctx.bot.d.ncom += 1
+
     if len(ctx.options["target"].attachments) == 0:
         await ctx.respond("There's nothing here to find the sauce of.")
 
@@ -83,6 +85,8 @@ async def mangamenu(ctx: lb.MessageContext):
 @lb.command("sauce", "Show ya sauce for the image", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashCommand)
 async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
+    ctx.bot.d.ncom += 1
+
     if not check_if_url(link):
         await ctx.respond("That's not a link <:AkanePoutColor:852847827826376736>")
         return
@@ -230,6 +234,8 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
 @lb.command("pingu", "Check if site alive", pass_options=True, auto_defer=True)
 @lb.implements(lb.PrefixCommand)
 async def pingu(ctx: lb.Context, link: str) -> None:
+    ctx.bot.d.ncom += 1
+
     if not check_if_url(link):
         await ctx.respond("That's... not a link <:AkanePoutColor:852847827826376736>")
         return

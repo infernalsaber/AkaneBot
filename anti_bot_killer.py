@@ -10,9 +10,11 @@ while True:
             os.remove("ded.txt")
             break
 
-        process = subprocess.Popen(check, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(
+            check, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         stdout, stderr = process.communicate()
-        if not int.from_bytes(stdout, byteorder='big'):
+        if not int.from_bytes(stdout, byteorder="big"):
             print("Starting bot.")
 
             if os.name == "nt":
@@ -27,7 +29,6 @@ while True:
         print(e)
 # print(type(os.system("ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'")))
 # print(int(os.system("ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'")) == 0)
-
 
 
 # print(stdout, type(stdout))

@@ -15,6 +15,8 @@ reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins")
 @lb.implements(lb.PrefixCommand)
 async def reload_plugin(ctx: lb.Context, extension: str) -> None:
     """Reload an extension"""
+    ctx.bot.d.ncom += 1
+
     ctx.bot.reload_extensions(f"extensions.{extension}")
     # try:
     #     ctx.bot.unload_extensions(f"extensions.{extension}")
@@ -34,6 +36,8 @@ async def reload_plugin(ctx: lb.Context, extension: str) -> None:
 @lb.implements(lb.PrefixCommand)
 async def load_plugin(ctx: lb.Context, extension: str) -> None:
     """Load an extension"""
+    ctx.bot.d.ncom += 1
+
     ctx.bot.load_extensions(f"extensions.{extension}")
     await ctx.respond(f"Extension {extension} loaded successfully.")
 
@@ -45,6 +49,8 @@ async def load_plugin(ctx: lb.Context, extension: str) -> None:
 @lb.implements(lb.PrefixCommand)
 async def unload_plugin(ctx: lb.Context, extension: str) -> None:
     """Unload an extension"""
+    ctx.bot.d.ncom += 1
+
     ctx.bot.unload_extensions(f"extensions.{extension}")
     await ctx.respond("Extension unloaded successfully.")
 

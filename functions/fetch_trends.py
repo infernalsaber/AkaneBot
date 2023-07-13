@@ -6,9 +6,8 @@ import requests
 
 import requests_cache
 
-requests_cache.install_cache(
-    "my_cache", expire_after=3600
-)
+requests_cache.install_cache("my_cache", expire_after=3600)
+
 
 async def search_it(search_query: str) -> dict | int:
     """Search for the anime"""

@@ -44,6 +44,8 @@ async def directory(ctx: lb.Context) -> None:
     Args:
         ctx (lb.Context): The event context (irrelevant to the user)
     """
+    ctx.bot.d.ncom += 1
+
     if not (guild := ctx.get_guild()):
         await ctx.respond("This command may only be used in servers.")
         return
@@ -104,6 +106,8 @@ async def directory(ctx: lb.Context) -> None:
 @lb.command("update", "Update the bot's source", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def update_code(ctx: lb.Context) -> None:
+    ctx.bot.d.ncom += 1
+
     with subprocess.Popen(
         ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as result:
@@ -118,7 +122,7 @@ async def update_code(ctx: lb.Context) -> None:
         else:
             await ctx.respond("Updated source.")
 
-    await ctx.edit_last_response("Shutting bot down...")
+    await ctx.edit_last_response("Restarting the bot...")
     await ctx.bot.close()
 
 
@@ -127,6 +131,8 @@ async def update_code(ctx: lb.Context) -> None:
 @lb.command("guilds", "Update the bot's source")
 @lb.implements(lb.PrefixCommand)
 async def guilds(ctx: lb.Context) -> None:
+    ctx.bot.d.ncom += 1
+
     try:
         # for i in :
         # embed = hk.Embed(color=0x000000)
@@ -161,6 +167,18 @@ async def guilds(ctx: lb.Context) -> None:
         # await ctx.respond(embed=embed)
     except Exception as e:
         print(e)
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.command("shutdown", "shut down")
+@lb.implements(lb.PrefixCommand)
+async def guilds(ctx: lb.Context) -> None:
+    ctx.bot.d.ncom += 1
+    with open("ded.txt", "w+", encoding="UTF-8") as ded:
+        ded.write(".")
+    await ctx.respond("Shutting bot down...")
+    await ctx.bot.close()
 
 
 def load(bot: lb.BotApp) -> None:
