@@ -37,7 +37,7 @@ async def mangamenu(ctx: lb.MessageContext):
     params = {
         "api_key": SAUCENAO_KEY,
         "output_type": 2,
-        "numres": 1,
+        "numres": 5,
         "url": ctx.options["target"].attachments[0].url,
     }
 
