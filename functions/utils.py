@@ -22,10 +22,10 @@ class CustomNavi(nav.NavigatorView):
         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
 
     async def on_timeout(self) -> None:
+        await self.message.edit(components=[])
         if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
             self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
             print("Cleared cache\n\n\n")
-        await self.message.edit(components=[])
 
 
 class CustomView(miru.View):

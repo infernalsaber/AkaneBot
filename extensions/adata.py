@@ -880,7 +880,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         timeout=10,
     )
 
-    if not response.ok:
+    if not response.ok or not len(response.json()["data"]["Page"]["media"]):
         print(response.json())
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
@@ -890,7 +890,10 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     num = 0
     if not len(response.json()["data"]["Page"]["media"]) == 1:
         view = CustomView(user_id=ctx.author.id)
-        embed = hk.Embed(title="Choose the desired anime", color=0x43408A)
+        embed = hk.Embed(
+            title="Choose the desired anime", color=0x43408A,
+            timestamp=datetime.datetime.now().astimezone()
+            )
         # for item in response.json()['data']['Page']['media']:
         # await ctx.respond("oomphie")
         # print(response.json()['data']['Page']['media'])
