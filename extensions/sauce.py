@@ -91,7 +91,7 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
         await ctx.respond("That's not a link <:AkanePoutColor:852847827826376736>")
         return
 
-    params = {"api_key": SAUCENAO_KEY, "output_type": 2, "numres": 1, "url": link}
+    params = {"api_key": SAUCENAO_KEY, "output_type": 2, "numres": 5, "url": link}
 
     if service != "TraceMoe":
         async with ctx.bot.d.aio_session.get(
