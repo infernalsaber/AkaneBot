@@ -252,9 +252,6 @@ class PreviewButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext):
         if self.label == "🔍":
-            await self.view.swap_pages(
-                ctx, ctx.bot.d.chapter_info[self.view.message_id][5]
-            )
             self.label = "Preview"
             self.emoji = hk.Emoji.parse("<a:peek:1061709886712455308>")
             print(self.view.children)
@@ -265,9 +262,12 @@ class PreviewButton(nav.NavButton):
             self.view.clear_items()
             view.add_item(self)
             view.add_item(KillNavButton())
-            await ctx.edit_response(components=view)
+            await self.view.swap_pages(
+                ctx, ctx.bot.d.chapter_info[self.view.message_id][5]
+            )
+            # await ctx.edit_response(components=view)
 
-            print("Items removed")
+            # print("Items removed")
             return
         # await ctx.respond("Testx")
         # view = self.view
@@ -360,11 +360,11 @@ class TrailerButton(nav.NavButton):
             return
 
         if self.label == "🔍":
-            await self.view.swap_pages(ctx, self.other_page)
             self.label = "Trailer"
             self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
+            await self.view.swap_pages(ctx, self.other_page)
             # self.view.add_item(KillNavButton())
-            await ctx.edit_response(components=self.view)
+            # await ctx.edit_response(components=self.view)
 
             # print("Items removed")
             return
@@ -420,3 +420,24 @@ class KillButton(miru.Button):
         # await ctx.edit_response(
         #     flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
         # )
+
+class NewButton(miru.Button):
+    def __init__(self, style: Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        label: Optional[str] = None,
+        link: str = None,
+        custom_id: Optional[str] = None,
+        ) -> None:
+        self.link = link
+        super().__init__(style=style, label=label, custom_id=custom_id)
+        print(self.link)
+    
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        try:
+            # await ctx.respond("This button is brokem")
+            # await ctx.respond(
+            #     "You can't interact with this button",
+            #     flags=hk.MessageFlag.EPHEMERAL,
+            # )
+            await ctx.respond(f"{self.link}", flags=hk.MessageFlag.EPHEMERAL)
+        except Exception as e:
+            print(e)
