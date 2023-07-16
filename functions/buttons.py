@@ -25,7 +25,7 @@ def preview_maker(base_url, data_id, title, manga_id, cover):
     r_json = req.json()
     pages = []
 
-    for page in r_json["chapter"]["data"]:
+    for page in r_json["chapter"]["dataSaver"]:
         pages.append(
             hk.Embed(
                 title=title,

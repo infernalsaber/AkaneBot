@@ -265,7 +265,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
             embed=hk.Embed(title=embed_title, color=0x7DF9FF).set_image(
                 hk.File(f"pictures/{query}.png")
             )
-            # , attachments = None
+            , attachments = []
         )
 
         # await ctx.respond(

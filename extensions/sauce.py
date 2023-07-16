@@ -9,8 +9,8 @@ import lightbulb as lb
 import miru
 import requests
 
-from functions.buttons import GenericButton
-from functions.utils import check_if_url
+from extensions.ping import GenericButton
+from extensions.ping import check_if_url
 
 dotenv.load_dotenv()
 
@@ -19,27 +19,6 @@ SAUCENAO_KEY = os.getenv("SAUCENAO_KEY")
 sauce_plugin = lb.Plugin(
     "plot", "A set of commands that are used to plot anime's trends"
 )
-
-async def simple_parsing(ctx: lb.Context, data: dict):
-
-    sauce = "😵"
-    if "source" in data["data"].keys():
-        if "ext_urls" in data["data"].keys():
-            sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
-        else:
-            sauce = data["data"]["source"]
-    else:
-        sauce = data["data"]["ext_urls"][0]
-    await ctx.respond(
-        embed=hk.Embed(color=0x000000)
-        .add_field("Similarity", data["header"]["similarity"])
-        .add_field("Source", sauce)
-        .set_thumbnail(data["header"]["thumbnail"])
-        .set_author(name="Search results returned the follows: ")
-        .set_footer(
-            text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
-        )
-            )
 
 
 
@@ -98,19 +77,19 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
     params = {"api_key": SAUCENAO_KEY, "output_type": 2, "numres": 5, "url": link}
 
     if service != "TraceMoe":
-        async with ctx.bot.d.aio_session.get(
+        res = requests.get(
             "https://saucenao.com/search.php?", params=params
-        ) as res:
-            if res.ok:
-                res = await res.json()
-                # print(res)
-                # try:
-                data = res["results"][0]
-                # print(data)
-                try:
-                    await complex_parsing(ctx, data)
-                except:
-                    await simple_parsing(ctx, data)
+        )
+        if res.ok:
+            res = res.json()
+            # print(res)
+            # try:
+            data = res["results"][0]
+            # print(data)
+            try:
+                await complex_parsing(ctx, data)
+            except:
+                await simple_parsing(ctx, data)
     else:
         try:
             async with ctx.bot.d.aio_session.get(
@@ -237,7 +216,87 @@ async def complex_parsing(ctx: lb.Context, data: dict):
         )
         # except Exception as e:
         #     print(e)
+    
+    elif "Danbooru" in data["header"]["index_name"]:
+        # try:
+        view = miru.View()
+        view.add_item(
+            GenericButton(
+                style=hk.ButtonStyle.LINK,
+                emoji=hk.Emoji.parse(
+                    "<:danbooru:1130206873388326952>"
+                ),
+                url=data["data"]["ext_urls"][0],
+            )
+        )
+        view.add_item(
+            GenericButton(
+                style=hk.ButtonStyle.LINK,
+                label="Original Image",
+                url=data["data"]["source"],
+            )
+        )
+        creator = ""
+        if isinstance(data['data']['creator'], str):
+            creator = data['data']['creator']
+        else:
+            creator = ", ".join(data['data']['creator'])
+        await ctx.respond(
+            embed=hk.Embed(
+                color=0x000000,
+            )
+            .add_field("Similarity", data["header"]["similarity"])
+            .add_field(
+                "Artist", creator, inline=True
+            )
+            .add_field("Character(s)", data['data']['characters'], inline=True)
+            .add_field("Source Material", data['data']['material'])
+            .set_thumbnail(data["header"]["thumbnail"])
+            .set_author(name="Search results returned the follows: ")
+            .set_footer(
+                text="Powered by: SauceNAO",
+                icon="https://i.imgur.com/2VRIEPR.png",
+            ),
+            components=view,
+        )
+        # except Exception as e:
+        #     print(e)
+    
+    elif "Pixiv" in data["header"]["index_name"]:
+        # try:
+        view = miru.View()
+        view.add_item(
+            GenericButton(
+                style=hk.ButtonStyle.LINK,
+                emoji=hk.Emoji.parse(
+                    "<:pixiv:1130216490021425352>"
+                ),
+                url=data["data"]["ext_urls"][0],
+            )
+        )
+        await ctx.respond(
+            embed=hk.Embed(
+                color=0x000000,
+            )
+            .add_field("Similarity", data["header"]["similarity"])
+            .add_field(
+                "Author",
+                f"[{data['data']['member_name']}](https://www.pixiv.net/en/users/{data['data']['member_id']})",
+            )
+            .add_field("Title", data['data']['title'])
+            .set_thumbnail(data["header"]["thumbnail"])
+            .set_author(name="Search results returned the follows: ")
+            .set_footer(
+                text="Powered by: SauceNAO",
+                icon="https://i.imgur.com/2VRIEPR.png",
+            ),
+            components=view,
+        )
+        # except Exception as e:
+        #     print(e)
+
     else:
+        sauce = "😵"
         if "source" in data["data"].keys():
             if "ext_urls" in data["data"].keys():
                 sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
@@ -245,17 +304,52 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 sauce = data["data"]["source"]
         else:
             sauce = data["data"]["ext_urls"][0]
-        await ctx.respond(
-            embed=hk.Embed(color=0x000000)
-            .add_field("Similarity", data["header"]["similarity"])
-            .add_field("Source", sauce)
-            .set_thumbnail(data["header"]["thumbnail"])
-            .set_author(name="Search results returned the follows: ")
-            .set_footer(
-                text="Powered by: SauceNAO",
-                icon="https://i.imgur.com/2VRIEPR.png",
+        
+            embed= ( 
+                hk.Embed(
+                color=0x000000
+                )
+                .add_field("Similarity", data["header"]["similarity"])
+                .add_field("Source", sauce)
+                .set_thumbnail(data["header"]["thumbnail"])
+                .set_author(name="Search results returned the follows: ")
+                .set_footer(
+                    text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
+                )
             )
+        
+        for i, item in enumerate(data['data'].keys()):
+            if item not in ["source", "ext_urls"]:
+                if i%3:
+                    embed.add_field(sanitize_field(item), data["data"][item], inline=True)
+                else: 
+                    embed.add_field(sanitize_field(item), data["data"][item])
+        
+        await ctx.respond(embed=embed)
+
+async def simple_parsing(ctx: lb.Context, data: dict):
+
+    sauce = "😵"
+    if "source" in data["data"].keys():
+        if "ext_urls" in data["data"].keys():
+            sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
+        else:
+            sauce = data["data"]["source"]
+    else:
+        sauce = data["data"]["ext_urls"][0]
+    await ctx.respond(
+        embed=hk.Embed(color=0x000000)
+        .add_field("Similarity", data["header"]["similarity"])
+        .add_field("Source", sauce)
+        .set_thumbnail(data["header"]["thumbnail"])
+        .set_author(name="Search results returned the follows: ")
+        .set_footer(
+            text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
         )
+    )
+
+def sanitize_field(name: str) -> str:
+    return name.replace("_", " ").capitalize()
 
 async def al_from_mal(mal_id: int, type: str = None) -> str:
     query = """

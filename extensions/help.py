@@ -14,8 +14,8 @@ from typing import Optional
 
 import datetime
 
-from functions.buttons import KillNavButton, CustomNextButton, CustomPrevButton
-from functions.utils import CustomNavi
+from extensions.ping import KillNavButton, CustomNextButton, CustomPrevButton
+from extensions.ping import CustomNavi
 
 from miru.ext import nav
 

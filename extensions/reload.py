@@ -9,7 +9,7 @@ reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins")
 @lb.option(
     "extension",
     "The extension to reload",
-    choices=["fun", "compiler", "gallery", "listener"],
+
 )
 @lb.command("reload", "Reload an extension", pass_options=True, aliases=["rl"])
 @lb.implements(lb.PrefixCommand)

@@ -13,6 +13,7 @@ from lightbulb.ext import tasks
 
 dotenv.load_dotenv()
 
+import aiohttp_client_cache
 
 def return_prefix() -> list:
     if os.name == "nt":
@@ -70,7 +71,15 @@ bot.load_extensions_from("./extensions/")
 async def on_starting(event: hk.StartingEvent) -> None:
     """Code which is executed once when the bot starts"""
 
-    bot.d.aio_session = aiohttp.ClientSession()
+    bot.d.aio_session = aiohttp_client_cache.CachedSession(
+        cache_name='cache_db.db',  # For SQLite, this will be used as the filename
+        expire_after=60*60,                         # By default, cached responses expire in an hour
+        allowed_codes=(200, 403, 404),                   # Cache responses with these status codes
+        allowed_methods=['GET', 'POST'],            # Cache requests with these HTTP methods
+        include_headers=True,                       # Cache requests with different headers separately
+        ignored_params=['auth_token'],              # Keep using the cached response even if this param changes
+        timeout=2.5,
+    )
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.ncom = 0

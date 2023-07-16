@@ -7,7 +7,7 @@ import lightbulb as lb
 import requests
 from miru.ext import nav
 
-from functions.buttons import (
+from extensions.ping import (
     CustomNextButton,
     CustomPrevButton,
     GenericButton,
@@ -17,7 +17,7 @@ from functions.buttons import (
     TrailerButton,
 )
 from functions.errors import RequestsFailedError
-from functions.utils import CustomNavi, CustomView
+from extensions.ping import CustomNavi, CustomView
 
 al_listener = lb.Plugin(
     "Weeb", "Search functions for anime, manga and characters (with an easter egg)"
@@ -73,104 +73,104 @@ async def get_imp_info(chapters):
 # @al_listener.listener(hk.th)
 
 
-@al_listener.listener(hk.GuildMessageCreateEvent)
-async def al_link_finder(event: hk.GuildMessageCreateEvent) -> None:
-    """Check if a message contains an animanga link and display it's info"""
-    return
-    if event.is_bot:
-        return
-    # print(event.message.content)
-    list_of_series = pattern.findall(event.message.content) or []
-    # a = hk.MessageFlag
-    # print(list_of_series)
-    if len(list_of_series) != 0:
-        # await event.message.respond("Beep, bop. AniList link found")
-        # await al_listener.bot.rest.edit_message(
-        #     event.channel_id, event.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
-        # )
-        list_of_series = [list_of_series[0]]
-        for series in list_of_series:
-            # print(series)
-            query = """
-query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
-    id
-    idMal
-    title {
-        english
-        romaji
-    }
-    type
-    averageScore
-    format
-    meanScore
-    chapters
-    episodes
-    startDate {
-        year
-    }
-    coverImage {
-        large
-    }
-    bannerImage
-    genres
-    status
-    description (asHtml: false)
-    siteUrl
-  }
-}
+# @al_listener.listener(hk.GuildMessageCreateEvent)
+# async def al_link_finder(event: hk.GuildMessageCreateEvent) -> None:
+#     """Check if a message contains an animanga link and display it's info"""
+#     return
+#     if event.is_bot:
+#         return
+#     # print(event.message.content)
+#     list_of_series = pattern.findall(event.message.content) or []
+#     # a = hk.MessageFlag
+#     # print(list_of_series)
+#     if len(list_of_series) != 0:
+#         # await event.message.respond("Beep, bop. AniList link found")
+#         # await al_listener.bot.rest.edit_message(
+#         #     event.channel_id, event.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
+#         # )
+#         list_of_series = [list_of_series[0]]
+#         for series in list_of_series:
+#             # print(series)
+#             query = """
+# query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
+#   Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+#     id
+#     idMal
+#     title {
+#         english
+#         romaji
+#     }
+#     type
+#     averageScore
+#     format
+#     meanScore
+#     chapters
+#     episodes
+#     startDate {
+#         year
+#     }
+#     coverImage {
+#         large
+#     }
+#     bannerImage
+#     genres
+#     status
+#     description (asHtml: false)
+#     siteUrl
+#   }
+# }
 
-"""
+# """
 
-            variables = {"id": series[3], "type": series[2].upper()}
+#             variables = {"id": series[3], "type": series[2].upper()}
 
-            response = requests.post(
-                "https://graphql.anilist.co",
-                json={"query": query, "variables": variables},
-                timeout=10,
-            )
-            if response.status_code != 200:
-                print(response.json())
-                await event.message.respond(
-                    f"Nvm 😵, error `code: {response.status_code}`"
-                )
-                return
-            print("\n\n", response.json()["data"]["page"]["Media"], "\n\n")
-            response = response.json()["data"]["Media"]
+#             response = requests.post(
+#                 "https://graphql.anilist.co",
+#                 json={"query": query, "variables": variables},
+#                 timeout=10,
+#             )
+#             if response.status_code != 200:
+#                 print(response.json())
+#                 await event.message.respond(
+#                     f"Nvm 😵, error `code: {response.status_code}`"
+#                 )
+#                 return
+#             print("\n\n", response.json()["data"]["page"]["Media"], "\n\n")
+#             response = response.json()["data"]["Media"]
 
-            title = response["title"]["english"] or response["title"]["romaji"]
+#             title = response["title"]["english"] or response["title"]["romaji"]
 
-            no_of_items = response["chapters"] or response["episodes"] or "NA"
+#             no_of_items = response["chapters"] or response["episodes"] or "NA"
 
-            await event.message.respond(
-                content="Here are the details of the AniList series in the link",
-                embed=hk.Embed(
-                    description="\n\n",
-                    color=0x2B2D42,
-                    timestamp=datetime.datetime.now().astimezone(),
-                )
-                .add_field("Rating", response["meanScore"])
-                .add_field("Genres", ", ".join(response["genres"][:4]))
-                .add_field("Status", response["status"], inline=True)
-                .add_field(
-                    "Chapters" if response["type"] == "MANGA" else "ANIME",
-                    no_of_items,
-                    inline=True,
-                )
-                .add_field(
-                    "Summary",
-                    f"{parse_description(response['description'])}",
-                )
-                .set_thumbnail(response["coverImage"]["large"])
-                .set_image(response["bannerImage"])
-                .set_author(url=response["siteUrl"], name=title)
-                .set_footer(
-                    text="Source: AniList",
-                    icon="https://i.imgur.com/NYfHiuu.png",
-                ),
-            )
+#             await event.message.respond(
+#                 content="Here are the details of the AniList series in the link",
+#                 embed=hk.Embed(
+#                     description="\n\n",
+#                     color=0x2B2D42,
+#                     timestamp=datetime.datetime.now().astimezone(),
+#                 )
+#                 .add_field("Rating", response["meanScore"])
+#                 .add_field("Genres", ", ".join(response["genres"][:4]))
+#                 .add_field("Status", response["status"], inline=True)
+#                 .add_field(
+#                     "Chapters" if response["type"] == "MANGA" else "ANIME",
+#                     no_of_items,
+#                     inline=True,
+#                 )
+#                 .add_field(
+#                     "Summary",
+#                     f"{parse_description(response['description'])}",
+#                 )
+#                 .set_thumbnail(response["coverImage"]["large"])
+#                 .set_image(response["bannerImage"])
+#                 .set_author(url=response["siteUrl"], name=title)
+#                 .set_footer(
+#                     text="Source: AniList",
+#                     icon="https://i.imgur.com/NYfHiuu.png",
+#                 ),
+#             )
 
-            # await al_search(ctx, type, media)
+#             # await al_search(ctx, type, media)
 
 
 # @al_listener.listener(hk.GuildReactionAddEvent)
@@ -771,20 +771,20 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     print("\n\nNOVEL SEARCH\n\n")
     variables = {"search": novel, "type": "MANGA"}
 
-    response = requests.post(
+    response = await ctx.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
         timeout=10,
     )
-    print(response.json())
+    # print(response.json())
 
     if not response.ok:
-        print(response.json())
+        # print(response.json())
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
         return
-    response = response.json()["data"]["Media"]
+    response = (await response.json())["data"]["Media"]
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
@@ -874,21 +874,21 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     variables = {"search": anime, "type": "ANIME"}
 
-    response = requests.post(
+    response = await ctx.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
         timeout=10,
     )
 
-    if not response.ok or not len(response.json()["data"]["Page"]["media"]):
-        print(response.json())
+    if not response.ok or not len((await response.json())["data"]["Page"]["media"]):
+        # print(response.json())
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
         return
 
     num = 0
-    if not len(response.json()["data"]["Page"]["media"]) == 1:
+    if not len((await response.json())["data"]["Page"]["media"]) == 1:
         view = CustomView(user_id=ctx.author.id)
         embed = hk.Embed(
             title="Choose the desired anime", color=0x43408A,
@@ -897,7 +897,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         # for item in response.json()['data']['Page']['media']:
         # await ctx.respond("oomphie")
         # print(response.json()['data']['Page']['media'])
-        for count, item in enumerate(response.json()["data"]["Page"]["media"]):
+        for count, item in enumerate((await response.json())["data"]["Page"]["media"]):
             # print("\n")
             # print(item)
             embed.add_field(
@@ -932,7 +932,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         num = int(num) - 1
     # print(isinstance(num, int))
     # print(response.json()['data']['Page']['media'][0])
-    response = response.json()["data"]["Page"]["media"][num]
+    response = (await response.json())["data"]["Page"]["media"][num]
     # num = int(view.answer) - 1
     # print(type(num))
 
@@ -1026,14 +1026,14 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     variables = {"search": manga, "type": "MANGA"}
 
-    response = requests.post(
+    response = await ctx.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
         timeout=10,
     )
 
     if not response.ok:
-        print(response.json())
+        # print(response.json())
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
@@ -1045,7 +1045,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     # if type == "ANIME" and len(response.json()['data']['Page']['media']) == 1:
     #     response = response.json()['data']['Page']['media'][0]
 
-    response = response.json()["data"]["Media"]
+    response = (await response.json())["data"]["Media"]
     print(response)
 
     # print(isinstance(response, dict))
@@ -1064,17 +1064,32 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     print("\n\nUsing MD\n\n")
     base_url = "https://api.mangadex.org"
 
-    req = requests.get(f"{base_url}/manga", params={"title": title}, timeout=10)
+    order = {
+    "rating": "desc",
+    "followedCount": "desc",
+    }
+
+    final_order_query = {}
+
+# { "order[rating]": "desc", "order[followedCount]": "desc" }
+    for key, value in order.items():
+        final_order_query[f"order[{key}]"] = value
+
+    req = await ctx.bot.d.aio_session.get(
+        f"{base_url}/manga", 
+        params={**{"title": title}, **final_order_query}, 
+        timeout=10
+    )
 
     if req.ok:
         try:
-            manga_id = req.json()["data"][0]["id"]
+            manga_id = (await req.json())["data"][0]["id"]
 
             # print(f"The link to the manga is: https://mangadex.org/title/{manga_id}")
 
             languages = ["en"]
 
-            req = requests.get(
+            req = await ctx.bot.d.aio_session.get(
                 f"{base_url}/manga/{manga_id}/aggregate",
                 params={"translatedLanguage[]": languages},
                 timeout=10,
@@ -1082,7 +1097,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             # print(r.status_code)
             # print(r.json())
             # print([chapter["id"] for chapter in r.json()["data"]])
-            data = await get_imp_info(req.json())
+            data = await get_imp_info(await req.json())
 
             if no_of_items == "NA":
                 no_of_items = (
@@ -1220,7 +1235,7 @@ async def search_vn(ctx: lb.Context, query: str):
         "fields": "title, image.url, rating, released, length_minutes, description, tags.name",
         # "sort": "title"
     }
-    req = requests.post(url, headers=headers, json=data)
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         await ctx.respond("Couldn't find the VN you asked for.")
@@ -1228,7 +1243,7 @@ async def search_vn(ctx: lb.Context, query: str):
 
     # print(req.json())
     try:
-        req = req.json()
+        req = await req.json()
         print(list(tag["name"] for tag in req["results"][0]["tags"])[:3])
         if req["results"][0]["description"]:
             description = parse_vndb_desciption(req["results"][0]["description"])
@@ -1330,13 +1345,13 @@ async def search_vnchara(ctx: lb.Context, query: str):
         "fields": "name, description, age, sex,  image.url, traits.name",
     }
 
-    req = requests.post(url, headers=headers, json=data)
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         await ctx.respond("Couldn't find the tag you asked for.")
         return
 
-    req = req.json()
+    req = await req.json()
     # print(list(tag['name'] for tag in req['results'][0]['tags'])[:3])
 
     if req["results"][0]["description"]:
@@ -1382,7 +1397,7 @@ async def search_vntag(ctx: lb.Context, query: str):
         "fields": "name, aliases, description, category, vn_count"
         # "sort": "title"
     }
-    req = requests.post(url, headers=headers, json=data)
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         await ctx.respond("Couldn't find the tag you asked for.")
@@ -1390,7 +1405,7 @@ async def search_vntag(ctx: lb.Context, query: str):
 
     # print(req.json())
 
-    req = req.json()
+    req = await req.json()
     # print(list(tag['name'] for tag in req['results'][0]['tags'])[:3])
     if req["results"][0]["description"]:
         description = parse_vndb_desciption(req["results"][0]["description"])
