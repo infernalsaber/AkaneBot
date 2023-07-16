@@ -9,8 +9,8 @@ import hikari as hk
 import lightbulb as lb
 from lightbulb.ext import tasks
 
-from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
-from functions.utils import CustomNavi
+from extensions.ping import CustomNextButton, CustomPrevButton, KillNavButton
+from extensions.ping import CustomNavi
 
 task_plugin = lb.Plugin("Tasks", "Background processes")
 

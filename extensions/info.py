@@ -4,8 +4,8 @@ import hikari as hk
 import lightbulb as lb
 import psutil
 
-from functions.buttons import GenericButton
-from functions.utils import CustomView
+from extensions.ping import GenericButton
+from extensions.ping import CustomView
 
 info_plugin = lb.Plugin("Info", "Get information about an entity")
 
