@@ -7,6 +7,7 @@ import dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
+import re
 import requests
 
 from extensions.ping import GenericButton
@@ -205,6 +206,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 "Source",
                 f"{data['data']['source']} {data['data']['part']}",
             )
+            .add_field("Timestamp", data["data"]["est_time"])
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
             .set_footer(
@@ -287,6 +289,35 @@ async def complex_parsing(ctx: lb.Context, data: dict):
         )
         # except Exception as e:
         #     print(e)
+    elif "H-Misc" in data["header"]["index_name"]:
+        # try:
+        view = miru.View()
+        # try:
+        view.add_item(
+            GenericButton(
+                style=hk.ButtonStyle.LINK,
+                emoji=hk.Emoji.parse("<:vndb_circle:1130453890307997747>"),
+                label="VNDB",
+                url=await vndb_url(data['data']['source']),
+            )
+        )
+
+        await ctx.respond(
+            embed=hk.Embed(
+                color=0x000000,
+            )
+            .add_field("Similarity", data["header"]["similarity"])
+            .add_field("Source", data['data']['source'])
+            .add_field("Creator", ", ".join(data["data"]["creator"]))
+            .set_thumbnail(data["header"]["thumbnail"])
+            .set_author(name="Search results returned the follows: ")
+            .set_footer(
+                text="Powered by: SauceNAO",
+                icon="https://i.imgur.com/2VRIEPR.png",
+            ),
+            components=view,
+        )
+
 
     else:
         sauce = "😵"
@@ -362,7 +393,26 @@ async def al_from_mal(mal_id: int = None, type: str = None, name: str = None) ->
     )).json())["data"]["Media"]
 
 
+async def vndb_url(text):
+ 
+    pattern = r'\[.*?\]'
+    result_text = re.sub(pattern, '', text)
 
+    url = "https://api.vndb.org/kana/vn"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "filters": ["search", "=", result_text],
+        "fields": "title",
+        # "sort": "title"
+    }
+    req = await sauce_plugin.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+
+    if not req.ok:
+        return
+
+    req = await req.json()
+    return f"https://vndb.org/{req['results'][0]['id']}"
+    # return result_text
 
 
 
