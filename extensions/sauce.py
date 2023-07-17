@@ -43,7 +43,7 @@ async def mangamenu(ctx: lb.MessageContext):
     }
 
     async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params
+        "https://saucenao.com/search.php?", params=params, timeout=3
     ) as res:
         if res.ok:
             res = await res.json()
