@@ -21,7 +21,6 @@ sauce_plugin = lb.Plugin(
 )
 
 
-
 @sauce_plugin.command
 @lb.command("Find the Sauce", "Search the sauce of the image")
 @lb.implements(lb.MessageCommand)
@@ -48,10 +47,8 @@ async def mangamenu(ctx: lb.MessageContext):
         if res.ok:
             res = await res.json()
             await simple_parsing(ctx, res["results"][0])
-            # print(res)
-            
 
-    # await find_sauce(ctx, "MANGA", ctx.options["target"].content)
+
 
 
 @sauce_plugin.command
@@ -77,15 +74,11 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
     params = {"api_key": SAUCENAO_KEY, "output_type": 2, "numres": 5, "url": link}
 
     if service != "TraceMoe":
-        res = requests.get(
-            "https://saucenao.com/search.php?", params=params
-        )
+        res = await ctx.bot.d.aio_session.get("https://saucenao.com/search.php?", params=params,timeout=3)
         if res.ok:
-            res = res.json()
-            # print(res)
-            # try:
+            res = await res.json()
+
             data = res["results"][0]
-            # print(data)
             try:
                 await complex_parsing(ctx, data)
             except:
@@ -93,14 +86,14 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
     else:
         try:
             async with ctx.bot.d.aio_session.get(
-                "https://api.trace.moe/search", params={"url": link}
+                "https://api.trace.moe/search", params={"url": link},timeout=3
             ) as res:
                 if res.ok:
                     res = (await res.json())["result"]
 
                     sauce = f"[{res[0]['filename']}](https://anilist.co/anime/{res[0]['anilist']})"
 
-                    print(res[0]["similarity"] * 100)  # , "\n\n")
+                    print(res[0]["similarity"] * 100)
 
                     await ctx.respond(
                         embed=hk.Embed(color=0x000000)
@@ -112,7 +105,6 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
                         .set_author(name="Search results returned the follows: ")
                         .set_footer(
                             text="Powered by: Trace.Moe",
-                            # icon="https://i.imgur.com/2VRIEPR.png"
                         )
                     )
                 else:
@@ -147,17 +139,28 @@ async def pingu(ctx: lb.Context, link: str) -> None:
 async def complex_parsing(ctx: lb.Context, data: dict):
     sauce = "😵"
     if "MangaDex" in data["header"]["index_name"]:
-        # try:
         view = miru.View()
-        # al_url = await al_from_mal(data['data']['mal_id'])
-        # al_url = al_url['siteUrl']
-        view.add_item(
-            GenericButton(
-                style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
-                url=(await al_from_mal(data["data"]["mal_id"]))["siteUrl"],
-            )
-        )
+
+        try:
+            if "mal_id" in data["data"].keys():
+                view.add_item(
+                    GenericButton(
+                        style=hk.ButtonStyle.LINK,
+                        emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                        url=(await al_from_mal(data["data"]["mal_id"]))["siteUrl"],
+                    )
+                )
+            else:
+                print("okie dokie \n\n\n")
+                view.add_item(
+                    GenericButton(
+                        style=hk.ButtonStyle.LINK,
+                        emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                        url=(await al_from_mal(name=data["data"]["source"]))["siteUrl"],
+                    )
+                )
+        except Exception as e:
+            print(e)
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
@@ -170,9 +173,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
-            .add_field(
-                "Source", f"{data['data']['source']} {data['data']['part']}"
-            )
+            .add_field("Source", f"{data['data']['source']} {data['data']['part']}")
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
             .set_footer(
@@ -191,9 +192,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
             view.add_item(
                 GenericButton(
                     style=hk.ButtonStyle.LINK,
-                    emoji=hk.Emoji.parse(
-                        "<:anilist:1127683041372942376>"
-                    ),
+                    emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
                     url=data["data"]["ext_urls"][2],
                 )
             )
@@ -216,16 +215,14 @@ async def complex_parsing(ctx: lb.Context, data: dict):
         )
         # except Exception as e:
         #     print(e)
-    
+
     elif "Danbooru" in data["header"]["index_name"]:
         # try:
         view = miru.View()
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse(
-                    "<:danbooru:1130206873388326952>"
-                ),
+                emoji=hk.Emoji.parse("<:danbooru:1130206873388326952>"),
                 url=data["data"]["ext_urls"][0],
             )
         )
@@ -237,20 +234,18 @@ async def complex_parsing(ctx: lb.Context, data: dict):
             )
         )
         creator = ""
-        if isinstance(data['data']['creator'], str):
-            creator = data['data']['creator']
+        if isinstance(data["data"]["creator"], str):
+            creator = data["data"]["creator"]
         else:
-            creator = ", ".join(data['data']['creator'])
+            creator = ", ".join(data["data"]["creator"])
         await ctx.respond(
             embed=hk.Embed(
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
-            .add_field(
-                "Artist", creator, inline=True
-            )
-            .add_field("Character(s)", data['data']['characters'], inline=True)
-            .add_field("Source Material", data['data']['material'])
+            .add_field("Artist", creator, inline=True)
+            .add_field("Character(s)", data["data"]["characters"], inline=True)
+            .add_field("Source Material", data["data"]["material"])
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
             .set_footer(
@@ -261,16 +256,14 @@ async def complex_parsing(ctx: lb.Context, data: dict):
         )
         # except Exception as e:
         #     print(e)
-    
+
     elif "Pixiv" in data["header"]["index_name"]:
         # try:
         view = miru.View()
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse(
-                    "<:pixiv:1130216490021425352>"
-                ),
+                emoji=hk.Emoji.parse("<:pixiv:1130216490021425352>"),
                 url=data["data"]["ext_urls"][0],
             )
         )
@@ -283,7 +276,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 "Author",
                 f"[{data['data']['member_name']}](https://www.pixiv.net/en/users/{data['data']['member_id']})",
             )
-            .add_field("Title", data['data']['title'])
+            .add_field("Title", data["data"]["title"])
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
             .set_footer(
@@ -304,31 +297,31 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 sauce = data["data"]["source"]
         else:
             sauce = data["data"]["ext_urls"][0]
-        
-            embed= ( 
-                hk.Embed(
-                color=0x000000
-                )
-                .add_field("Similarity", data["header"]["similarity"])
-                .add_field("Source", sauce)
-                .set_thumbnail(data["header"]["thumbnail"])
-                .set_author(name="Search results returned the follows: ")
-                .set_footer(
-                    text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
-                )
+
+        embed = (
+            hk.Embed(color=0x000000)
+            .add_field("Similarity", data["header"]["similarity"])
+            .add_field("Source", sauce)
+            .set_thumbnail(data["header"]["thumbnail"])
+            .set_author(name="Search results returned the follows: ")
+            .set_footer(
+                text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
             )
-        
-        for i, item in enumerate(data['data'].keys()):
+        )
+
+        for i, item in enumerate(data["data"].keys()):
             if item not in ["source", "ext_urls"]:
-                if i%3:
-                    embed.add_field(sanitize_field(item), data["data"][item], inline=True)
-                else: 
+                if i % 3:
+                    embed.add_field(
+                        sanitize_field(item), data["data"][item], inline=True
+                    )
+                else:
                     embed.add_field(sanitize_field(item), data["data"][item])
-        
+
         await ctx.respond(embed=embed)
 
-async def simple_parsing(ctx: lb.Context, data: dict):
 
+async def simple_parsing(ctx: lb.Context, data: dict):
     sauce = "😵"
     if "source" in data["data"].keys():
         if "ext_urls" in data["data"].keys():
@@ -343,34 +336,34 @@ async def simple_parsing(ctx: lb.Context, data: dict):
         .add_field("Source", sauce)
         .set_thumbnail(data["header"]["thumbnail"])
         .set_author(name="Search results returned the follows: ")
-        .set_footer(
-            text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
-        )
+        .set_footer(text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png")
     )
+
 
 def sanitize_field(name: str) -> str:
     return name.replace("_", " ").capitalize()
 
-async def al_from_mal(mal_id: int, type: str = None) -> str:
+
+async def al_from_mal(mal_id: int = None, type: str = None, name: str = None) -> str:
     query = """
-  query ($mal_id: Int) { # Define which variables will be used (id)
-    Media (idMal: $mal_id, type: MANGA) {
+  query ($mal_id: Int, $search: String) { # Define which variables will be used (id)
+    Media (idMal: $mal_id, search: $search, type: MANGA) {
       siteUrl
     }
   }
 
   """
 
-    variables = {"mal_id": mal_id}
-
-    return requests.post(
+    variables = {"mal_id": mal_id, "search": name}
+    return (await (await sauce_plugin.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
-        timeout=10,
-    ).json()["data"]["Media"]
+        timeout=3,
+    )).json())["data"]["Media"]
 
 
-#   print(a.json())
+
+
 
 
 def load(bot: lb.BotApp) -> None:

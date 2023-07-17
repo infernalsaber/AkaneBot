@@ -9,8 +9,10 @@ import hikari as hk
 import lightbulb as lb
 from lightbulb.ext import tasks
 
-from extensions.ping import CustomNextButton, CustomPrevButton, KillNavButton
 from extensions.ping import CustomNavi
+from extensions.ping import CustomNextButton
+from extensions.ping import CustomPrevButton
+from extensions.ping import KillNavButton
 
 task_plugin = lb.Plugin("Tasks", "Background processes")
 
@@ -28,10 +30,6 @@ async def clear_pic_files():
     for file in files:
         os.remove(file)
     print("Cleared")
-
-
-# @tasks.task(d=3)
-# async def clear_pic_files():
 
 
 @task_plugin.command
@@ -57,7 +55,7 @@ async def directory(ctx: lb.Context) -> None:
         await ctx.respond("Too many items. Can't list")
         return
 
-    for i, item in enumerate(["pictures"]):
+    for i, item in enumerate(["./pictures"]):
         embed.add_field(f"`{i+1}.`", f"```ansi\n\u001b[0;35m{item} ```")
         view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=str(item)))
     view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
@@ -73,8 +71,6 @@ async def directory(ctx: lb.Context) -> None:
 
     folder = view.answer
 
-    # view.remove_item(item)
-
     embed2 = hk.Embed()
     view2 = miru.View()
 
@@ -85,19 +81,18 @@ async def directory(ctx: lb.Context) -> None:
     view2.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
     # view.
 
-    # view.add_item(NoButton(style=hk.ButtonStyle.DANGER, label="No"))
     choice = await ctx.edit_last_response(embed=embed2, components=view2)
 
     await view2.start(choice)
     await view2.wait()
-    # view.from_message(message)
+
     if hasattr(view2, "answer"):  # Check if there is an answer
         await ctx.edit_last_response(content="Here it is.", embeds=[], components=[])
         filez = os.listdir(f"./{folder}")[int(view2.answer) - 1]
     else:
         await ctx.edit_last_response("Process timed out.", embeds=[], components=[])
         return
-        # return
+
     await ctx.respond(attachment=f"{folder}/{filez}")
 
 
@@ -122,8 +117,12 @@ async def update_code(ctx: lb.Context) -> None:
             await ctx.respond("Updated source.")
 
     await ctx.edit_last_response("Restarting the bot...")
-    await ctx.bot.close()
-
+    check = "ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'"
+    process = subprocess.Popen(
+            check, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+    stdout, stderr = process.communicate()
+    os.system(f'kill {int.from_bytes(stdout, byteorder="big")}')
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
@@ -132,40 +131,31 @@ async def update_code(ctx: lb.Context) -> None:
 async def guilds(ctx: lb.Context) -> None:
     ctx.bot.d.ncom += 1
 
-    try:
-        # for i in :
-        # embed = hk.Embed(color=0x000000)
-        pages = []
-        buttons = [CustomPrevButton(), KillNavButton(), CustomNextButton()]
-        for gld in list([guild for guild in ctx.bot.cache.get_guilds_view().values()]):
-            pages.append(
-                hk.Embed(
-                    color=0xF4EAE9,
-                    title=f"Server: {gld.name}",
-                    description=f"Server ID: `{gld.id}`",
-                    timestamp=datetime.datetime.now().astimezone(),
-                )
-                .add_field("Owner", await gld.fetch_owner(), inline=True)
-                .add_field(
-                    "Server Created",
-                    f"<t:{int(gld.created_at.timestamp())}:R>",
-                    inline=True,
-                )
-                .add_field("Member Count", gld.member_count)
-                .add_field(
-                    "Boosts", gld.premium_subscription_count or "NA", inline=True
-                )
-                .add_field("Boost Level", gld.premium_tier or "NA", inline=True)
-                .set_thumbnail(gld.icon_url)
-                .set_image(gld.banner_url)
+    pages = []
+    buttons = [CustomPrevButton(), KillNavButton(), CustomNextButton()]
+    for gld in list([guild for guild in ctx.bot.cache.get_guilds_view().values()]):
+        pages.append(
+            hk.Embed(
+                color=0xF4EAE9,
+                title=f"Server: {gld.name}",
+                description=f"Server ID: `{gld.id}`",
+                timestamp=datetime.datetime.now().astimezone(),
             )
-            # embed.add_field(gld.name, f"{gld.member_count}, {await gld.fetch_owner()}")
+            .add_field("Owner", await gld.fetch_owner(), inline=True)
+            .add_field(
+                "Server Created",
+                f"<t:{int(gld.created_at.timestamp())}:R>",
+                inline=True,
+            )
+            .add_field("Member Count", gld.member_count)
+            .add_field("Boosts", gld.premium_subscription_count or "NA", inline=True)
+            .add_field("Boost Level", gld.premium_tier or "NA", inline=True)
+            .set_thumbnail(gld.icon_url)
+            .set_image(gld.banner_url)
+        )
 
-        navigator = CustomNavi(pages=pages, buttons=buttons, user_id=ctx.author.id)
-        await navigator.send(ctx.channel_id)
-        # await ctx.respond(embed=embed)
-    except Exception as e:
-        print(e)
+    navigator = CustomNavi(pages=pages, buttons=buttons, user_id=ctx.author.id)
+    await navigator.send(ctx.channel_id)
 
 
 @task_plugin.command

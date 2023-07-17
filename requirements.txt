@@ -6,7 +6,7 @@ uvloop
 python-dotenv>=0.21.0
 
 aiohttp==3.8.3
-plotly==5.11.0
+plotly
 isodate==0.6.1
 psutil
 pillow
