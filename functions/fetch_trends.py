@@ -3,7 +3,6 @@ import datetime
 from operator import itemgetter
 
 import requests
-
 import requests_cache
 
 requests_cache.install_cache("my_cache", expire_after=3600)

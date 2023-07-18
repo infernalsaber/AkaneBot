@@ -2,16 +2,14 @@
 
 
 import os
+import re
 
 import dotenv
 import hikari as hk
 import lightbulb as lb
-import miru
-import re
 import requests
 
-from extensions.ping import GenericButton
-from extensions.ping import check_if_url
+from extensions.ping import CustomView, GenericButton, KillButton, check_if_url
 
 dotenv.load_dotenv()
 
@@ -23,23 +21,15 @@ sauce_plugin = lb.Plugin(
 
 
 @sauce_plugin.command
-@lb.command("Find the Sauce", "Search the sauce of the image")
-@lb.implements(lb.MessageCommand)
-async def mangamenu(ctx: lb.MessageContext):
-    ctx.bot.d.ncom += 1
-
-    if len(ctx.options["target"].attachments) == 0:
-        await ctx.respond("There's nothing here to find the sauce of.")
-
-    if not check_if_url(ctx.options["target"].attachments[0].url):
-        await ctx.respond("There's nothing here to find the sauce of.")
-        return
-
+@lb.command("User pfp Sauce", "Sauce of user pfp")
+@lb.implements(lb.UserCommand)
+async def pfp_sauce(ctx: lb.UserContext):
+    # try:
     params = {
         "api_key": SAUCENAO_KEY,
         "output_type": 2,
         "numres": 5,
-        "url": ctx.options["target"].attachments[0].url,
+        "url": ctx.options.target.avatar_url.url,
     }
 
     async with ctx.bot.d.aio_session.get(
@@ -47,9 +37,67 @@ async def mangamenu(ctx: lb.MessageContext):
     ) as res:
         if res.ok:
             res = await res.json()
-            await simple_parsing(ctx, res["results"][0])
+            try:
+                embed, view = await complex_parsing(ctx, res["results"][0])
+                await ctx.respond(
+                    embed=embed, components=view, flags=hk.MessageFlag.EPHEMERAL
+                )
+            except:
+                embed, view = await simple_parsing(ctx, res["results"][0])
+                await ctx.respond(
+                    embed=embed, components=view, flags=hk.MessageFlag.EPHEMERAL
+                )
 
 
+@sauce_plugin.command
+@lb.command("Find the Sauce", "Search the sauce of the image")
+@lb.implements(lb.MessageCommand)
+async def mangamenu(ctx: lb.MessageContext):
+    try:
+        url = find_url(ctx.options["target"].content)
+        # print(url)
+    except Exception as e:
+        print(e)
+
+    finally:
+        if len(ctx.options["target"].attachments) == 0 and not url:
+            await ctx.respond(
+                "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>"
+            )
+
+        # if not url:
+        if len(ctx.options["target"].attachments):
+            url = ctx.options["target"].attachments[0].url
+
+        # if not url:
+        #     print("no url")
+        # else:
+        #     print(url)
+
+    params = {
+        "api_key": SAUCENAO_KEY,
+        "output_type": 2,
+        "numres": 5,
+        "url": url,
+    }
+
+    async with ctx.bot.d.aio_session.get(
+        "https://saucenao.com/search.php?", params=params, timeout=3
+    ) as res:
+        if res.ok:
+            res = await res.json()
+            try:
+                embed, view = await complex_parsing(ctx, res["results"][0])
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                choice = await ctx.respond(embed=embed, components=view)
+                await view.start(choice)
+                await view.wait()
+            except:
+                embed, view = await simple_parsing(ctx, res["results"][0])
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                choice = await ctx.respond(embed=embed, components=view)
+                await view.start(choice)
+                await view.wait()
 
 
 @sauce_plugin.command
@@ -66,8 +114,6 @@ async def mangamenu(ctx: lb.MessageContext):
 @lb.command("sauce", "Show ya sauce for the image", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashCommand)
 async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
-    ctx.bot.d.ncom += 1
-
     if not check_if_url(link):
         await ctx.respond("That's not a link <:AkanePoutColor:852847827826376736>")
         return
@@ -75,19 +121,33 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
     params = {"api_key": SAUCENAO_KEY, "output_type": 2, "numres": 5, "url": link}
 
     if service != "TraceMoe":
-        res = await ctx.bot.d.aio_session.get("https://saucenao.com/search.php?", params=params,timeout=3)
+        res = await ctx.bot.d.aio_session.get(
+            "https://saucenao.com/search.php?", params=params, timeout=3
+        )
         if res.ok:
             res = await res.json()
 
             data = res["results"][0]
             try:
-                await complex_parsing(ctx, data)
-            except:
-                await simple_parsing(ctx, data)
+                embed, view = await complex_parsing(ctx, data)
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                choice = await ctx.respond(embed=embed, components=view)
+                await view.start(choice)
+                await view.wait()
+            except Exception as e:
+                print(e, "\n\n\n")
+                embed, view = await simple_parsing(ctx, data)
+                choice = view.add_item(
+                    KillButton(style=hk.ButtonStyle.SECONDARY, label="❌")
+                )
+                await view.start(choice)
+                await view.wait()
+                await ctx.respond(embed=embed, components=view)
+
     else:
         try:
             async with ctx.bot.d.aio_session.get(
-                "https://api.trace.moe/search", params={"url": link},timeout=3
+                "https://api.trace.moe/search", params={"url": link}, timeout=3
             ) as res:
                 if res.ok:
                     res = (await res.json())["result"]
@@ -95,19 +155,29 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
                     sauce = f"[{res[0]['filename']}](https://anilist.co/anime/{res[0]['anilist']})"
 
                     print(res[0]["similarity"] * 100)
+                    view = CustomView(user_id=ctx.author.id)
+                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
-                    await ctx.respond(
+                    choice = await ctx.respond(
                         embed=hk.Embed(color=0x000000)
                         .add_field(
                             "Similarity", f"{round(res[0]['similarity']*100, 2)}"
                         )
                         .add_field("Source", sauce)
+                        .add_field("Episode", res[0]["episode"] or "1", inline=True)
+                        .add_field(
+                            "Timestamp",
+                            f"{int(res[0]['from']//60)}m{int(res[0]['from']%60)}s - {int(res[0]['to']//60)}m{int(res[0]['to']%60)}s",
+                            inline=True,
+                        )
                         .set_thumbnail(res[0]["image"])
                         .set_author(name="Search results returned the follows: ")
                         .set_footer(
                             text="Powered by: Trace.Moe",
                         )
                     )
+                    await view.start(choice)
+                    await view.wait()
                 else:
                     await ctx.respond("Couldn't find it.")
         except Exception as e:
@@ -123,8 +193,6 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
 @lb.command("pingu", "Check if site alive", pass_options=True, auto_defer=True)
 @lb.implements(lb.PrefixCommand)
 async def pingu(ctx: lb.Context, link: str) -> None:
-    ctx.bot.d.ncom += 1
-
     if not check_if_url(link):
         await ctx.respond("That's... not a link <:AkanePoutColor:852847827826376736>")
         return
@@ -140,8 +208,7 @@ async def pingu(ctx: lb.Context, link: str) -> None:
 async def complex_parsing(ctx: lb.Context, data: dict):
     sauce = "😵"
     if "MangaDex" in data["header"]["index_name"]:
-        view = miru.View()
-
+        view = CustomView(user_id=ctx.author.id)
         try:
             if "mal_id" in data["data"].keys():
                 view.add_item(
@@ -152,7 +219,6 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                     )
                 )
             else:
-                print("okie dokie \n\n\n")
                 view.add_item(
                     GenericButton(
                         style=hk.ButtonStyle.LINK,
@@ -169,26 +235,27 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 url=data["data"]["ext_urls"][0],
             )
         )
-        await ctx.respond(
-            embed=hk.Embed(
+        return (
+            hk.Embed(
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
             .add_field("Source", f"{data['data']['source']} {data['data']['part']}")
+            .add_field("Author", data["data"]["author"])
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
             .set_footer(
                 text="Powered by: SauceNAO",
                 icon="https://i.imgur.com/2VRIEPR.png",
             ),
-            components=view,
+            view,
         )
         # except Exception as e:
         #     print(e)
 
     elif "Anime" in data["header"]["index_name"]:
         # try:
-        view = miru.View()
+        view = CustomView(user_id=ctx.author.id)
         if len(data["data"]["ext_urls"]) > 1:
             view.add_item(
                 GenericButton(
@@ -197,30 +264,31 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                     url=data["data"]["ext_urls"][2],
                 )
             )
-        await ctx.respond(
-            embed=hk.Embed(
+        return (
+            hk.Embed(
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
             .add_field(
                 "Source",
-                f"{data['data']['source']} {data['data']['part']}",
+                data["data"]["source"],
             )
-            .add_field("Timestamp", data["data"]["est_time"])
+            .add_field("Episode", data["data"]["part"], inline=True)
+            .add_field("Timestamp", data["data"]["est_time"], inline=True)
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
             .set_footer(
                 text="Powered by: SauceNAO",
                 icon="https://i.imgur.com/2VRIEPR.png",
             ),
-            components=view,
+            view,
         )
         # except Exception as e:
         #     print(e)
 
     elif "Danbooru" in data["header"]["index_name"]:
         # try:
-        view = miru.View()
+        view = CustomView(user_id=ctx.author.id)
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
@@ -240,8 +308,8 @@ async def complex_parsing(ctx: lb.Context, data: dict):
             creator = data["data"]["creator"]
         else:
             creator = ", ".join(data["data"]["creator"])
-        await ctx.respond(
-            embed=hk.Embed(
+        return (
+            hk.Embed(
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
@@ -254,14 +322,14 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 text="Powered by: SauceNAO",
                 icon="https://i.imgur.com/2VRIEPR.png",
             ),
-            components=view,
+            view,
         )
         # except Exception as e:
         #     print(e)
 
     elif "Pixiv" in data["header"]["index_name"]:
         # try:
-        view = miru.View()
+        view = CustomView(user_id=ctx.author.id)
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
@@ -269,8 +337,8 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 url=data["data"]["ext_urls"][0],
             )
         )
-        await ctx.respond(
-            embed=hk.Embed(
+        return (
+            hk.Embed(
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
@@ -285,29 +353,28 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 text="Powered by: SauceNAO",
                 icon="https://i.imgur.com/2VRIEPR.png",
             ),
-            components=view,
+            view,
         )
         # except Exception as e:
         #     print(e)
-    elif "H-Misc" in data["header"]["index_name"]:
-        # try:
-        view = miru.View()
+    elif "H-Misc (E-Hentai)" in data["header"]["index_name"]:
+        view = CustomView(user_id=ctx.author.id)
         # try:
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
                 emoji=hk.Emoji.parse("<:vndb_circle:1130453890307997747>"),
                 label="VNDB",
-                url=await vndb_url(data['data']['source']),
+                url=await vndb_url(data["data"]["source"]),
             )
         )
 
-        await ctx.respond(
-            embed=hk.Embed(
+        return (
+            hk.Embed(
                 color=0x000000,
             )
             .add_field("Similarity", data["header"]["similarity"])
-            .add_field("Source", data['data']['source'])
+            .add_field("Source", data["data"]["source"])
             .add_field("Creator", ", ".join(data["data"]["creator"]))
             .set_thumbnail(data["header"]["thumbnail"])
             .set_author(name="Search results returned the follows: ")
@@ -315,13 +382,12 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 text="Powered by: SauceNAO",
                 icon="https://i.imgur.com/2VRIEPR.png",
             ),
-            components=view,
+            view,
         )
-
 
     else:
         sauce = "😵"
-        if "source" in data["data"].keys():
+        if "source" in data["data"].keys() and data["data"]["source"] != "":
             if "ext_urls" in data["data"].keys():
                 sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
             else:
@@ -341,7 +407,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
         )
 
         for i, item in enumerate(data["data"].keys()):
-            if item not in ["source", "ext_urls"]:
+            if item not in ["source", "ext_urls"] and not "id" in item:
                 if i % 3:
                     embed.add_field(
                         sanitize_field(item), data["data"][item], inline=True
@@ -349,7 +415,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
                 else:
                     embed.add_field(sanitize_field(item), data["data"][item])
 
-        await ctx.respond(embed=embed)
+        return (embed, CustomView(user_id=ctx.author.id))
 
 
 async def simple_parsing(ctx: lb.Context, data: dict):
@@ -361,13 +427,16 @@ async def simple_parsing(ctx: lb.Context, data: dict):
             sauce = data["data"]["source"]
     else:
         sauce = data["data"]["ext_urls"][0]
-    await ctx.respond(
-        embed=hk.Embed(color=0x000000)
+    return (
+        hk.Embed(color=0x000000)
         .add_field("Similarity", data["header"]["similarity"])
         .add_field("Source", sauce)
         .set_thumbnail(data["header"]["thumbnail"])
         .set_author(name="Search results returned the follows: ")
-        .set_footer(text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png")
+        .set_footer(
+            text="Powered by: SauceNAO", icon="https://i.imgur.com/2VRIEPR.png"
+        ),
+        CustomView(user_id=ctx.author.id),
     )
 
 
@@ -386,17 +455,20 @@ async def al_from_mal(mal_id: int = None, type: str = None, name: str = None) ->
   """
 
     variables = {"mal_id": mal_id, "search": name}
-    return (await (await sauce_plugin.bot.d.aio_session.post(
-        "https://graphql.anilist.co",
-        json={"query": query, "variables": variables},
-        timeout=3,
-    )).json())["data"]["Media"]
+    return (
+        await (
+            await sauce_plugin.bot.d.aio_session.post(
+                "https://graphql.anilist.co",
+                json={"query": query, "variables": variables},
+                timeout=3,
+            )
+        ).json()
+    )["data"]["Media"]
 
 
 async def vndb_url(text):
- 
-    pattern = r'\[.*?\]'
-    result_text = re.sub(pattern, '', text)
+    pattern = r"\[.*?\]"
+    result_text = re.sub(pattern, "", text)
 
     url = "https://api.vndb.org/kana/vn"
     headers = {"Content-Type": "application/json"}
@@ -405,7 +477,9 @@ async def vndb_url(text):
         "fields": "title",
         # "sort": "title"
     }
-    req = await sauce_plugin.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+    req = await sauce_plugin.bot.d.aio_session.post(
+        url, headers=headers, json=data, timeout=3
+    )
 
     if not req.ok:
         return
@@ -414,6 +488,20 @@ async def vndb_url(text):
     return f"https://vndb.org/{req['results'][0]['id']}"
     # return result_text
 
+
+pattern = r"https?://\S+|www\.\S+"
+
+url_regex = re.compile(pattern)
+
+
+def find_url(text):
+    # Find the first occurrence of the pattern in the text
+    match = url_regex.search(text)
+
+    if match:
+        return match.group()
+    else:
+        return None
 
 
 def load(bot: lb.BotApp) -> None:

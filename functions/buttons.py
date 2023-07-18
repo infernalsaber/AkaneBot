@@ -4,11 +4,11 @@ from typing import Optional, Union
 import hikari as hk
 import miru
 import requests
+import requests_cache
 from miru.ext import nav
 
 # from bs4 import BeautifulSoup
 
-import requests_cache
 
 requests_cache.install_cache(
     "my_cache", expire_after=3600
@@ -421,16 +421,19 @@ class KillButton(miru.Button):
         #     flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
         # )
 
+
 class NewButton(miru.Button):
-    def __init__(self, style: Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+    def __init__(
+        self,
+        style: Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
         label: Optional[str] = None,
         link: str = None,
         custom_id: Optional[str] = None,
-        ) -> None:
+    ) -> None:
         self.link = link
         super().__init__(style=style, label=label, custom_id=custom_id)
         print(self.link)
-    
+
     async def callback(self, ctx: miru.ViewContext) -> None:
         try:
             # await ctx.respond("This button is brokem")

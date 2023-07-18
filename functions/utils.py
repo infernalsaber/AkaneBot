@@ -101,6 +101,7 @@ def rss2json(url):
 
     return json.dumps(feedsdict)
 
+
 class PeristentViewTest(miru.View):
     def __init__(self) -> None:
         super().__init__(autodefer=True, timeout=None)

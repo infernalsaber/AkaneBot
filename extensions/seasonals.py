@@ -2,46 +2,49 @@
 import asyncio
 import datetime
 import json
-import sqlite3
+import re
 
 import hikari as hk
 import lightbulb as lb
-import miru
 import requests
 from dateutil import parser
 
-from functions.buttons import GenericButton
-from functions.utils import rss2json
+from extensions.ping import GenericButton, NewButton, PeristentViewTest, rss2json
 
 aniupdates = lb.Plugin("Anime Updates", "Keep a track of seasonal anime")
+
+
+async def get_magnet_for(query: str):
+    magnet_feed = "https://subsplease.org/rss/?r=1080"
+    items = rss2json(magnet_feed)
+    items = json.loads(items)
+
+    for i in items["feeds"]:
+        if i["title"] == query:
+            return i["link"]
 
 
 async def get_anime_updates() -> list:
     link = "https://www.toptal.com/developers/feed2json/convert"
 
-    magnet_feed = "https://subsplease.org/rss/?r=1080"
+    # magnet_feed = "https://subsplease.org/rss/?r=1080"
     link_feed = "https://subsplease.org/rss/?t&r=1080"
 
     items = rss2json(link_feed)
     items = json.loads(items)
     if not items["data"]["status"] == "ok":
         return []
-    # print(items)
 
     updates = []
 
-    # print(items.keys())
     for i in items["feeds"]:
         item_dict = {}
-        if not "1080" in i["title"]:
-            continue
-        # print("\n")
+        # if not "1080" in i["title"]:
+        #     continue
+
         print(datetime.datetime.now(datetime.timezone.utc))
         print(i["title"])
         print(i["published"])
-        # print(parser.parse(i['date_published']))
-        # print((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])))
-        # print(int((datetime.datetime.now(datetime.timezone.utc)-parser.parse(i['date_published'])).total_seconds()) )
 
         # try:
         if (
@@ -74,9 +77,11 @@ async def get_anime_updates() -> list:
 @aniupdates.listener(hk.StartedEvent)
 async def on_starting(event: hk.StartedEvent) -> None:
     """Event fired on start of bot"""
-    conn = sqlite3.connect("akane_db.db")
-    cursor = conn.cursor()
-    aniupdates.bot.d.con = conn
+    view = PeristentViewTest()
+    await view.start()
+    # conn = sqlite3.connect("akane_db.db")
+    # cursor = conn.cursor()
+    # aniupdates.bot.d.con = conn
 
     #     cursor.execute('''
     #     CREATE TABLE IF NOT EXISTS aniupdates (
@@ -92,11 +97,21 @@ async def on_starting(event: hk.StartedEvent) -> None:
             print("\n\nNOTHING\n\n")
         # print(updates)
         for update in updates:
-            view = miru.View()
+            view = PeristentViewTest()
+            view.add_item(
+                NewButton(
+                    style=hk.ButtonStyle.SECONDARY,
+                    # label="🧲",
+                    custom_id=f"{int(datetime.datetime.now().timestamp())}",
+                    emoji=hk.Emoji.parse("🧲"),
+                    link=await get_magnet_for(update["file"]),
+                )
+            )
             view.add_item(
                 GenericButton(
-                    style=hk.ButtonStyle.LINK,
-                    # label = "Nyaa",
+                    style=hk.ButtonStyle.SECONDARY,
+                    # label="🧲",
+                    # custom_id=f"{int(datetime.datetime.now().timestamp())}",
                     emoji=hk.Emoji.parse("<:nyaasi:1127717935968952440>"),
                     url=update["link"],
                 )
@@ -110,18 +125,25 @@ async def on_starting(event: hk.StartedEvent) -> None:
                 )
             )
             for channel in aniupdates.bot.d.update_channels:
-                await aniupdates.bot.rest.create_message(
+                check = await aniupdates.bot.rest.create_message(
                     channel=channel,
                     # content=update,
                     embed=hk.Embed(
                         color=0x7DF9FF,
-                        description=update["file"],
+                        description=update["file"][13:],
                         timestamp=update["timestamp"],
-                        title=f"New Episode of {update['data']['title']['romaji']} out",
-                        url=update["link"],
-                    ).add_field("Episode", get_episode_number(update["file"]))
+                        title=f"Episode {get_episode_number(update['file'])}: {update['data']['title']['romaji']} out",
+                        # url=update["link"],
+                    )
+                    .add_field(
+                        "Rating", update["data"]["meanScore"] or "NA", inline=True
+                    )
+                    .add_field(
+                        "Genres", ", ".join(update["data"]["genres"][:4]), inline=True
+                    )
+                    # .add_field("Episode", get_episode_number(update["file"]))
                     # .add_field("Filler", "This is some random filler text to take the space")
-                    # .add_field("🧲", f"```{update['url']}```")
+                    # .add_field("🧲", f"```{update['link']}```")
                     # .set_author(
                     #     name=f"New Episode of {update['data']['title']['romaji']} out",
                     #     url=update['data']['siteUrl']
@@ -129,7 +151,9 @@ async def on_starting(event: hk.StartedEvent) -> None:
                     .set_thumbnail(update["data"]["coverImage"]["extraLarge"]),
                     components=view,
                 )
-        await asyncio.sleep(720)
+                await view.start(check)
+                # await view.wait()
+        await asyncio.sleep(700)
 
 
 def return_anime_info(anime):
@@ -146,6 +170,8 @@ def return_anime_info(anime):
       }
       description (asHtml: false)
       siteUrl
+      meanScore
+      genres
     }
   }
 
@@ -161,12 +187,21 @@ def return_anime_info(anime):
 
 
 def get_episode_number(name):
-    num = name[13:-23].split("-")[-1].strip()
-    try:
-        num = int(num)
-    except:
-        num = 1
-    return num
+    name = name[13:-23].split("-")[-1].strip()
+    regex = "(\d+)(v\d)?"
+
+    ep = re.search(regex, name).group(1)
+
+    if not ep:
+        return 1
+
+    return ep
+    # num = name[13:-23].split("-")[-1].strip()
+    # try:
+    #     num = int(num)
+    # except:
+    #     num = 1
+    # return num
 
 
 def load(bot: lb.BotApp) -> None:

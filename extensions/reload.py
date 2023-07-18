@@ -1,4 +1,6 @@
 """Load, unload or reload a plugin"""
+import glob
+
 import lightbulb as lb
 
 reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins")
@@ -9,23 +11,22 @@ reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins")
 @lb.option(
     "extension",
     "The extension to reload",
-
 )
 @lb.command("reload", "Reload an extension", pass_options=True, aliases=["rl"])
 @lb.implements(lb.PrefixCommand)
 async def reload_plugin(ctx: lb.Context, extension: str) -> None:
     """Reload an extension"""
-    ctx.bot.d.ncom += 1
+
+    try:
+        if extension == "all":
+            for i in glob.glob("./extensions/*.py"):
+                ctx.bot.reload_extensions(f"{i[2:-3].replace('/', '.')}")
+            await ctx.respond("Reloaded all extensions")
+            return
+    except Exception as e:
+        print(e)
 
     ctx.bot.reload_extensions(f"extensions.{extension}")
-    # try:
-    #     ctx.bot.unload_extensions(f"extensions.{extension}")
-    #     # await ctx.respond("oopsie. ")
-    # except Exception as e:
-    #     await ctx.respond(f"Couldn't unload extension: {e}")
-    # else:
-    #     await ctx.respond("Extension unloaded successfully.")
-    #     ctx.bot.load_extensions(f"extensions.{extension}")
     await ctx.respond("Extension reloaded successfully.")
 
 
@@ -36,7 +37,6 @@ async def reload_plugin(ctx: lb.Context, extension: str) -> None:
 @lb.implements(lb.PrefixCommand)
 async def load_plugin(ctx: lb.Context, extension: str) -> None:
     """Load an extension"""
-    ctx.bot.d.ncom += 1
 
     ctx.bot.load_extensions(f"extensions.{extension}")
     await ctx.respond(f"Extension {extension} loaded successfully.")
@@ -49,7 +49,6 @@ async def load_plugin(ctx: lb.Context, extension: str) -> None:
 @lb.implements(lb.PrefixCommand)
 async def unload_plugin(ctx: lb.Context, extension: str) -> None:
     """Unload an extension"""
-    ctx.bot.d.ncom += 1
 
     ctx.bot.unload_extensions(f"extensions.{extension}")
     await ctx.respond("Extension unloaded successfully.")

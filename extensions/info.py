@@ -4,8 +4,7 @@ import hikari as hk
 import lightbulb as lb
 import psutil
 
-from extensions.ping import GenericButton
-from extensions.ping import CustomView
+from extensions.ping import CustomView, GenericButton
 
 info_plugin = lb.Plugin("Info", "Get information about an entity")
 
@@ -17,7 +16,7 @@ info_plugin = lb.Plugin("Info", "Get information about an entity")
 @lb.implements(lb.PrefixCommand)
 async def botinfo(ctx: lb.Context) -> None:
     """Get info about the bot"""
-    ctx.bot.d.ncom += 1
+
     user = info_plugin.bot.get_me()
     data = await info_plugin.bot.rest.fetch_application()
     guilds = list(await info_plugin.bot.rest.fetch_my_guilds())
@@ -89,7 +88,6 @@ async def botinfo(ctx: lb.Context) -> None:
                     embed=hk.Embed(description=changes, color=0x43408A).set_author(
                         name="Bot Changelog (Recent)"
                     ),
-                    # reply = True,
                     flags=hk.MessageFlag.EPHEMERAL,
                 )
             else:

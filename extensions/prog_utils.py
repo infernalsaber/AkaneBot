@@ -4,14 +4,12 @@ import subprocess
 import hikari as hk
 import lightbulb as lb
 
-
 compiler_plugin = lb.Plugin("Compiler", "An interpreter for Python")
 
 DSC_SYNTAX_GIST = (
     "https://gist.github.com/matthewzring"
     "/9f7bbfd102003963f9be7dbcf7d40e51#syntax-highlighting"
 )
-
 
 
 @compiler_plugin.command
@@ -63,9 +61,6 @@ async def compiler(ctx: lb.Context, code: str) -> None:
                 await ctx.respond(
                     f"This is the output ```ansi\n{str(output, 'UTF-8')}```"
                 )
-            # await ctx.respond(a)
-
-
 
 
 @compiler.set_error_handler
