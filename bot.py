@@ -4,7 +4,6 @@ import datetime
 import logging
 import os
 
-import aiohttp
 import dotenv
 import hikari as hk
 import lightbulb as lb
@@ -14,6 +13,7 @@ from lightbulb.ext import tasks
 dotenv.load_dotenv()
 
 import aiohttp_client_cache
+
 
 def return_prefix() -> list:
     if os.name == "nt":
@@ -72,25 +72,25 @@ async def on_starting(event: hk.StartingEvent) -> None:
     """Code which is executed once when the bot starts"""
 
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
-        cache_name='cache_db.db',  # For SQLite, this will be used as the filename
-        expire_after=60*60,                         # By default, cached responses expire in an hour
-        allowed_codes=(200, 403, 404),                   # Cache responses with these status codes
-        allowed_methods=['GET', 'POST'],            # Cache requests with these HTTP methods
-        include_headers=True,                       # Cache requests with different headers separately
-        ignored_params=['auth_token'],              # Keep using the cached response even if this param changes
+        cache_name="cache_db.db",  # For SQLite, this will be used as the filename
+        expire_after=60 * 60,  # By default, cached responses expire in an hour
+        allowed_codes=(200, 403, 404),  # Cache responses with these status codes
+        allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
+        include_headers=True,  # Cache requests with different headers separately
+        ignored_params=[
+            "auth_token"
+        ],  # Keep using the cached response even if this param changes
         timeout=2.5,
     )
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
-    bot.d.ncom = 0
     bot.d.update_channels = ["1127609035374461070"]
     if not os.path.exists("logs"):
         os.mkdir("logs")
         os.mkdir("pictures")
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
         pass
-    # with open("ded.txt", "w+", encoding="UTF-8"):
-    #     pass
+
     setup_logging()
 
 
@@ -115,8 +115,7 @@ def verbose_timedelta(delta):
 @bot.listen()
 async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
-    # with open("ded.txt", "a", encoding="UTF-8") as ded:
-    #     ded.write(".")
+
     await bot.rest.create_message(
         1129030476695343174,
         f"Bot closed with {bot.d.ncom} commands and {verbose_timedelta(datetime.datetime.now().astimezone()-bot.d.timeup)} uptime",
@@ -192,7 +191,6 @@ if __name__ == "__main__":
     if os.name == "nt":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     else:
-        # pass
         import uvloop
 
         uvloop.install()

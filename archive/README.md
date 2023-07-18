@@ -1,0 +1,1 @@
+Housing functions here which were removed from/were tested for the bot

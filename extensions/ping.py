@@ -1,16 +1,8 @@
 """Plugin running the background tasks and utilities for the bot"""
-import asyncio
 import datetime
-import glob
-import os
-import subprocess
 
 import hikari as hk
 import lightbulb as lb
-from lightbulb.ext import tasks
-
-# from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
-# from functions.utils import CustomNavi
 
 ping_plugin = lb.Plugin("Ping", "Pong")
 
@@ -20,22 +12,14 @@ from typing import Optional, Union
 
 import hikari as hk
 import miru
-import requests
 from miru.ext import nav
-
-# from bs4 import BeautifulSoup
-
-import requests_cache
-
-requests_cache.install_cache(
-    "my_cache", expire_after=600
-)  # Cache expires after 1 hour (3600 seconds)
 
 
 async def preview_maker(base_url, data_id, title, manga_id, cover):
-    req = await ping_plugin.bot.d.aio_session.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
-    # if req.from_cache:
-    #     print("Cache works!!!\n\n")
+    req = await ping_plugin.bot.d.aio_session.get(
+        f"{base_url}/at-home/server/{data_id}", timeout=10
+    )
+
     if not req.ok:
         return
 
@@ -43,16 +27,16 @@ async def preview_maker(base_url, data_id, title, manga_id, cover):
     pages = []
 
     try:
-        if (await ping_plugin.bot.d.aio_session.get(r_json["chapter"]["dataSaver"][0])).ok:
+        if (
+            await ping_plugin.bot.d.aio_session.get(r_json["chapter"]["dataSaver"][0])
+        ).ok:
             print("OK\n\n\n")
         else:
             print("NOTOK\n\n\n")
     except Exception as e:
         print("ERra\n\n\n", e)
 
-
     for page in r_json["chapter"]["data"]:
-        # print(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
         pages.append(
             hk.Embed(
                 title=title,
@@ -76,17 +60,7 @@ async def preview_maker(base_url, data_id, title, manga_id, cover):
             url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1",
         )
     )
-    # buttons = [
-    #     nav.PrevButton(
-    #         style=hk.ButtonStyle.SECONDARY,
-    #         emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
-    #     ),
-    #     nav.IndicatorButton(),
-    #     nav.NextButton(
-    #         style=hk.ButtonStyle.SECONDARY,
-    #         emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
-    #     ),
-    # ]
+
     return pages
 
 
@@ -107,7 +81,7 @@ class GenericButton(miru.Button):
                 flags=hk.MessageFlag.EPHEMERAL,
             )
             return
-        # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
+
         self.view.answer = self.label
         self.view.stop()
 
@@ -139,12 +113,8 @@ class KillNavButton(nav.NavButton):
                 flags=hk.MessageFlag.EPHEMERAL,
             )
             return
-        # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
+
         await self.view.message.delete()
-        # await ctx.bot.rest.edit_message(
-        #     ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
-        # )
-        # self.view.stop()
 
     async def before_page_change(self) -> None:
         ...
@@ -168,9 +138,6 @@ class CustomPrevButton(nav.NavButton):
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
         )
-        # if custom_id:
-        #     page = self.custom_id
-        #     self.view.current_page = int(page)
 
     async def callback(self, ctx: miru.ViewContext):
         if not ctx.author.id == self.view.user_id:
@@ -249,11 +216,6 @@ class NavLinkButton(nav.NavButton):
 
     async def callback(self, ctx: miru.ViewContext):
         ...
-        # if self.view.current_page == len(self.view.pages) - 1:
-        #     self.view.current_page = 0
-        # else:
-        #     self.view.current_page += 1
-        # await self.view.send_page(ctx)
 
     async def before_page_change(self) -> None:
         ...
@@ -292,18 +254,9 @@ class PreviewButton(nav.NavButton):
             await self.view.swap_pages(
                 ctx, ctx.bot.d.chapter_info[self.view.message_id][5]
             )
-            # await ctx.edit_response(components=view)
 
-            # print("Items removed")
             return
-        # await ctx.respond("Testx")
-        # view = self.view
-        # self.view.clear_items()
-        # try:
-        #     print("MID: ", self.view.message_id)
-        # except:
-        #     pass
-        # print(data)
+
         try:
             for item in self.view.children:
                 if not item == self:
@@ -336,15 +289,11 @@ class PreviewButton(nav.NavButton):
                 emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
             )
         )
-        # self.view.add_item(NavLinkButton(
-        #     url=f"https://mangadex.org/title/{data[3]}"
-        #     )
-        # )
+
         self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
         await ctx.edit_response(components=self.view)
-        # self.view.add_item(
 
     async def before_page_change(self) -> None:
         ...
@@ -390,28 +339,15 @@ class TrailerButton(nav.NavButton):
             self.label = "Trailer"
             self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
             await self.view.swap_pages(ctx, self.other_page)
-            # self.view.add_item(KillNavButton())
-            # await ctx.edit_response(components=self.view)
 
-            # print("Items removed")
             return
-        # await ctx.respond("Testx")
-        # view = self.view
-        # self.view.clear_items()
-        # try:
-        #     print("MID: ", self.view.message_id)
-        # except:
-        #     pass
-        # data = ctx.bot.d.chapter_info[self.view.message_id]
-        # print(data)
-        # try:
+
         await self.view.swap_pages(ctx, [self.trailer])
 
         self.label = "🔍"
         self.emoji = None
-        # self.view.add_item(KillNavButton())
+
         await ctx.edit_response(components=self.view)
-        # self.view.add_item(
 
     async def before_page_change(self) -> None:
         ...
@@ -437,34 +373,25 @@ class KillButton(miru.Button):
                 flags=hk.MessageFlag.EPHEMERAL,
             )
             return
-        # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
-        # await ctx.bot.rest.edit_message(
-        #     ctx.channel_id, ctx.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
-        # # )
-        # view = self.view
-        # self.view.clear_items()
+
         await self.view.message.delete()
-        # await ctx.edit_response(
-        #     flags=hk.MessageFlag.SUPPRESS_EMBEDS, components=[]
-        # )
+
 
 class NewButton(miru.Button):
-    def __init__(self, style: Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+    def __init__(
+        self,
+        style: Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
         label: Optional[str] = None,
         link: str = None,
+        emoji: hk.Emoji = None,
         custom_id: Optional[str] = None,
-        ) -> None:
+    ) -> None:
         self.link = link
-        super().__init__(style=style, label=label, custom_id=custom_id)
+        super().__init__(style=style, label=label, emoji=emoji, custom_id=custom_id)
         print(self.link)
-    
+
     async def callback(self, ctx: miru.ViewContext) -> None:
         try:
-            # await ctx.respond("This button is brokem")
-            # await ctx.respond(
-            #     "You can't interact with this button",
-            #     flags=hk.MessageFlag.EPHEMERAL,
-            # )
             await ctx.respond(f"{self.link}", flags=hk.MessageFlag.EPHEMERAL)
         except Exception as e:
             print(e)
@@ -573,9 +500,11 @@ def rss2json(url):
 
     return json.dumps(feedsdict)
 
+
 class PeristentViewTest(miru.View):
     def __init__(self) -> None:
         super().__init__(autodefer=True, timeout=None)
+
 
 def load(bot: lb.BotApp) -> None:
     """Load the plugin"""

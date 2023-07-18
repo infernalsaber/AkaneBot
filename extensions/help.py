@@ -1,24 +1,17 @@
 """Make cool plot charts"""
-import io
-from PIL import Image
+import datetime
+from typing import Optional
 
 import hikari as hk
 import lightbulb as lb
-
-
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import plotly.io as pio
-
-from typing import Optional
-
-import datetime
-
-from extensions.ping import KillNavButton, CustomNextButton, CustomPrevButton
-from extensions.ping import CustomNavi
-
 from miru.ext import nav
 
+from extensions.ping import (
+    CustomNavi,
+    CustomNextButton,
+    CustomPrevButton,
+    KillNavButton,
+)
 
 help_plugin = lb.Plugin("Help", "Bot Help")
 
@@ -43,7 +36,6 @@ async def help_cmd(ctx: lb.Context, query: Optional[str] = None) -> None:
         ctx (lb.Context): The event context (irrelevant to the user)
         query (str): The name of the two anime (seperated by "vs")
     """
-    ctx.bot.d.ncom += 1
 
     pages = [
         hk.Embed(

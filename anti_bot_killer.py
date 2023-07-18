@@ -1,6 +1,6 @@
-import time
-import subprocess
 import os
+import subprocess
+import time
 
 check = "ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'"
 
@@ -27,10 +27,3 @@ while True:
             time.sleep(10)
     except Exception as e:
         print(e)
-# print(type(os.system("ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'")))
-# print(int(os.system("ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'")) == 0)
-
-
-# print(stdout, type(stdout))
-# x = int.from_bytes(stdout, byteorder='big')
-# print(x, x == 0)

@@ -6,15 +6,17 @@ import hikari as hk
 import lightbulb as lb
 from miru.ext import nav
 
-from extensions.ping import CustomNavi
-from extensions.ping import CustomNextButton
-from extensions.ping import CustomPrevButton
-from extensions.ping import CustomView
-from extensions.ping import GenericButton
-from extensions.ping import KillButton
-from extensions.ping import KillNavButton
-from extensions.ping import PreviewButton
-from extensions.ping import TrailerButton
+from extensions.ping import (
+    CustomNavi,
+    CustomNextButton,
+    CustomPrevButton,
+    CustomView,
+    GenericButton,
+    KillButton,
+    KillNavButton,
+    PreviewButton,
+    TrailerButton,
+)
 from functions.errors import RequestsFailedError
 
 al_listener = lb.Plugin(
@@ -48,7 +50,6 @@ def parse_description(description: str) -> str:
 
         description = description + "..."
 
-
     return description
 
 
@@ -66,7 +67,6 @@ async def get_imp_info(chapters):
         "latest": {"chapter": chapter_last, "id": id_last},
         "first": {"chapter": chapter_first, "id": id_first},
     }
-
 
 
 @al_listener.command
@@ -91,7 +91,6 @@ async def get_imp_info(chapters):
 async def al_search(ctx: lb.Context, type: str, media: str) -> None:
     """Search an anime/manga/character on AL"""
 
-    ctx.bot.d.ncom += 1
     print("Type is", type)
 
     if type.lower() in ["anime", "manga", "m", "a"]:
@@ -103,7 +102,6 @@ async def al_search(ctx: lb.Context, type: str, media: str) -> None:
             return
 
     elif type.lower() in ["character", "c"]:
-
         await search_character(ctx, media)
         return
 
@@ -122,13 +120,11 @@ async def al_search(ctx: lb.Context, type: str, media: str) -> None:
         return
 
 
-
 @al_listener.command
 @lb.option("query", "The anime query", modifier=lb.commands.OptionModifier.CONSUME_REST)
 @lb.command("anime", "Search a anime", pass_options=True, aliases=["ani", "a"])
 @lb.implements(lb.PrefixCommand)
 async def anime_search(ctx: lb.PrefixContext, query: str):
-    ctx.bot.d.ncom += 1
     await search_anime(ctx, query)
 
 
@@ -137,7 +133,6 @@ async def anime_search(ctx: lb.PrefixContext, query: str):
 @lb.command("manga", "Search a manga", pass_options=True, aliases=["m"])
 @lb.implements(lb.PrefixCommand)
 async def manga_search(ctx: lb.PrefixContext, query: str):
-    ctx.bot.d.ncom += 1
     await search_manga(ctx, query)
 
 
@@ -150,7 +145,6 @@ async def manga_search(ctx: lb.PrefixContext, query: str):
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, user: str):
     await ctx.respond(f"https://anilist.co/user/{user}")
-    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -159,7 +153,6 @@ async def user_al(ctx: lb.PrefixContext, user: str):
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, query: str):
     await search_novel(ctx, query)
-    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -172,7 +165,6 @@ async def user_al(ctx: lb.PrefixContext, query: str):
 @lb.implements(lb.PrefixCommand)
 async def user_al(ctx: lb.PrefixContext, query: str):
     await search_character(ctx, query)
-    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -194,7 +186,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
     Raises:
         RequestsFailedError: Raised if the API call fails
     """
-    ctx.bot.d.ncom += 1
+
     num = 5
     if filter and filter in ["airing", "upcoming", "bypopularity", "favorite"]:
         params = {"limit": num, "filter": filter}
@@ -208,7 +200,6 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
     async with ctx.bot.d.aio_session.get(
         "https://api.jikan.moe/v4/top/anime", params=params, timeout=3
     ) as res:
-
         if res.ok:
             res = await res.json()
             embed = (
@@ -239,7 +230,6 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
 @lb.implements(lb.PrefixCommand)
 async def vn_search(ctx: lb.PrefixContext, query: str):
     await search_vn(ctx, query)
-    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -250,7 +240,6 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 @lb.implements(lb.PrefixCommand)
 async def vn_search(ctx: lb.PrefixContext, query: str):
     await search_vntag(ctx, query)
-    ctx.bot.d.ncom += 1
 
 
 @al_listener.command
@@ -268,10 +257,7 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 @lb.command("nh", "Search 🌚", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def nhhh(ctx: lb.PrefixContext, code: int):
-    ctx.bot.d.ncom += 1
-
     if not ctx.get_channel().is_nsfw:
-
         return
 
     res = await ctx.bot.d.aio_session.get(
@@ -361,10 +347,11 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
     }
 
     response = await ctx.bot.d.aio_session.post(
-        "https://graphql.anilist.co", json={"query": query, "variables": variables}, timeout=3
+        "https://graphql.anilist.co",
+        json={"query": query, "variables": variables},
+        timeout=3,
     )
     if not response.ok:
-
         await ctx.respond(
             f"Failed to fetch data 😵. \nTry typing the full name of the character."
         )
@@ -382,8 +369,6 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             dob += f"/{response['dateOfBirth']['year']}"
     else:
         dob = "NA"
-
-
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -465,9 +450,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         timeout=3,
     )
 
-
     if not response.ok:
-
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
@@ -569,7 +552,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     )
 
     if not response.ok or not len((await response.json())["data"]["Page"]["media"]):
-
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
@@ -600,14 +582,12 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         except Exception as e:
             print(e)
 
-
         choice = await ctx.respond(embed=embed, components=view)
 
         await view.start(choice)
         await view.wait()
 
         if hasattr(view, "answer"):  # Check if there is an answer
-
             print(f"Received an answer! It is: {view.answer}")
             num = f"{view.answer}"
             await ctx.delete_last_response()
@@ -616,7 +596,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             return
 
         num = int(num) - 1
- 
 
     response = (await response.json())["data"]["Page"]["media"][num]
 
@@ -630,7 +609,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     else:
         response["description"] = "NA"
     print("response parsed ig")
-
 
     pages = [
         hk.Embed(
@@ -713,17 +691,13 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     )
 
     if not response.ok:
-
         await ctx.respond(
             f"Failed to fetch data 😵, error `code: {response.status_code}`"
         )
         return
 
-
-
     response = (await response.json())["data"]["Media"]
     print(response)
-
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
@@ -736,7 +710,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         response["description"] = "NA"
     print("response parsed ig")
 
-
     print("\n\nUsing MD\n\n")
     base_url = "https://api.mangadex.org"
 
@@ -746,7 +719,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     }
 
     final_order_query = {}
-
 
     for key, value in order.items():
         final_order_query[f"order[{key}]"] = value
@@ -760,7 +732,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     if req.ok:
         try:
             manga_id = (await req.json())["data"][0]["id"]
-
 
             languages = ["en"]
 
@@ -785,7 +756,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             no_of_items = "NA"
     else:
         no_of_items = "NA"
-
 
     try:
         pages = [
@@ -812,10 +782,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             )
         ]
 
-
-
         buttons = [PreviewButton(), KillNavButton()]
-
 
         navigator = CustomNavi(
             pages=pages, buttons=buttons, timeout=180, user_id=ctx.author.id
@@ -823,14 +790,8 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     except Exception as e:
         print(e)
 
-
     if isinstance(ctx, lb.SlashContext):
-        await navigator.send(
-            ctx.interaction,
-            responded=True
-
-
-        )
+        await navigator.send(ctx.interaction, responded=True)
     else:
         await navigator.send(
             ctx.channel_id,
@@ -849,7 +810,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     ]
 
 
-
 async def search_vn(ctx: lb.Context, query: str):
     url = "https://api.vndb.org/kana/vn"
     headers = {"Content-Type": "application/json"}
@@ -859,13 +819,14 @@ async def search_vn(ctx: lb.Context, query: str):
         # "sort": "title"
     }
     try:
-        req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+        req = await ctx.bot.d.aio_session.post(
+            url, headers=headers, json=data, timeout=3
+        )
 
         print(req)
         if not req.ok:
             await ctx.respond("Couldn't find the VN you asked for.")
             return
-
 
         print(await req.json())
         req = await req.json()
@@ -979,7 +940,6 @@ async def search_vnchara(ctx: lb.Context, query: str):
 
     req = await req.json()
 
-
     if req["results"][0]["description"]:
         description = parse_vndb_desciption(req["results"][0]["description"])
     else:
@@ -1028,8 +988,6 @@ async def search_vntag(ctx: lb.Context, query: str):
     if not req.ok:
         await ctx.respond("Couldn't find the tag you asked for.")
         return
-
-
 
     req = await req.json()
 
