@@ -44,7 +44,7 @@ async def botinfo(ctx: lb.Context) -> None:
         .add_field("Name", user)
         .add_field("No of Servers", len(guilds), inline=True)
         .add_field("No of Members", member, inline=True)
-        .add_field("Version", "v0.3.1")
+        .add_field("Version", "v0.3.3")
         .add_field(
             "Alive since", f"<t:{int(user.created_at.timestamp())}:R>", inline=True
         )
