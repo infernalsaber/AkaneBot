@@ -444,6 +444,7 @@ class CustomView(miru.View):
         super().__init__(autodefer=autodefer, timeout=timeout)
     
     async def on_timeout(self) -> None:
+        ...
         # await self.message.edit(components=[])
 
 
