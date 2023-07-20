@@ -590,9 +590,9 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         if hasattr(view, "answer"):  # Check if there is an answer
             print(f"Received an answer! It is: {view.answer}")
             num = f"{view.answer}"
-            await ctx.delete_last_response()
+            # await ctx.delete_last_response()
         else:
-            await ctx.edit_last_response("Process timed out.", embeds=[], views=[])
+            await ctx.edit_last_response(views=[])
             return
 
         num = int(num) - 1
@@ -610,25 +610,48 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         response["description"] = "NA"
     print("response parsed ig")
 
-    pages = [
-        hk.Embed(
-            description="\n\n",
-            color=0x2B2D42,
-            timestamp=datetime.datetime.now().astimezone(),
+    try:
+        view = CustomView(user_id=ctx.author.id)
+
+        trailer = "Couldn't find anything."
+
+        embed = (hk.Embed(
+                description="\n\n",
+                color=0x2B2D42,
+                timestamp=datetime.datetime.now().astimezone(),
+            )
+            .add_field("Rating", response["meanScore"] or "NA")
+            .add_field("Genres", ", ".join(response["genres"][:4]))
+            .add_field("Status", response["status"].replace("_", " "), inline=True)
+            .add_field("Episodes", no_of_items, inline=True)
+            .add_field("Summary", response["description"])
+            .set_thumbnail(response["coverImage"]["large"])
+            .set_image(response["bannerImage"])
+            .set_author(url=response["siteUrl"], name=title)
+            .set_footer(
+                text="Source: AniList",
+                icon="https://i.imgur.com/NYfHiuu.png",
+            )
         )
-        .add_field("Rating", response["meanScore"] or "NA")
-        .add_field("Genres", ", ".join(response["genres"][:4]))
-        .add_field("Status", response["status"].replace("_", " "), inline=True)
-        .add_field("Episodes", no_of_items, inline=True)
-        .add_field("Summary", response["description"])
-        .set_thumbnail(response["coverImage"]["large"])
-        .set_image(response["bannerImage"])
-        .set_author(url=response["siteUrl"], name=title)
-        .set_footer(
-            text="Source: AniList",
-            icon="https://i.imgur.com/NYfHiuu.png",
+        if response["trailer"]:
+            if response["trailer"]["site"] == "youtube":
+                trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
+            else:
+                trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
+
+            view.add_item(TrailerButton(trailer=trailer, other_page=embed))
+
+        view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+
+
+        await ctx.edit_last_response( 
+            embed=embed
+            , components=view, 
         )
-    ]
+        await view.start(choice)
+        await view.wait()
+    except Exception as e:
+        print(e)
     trailer = "Couldn't find anything."
 
     if response["trailer"]:
@@ -645,10 +668,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         pages=pages, buttons=buttons, timeout=180, user_id=ctx.author.id
     )
 
-    await navigator.send(
-        ctx.channel_id,
-    )
-    return
+
 
 
 async def search_manga(ctx, manga: str):
