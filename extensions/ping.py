@@ -302,7 +302,7 @@ class PreviewButton(nav.NavButton):
         await ctx.edit_response(components=[])
 
 
-class TrailerButton(nav.NavButton):
+class TrailerButton(miru.Button):
     """A custom next button class"""
 
     def __init__(
@@ -338,14 +338,19 @@ class TrailerButton(nav.NavButton):
         if self.label == "🔍":
             self.label = "Trailer"
             self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
-            await self.view.swap_pages(ctx, self.other_page)
+            
+            await ctx.edit_response(content=None, embeds=[self.other_page], components=self.view)
+            
+            # await self.view.swap_pages(ctx, self.other_page)
 
             return
 
-        await self.view.swap_pages(ctx, [self.trailer])
-
         self.label = "🔍"
         self.emoji = None
+
+        await ctx.edit_response(content=self.trailer, embeds=[])
+        # await self.view.swap_pages(ctx, [self.trailer])
+
 
         await ctx.edit_response(components=self.view)
 
