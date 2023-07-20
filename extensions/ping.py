@@ -442,8 +442,9 @@ class CustomView(miru.View):
     ) -> None:
         self.user_id = user_id
         super().__init__(autodefer=autodefer, timeout=timeout)
+    
     async def on_timeout(self) -> None:
-        await self.message.edit(components=[])
+        # await self.message.edit(components=[])
 
 
 def check_if_url(link: str) -> bool:
