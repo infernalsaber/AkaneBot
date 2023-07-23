@@ -193,6 +193,24 @@ async def delete_msg(ctx: lb.Context, channel: hk.GuildChannel, message: int) ->
     await ctx.respond("Deleted", delete_after=1)
     await ctx.event.message.delete()
 
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("sticker", "The channel where the message is", hk.GuildSticker)
+@lb.command("stinfo", "Unload an extension", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def sticker_info(ctx: lb.Context, sticker: hk.GuildSticker) -> None:
+    await ctx.respond(
+        embed=hk.Embed(
+            color=0x00FFFF
+        )
+        .add_field("Tag", sticker.tag)
+        .add_field("Type", sticker.type)
+        .add_field("Description", sticker.description)
+        .add_field("Name", sticker.name)
+        .add_field("Format Type", sticker.format_type)
+        .set_image(sticker.image_url)
+    )
+    # ctx.bot.rest.sched
 
 @task_plugin.listener(hk.StartedEvent)
 async def prefix_invocation(event: hk.StartedEvent) -> None:
