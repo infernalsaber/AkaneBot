@@ -231,12 +231,21 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
 async def vn_search(ctx: lb.PrefixContext, query: str):
     await search_vn(ctx, query)
 
+@al_listener.command
+@lb.option(
+    "query", "The vn trait to search", modifier=lb.commands.OptionModifier.CONSUME_REST
+)
+@lb.command("vntrait", "Search a vn", pass_options=True, aliases=["trait"])
+@lb.implements(lb.PrefixCommand)
+async def vn_search(ctx: lb.PrefixContext, query: str):
+    await search_vntrait(ctx, query)
+
 
 @al_listener.command
 @lb.option(
     "query", "The vntag to search", modifier=lb.commands.OptionModifier.CONSUME_REST
 )
-@lb.command("vntag", "Search a vntag", pass_options=True)
+@lb.command("vntag", "Search a vntag", pass_options=True, aliases=["tag"])
 @lb.implements(lb.PrefixCommand)
 async def vn_search(ctx: lb.PrefixContext, query: str):
     await search_vntag(ctx, query)
@@ -1025,6 +1034,70 @@ async def search_vntag(ctx: lb.Context, query: str):
         .add_field("Aliases", tags)
         .add_field("Category", req["results"][0]["category"].upper(), inline=True)
         .add_field("No of VNs", req["results"][0]["vn_count"], inline=True)
+        .add_field("Summary", description)
+        .set_author(
+            name=req["results"][0]["name"],
+            url=f"https://vndb.org/{req['results'][0]['id']}",
+        )
+        .set_footer(text="Source: VNDB", icon="https://files.catbox.moe/3gg4nn.jpg"),
+        components=view,
+    )
+    await view.start(choice)
+    await view.wait()
+
+    if hasattr(view, "answer"):  # Check if there is an answer
+        print(f"Received an answer! It is: {view.answer}")
+    else:
+        await ctx.edit_last_response(components=[])
+
+async def search_vntrait(ctx: lb.Context, query: str):
+    url = "https://api.vndb.org/kana/trait"
+    headers = {"Content-Type": "application/json"}
+    
+    values = {
+        "neil": "Savior Complex",
+        "esso": "Netorase",
+        "nut": "Siscon",
+        "salad": "Netorare (they are the stolen SO)" 
+    }
+
+    if query in values.keys():
+        query = values[query]
+
+    data = {
+        "filters": ["search", "=", query],
+        "fields": "name, aliases, description, group_name, char_count"
+        # "sort": "title"
+    }
+
+
+
+
+    
+    print("Query is", query)
+
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+
+    if not req.ok:
+        await ctx.respond("Couldn't find the tag you asked for.")
+        return
+
+    req = await req.json()
+
+    if req["results"][0]["description"]:
+        description = parse_vndb_desciption(req["results"][0]["description"])
+    else:
+        description = "NA"
+
+    tags = ", ".join(req["results"][0]["aliases"][:5]) or "NA"
+
+    view = CustomView(user_id=ctx.author.id)
+    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+    choice = await ctx.respond(
+        hk.Embed(color=0x948782, timestamp=datetime.datetime.now().astimezone())
+        .add_field("Aliases", tags)
+        .add_field("Group Name", req["results"][0]["group_name"], inline=True)
+        .add_field("No of Characters", req["results"][0]["char_count"], inline=True)
         .add_field("Summary", description)
         .set_author(
             name=req["results"][0]["name"],
