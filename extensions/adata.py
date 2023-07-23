@@ -304,6 +304,46 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
         print(res.json())
 
 
+
+@al_listener.command
+@lb.option(
+    "map", "The vnchara to search", modifier=lb.commands.OptionModifier.CONSUME_REST
+)
+@lb.option(
+    "person", "The vnchara to search")
+@lb.command("addtrait", "Search a vn character", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def add_trait_map(ctx: lb.PrefixContext, person: str, map: str):
+    try:
+        db = ctx.bot.d.con
+        cursor = db.cursor()
+        cursor.execute("""INSERT INTO traitmap (user, trait) VALUES (?, ?)""",(person, map),)
+        db.commit()
+        await ctx.respond("Done")
+    except Exception as e:
+        print(e)
+
+@al_listener.command
+@lb.option(
+    "person", "The vnchara to search")
+@lb.command("rmtrait", "Search a vn character", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def remove_trait_map(ctx: lb.PrefixContext, person: str):
+    try:
+        db = ctx.bot.d.con
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM traitmap where user = ?", (person,))
+        await ctx.respond("Removed trait")
+        db.commit()
+    except Exception as e:
+        print(e)
+
+async def fetch_trait_map(user):
+    db = al_listener.bot.d.con
+    cursor = db.cursor()
+    cursor.execute("SELECT trait FROM traitmap WHERE user=?", (user,))
+    return cursor.fetchone()
+
 async def search_character(ctx: lb.Context, character: str):
     """Search a character on AL"""
     query = """
@@ -1054,15 +1094,11 @@ async def search_vntrait(ctx: lb.Context, query: str):
     url = "https://api.vndb.org/kana/trait"
     headers = {"Content-Type": "application/json"}
     
-    values = {
-        "neil": "Savior Complex",
-        "esso": "Netorase",
-        "nut": "Siscon",
-        "salad": "Netorare (they are the stolen SO)" 
-    }
+    db_check = await fetch_trait_map(query.lower())
 
-    if query in values.keys():
-        query = values[query]
+    if db_check is not None:
+        query = db_check[0]
+    
 
     data = {
         "filters": ["search", "=", query],
@@ -1114,9 +1150,29 @@ async def search_vntrait(ctx: lb.Context, query: str):
     else:
         await ctx.edit_last_response(components=[])
 
+@al_listener.listener(hk.StartedEvent)
+async def on_starting(event: hk.StartedEvent) -> None:
+    """Event fired on start of bot"""
+    # return
+    # asyncio.sleep(0.5)
+    conn = al_listener.bot.d.con
+    cursor = conn.cursor()
+    # updates.bot.d.con = conn
 
-@al_search.set_error_handler
-async def gallery_errors_handler(event: lb.CommandErrorEvent) -> bool:
+    cursor.execute(
+        """
+    CREATE TABLE IF NOT EXISTS traitmap (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user TEXT,
+        trait TEXT
+    )
+"""
+    )
+    conn.commit()
+
+
+@al_listener.set_error_handler
+async def al_error_handler(event: lb.CommandErrorEvent) -> bool:
     """Exception handler"""
     exception = event.exception.__cause__ or event.exception
 
