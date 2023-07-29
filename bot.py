@@ -10,10 +10,10 @@ import lightbulb as lb
 import miru
 from lightbulb.ext import tasks
 
-dotenv.load_dotenv()
-
 import aiohttp_client_cache
+from functions.utils import verbose_timedelta
 
+dotenv.load_dotenv()
 
 def return_prefix() -> list:
     if os.name == "nt":
@@ -73,14 +73,14 @@ async def on_starting(event: hk.StartingEvent) -> None:
 
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
         cache_name="cache_db.db",  # For SQLite, this will be used as the filename
-        expire_after=60 * 60,  # By default, cached responses expire in an hour
+        expire_after=24 * 60 * 60,  # By default, cached responses expire in an hour
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
         include_headers=True,  # Cache requests with different headers separately
         ignored_params=[
             "auth_token"
         ],  # Keep using the cached response even if this param changes
-        timeout=2.5,
+        timeout=2,
     )
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
@@ -94,22 +94,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
     setup_logging()
 
 
-def verbose_timedelta(delta):
-    d = delta.days
-    h, s = divmod(delta.seconds, 3600)
-    m, s = divmod(s, 60)
-    labels = ["day", "hour", "minute", "second"]
-    dhms = [
-        "%s %s%s" % (i, lbl, "s" if i != 1 else "")
-        for i, lbl in zip([d, h, m, s], labels)
-    ]
-    for start in range(len(dhms)):
-        if not dhms[start].startswith("0"):
-            break
-    for end in range(len(dhms) - 1, -1, -1):
-        if not dhms[end].startswith("0"):
-            break
-    return ", ".join(dhms[start : end + 1])
+
 
 
 @bot.listen()
@@ -118,7 +103,7 @@ async def on_stopping(event: hk.StoppingEvent) -> None:
 
     await bot.rest.create_message(
         1129030476695343174,
-        f"Bot closed with {bot.d.ncom} commands and {verbose_timedelta(datetime.datetime.now().astimezone()-bot.d.timeup)} uptime",
+        f"Bot closed with {verbose_timedelta(datetime.datetime.now().astimezone()-bot.d.timeup)} uptime",
     )
 
 

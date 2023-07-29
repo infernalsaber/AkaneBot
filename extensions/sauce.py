@@ -11,6 +11,8 @@ import requests
 
 from extensions.ping import CustomView, GenericButton, KillButton, check_if_url
 
+from functions.utils import iso_to_timestamp
+
 dotenv.load_dotenv()
 
 SAUCENAO_KEY = os.getenv("SAUCENAO_KEY")
@@ -408,6 +410,13 @@ async def complex_parsing(ctx: lb.Context, data: dict):
 
         for i, item in enumerate(data["data"].keys()):
             if item not in ["source", "ext_urls"] and not "id" in item:
+                if item == "created_at":
+                    data["data"][item] = f"<t:{iso_to_timestamp(data['data'][item])}:D>"
+                
+                if item == "creator":
+                    if not isinstance(data["data"]["creator"], str):
+                        data["data"]["creator"] = ", ".join(data["data"]["creator"])
+
                 if i % 3:
                     embed.add_field(
                         sanitize_field(item), data["data"][item], inline=True

@@ -59,12 +59,6 @@ async def botinfo(ctx: lb.Context) -> None:
         )
         .set_author(name=f"{user.username} Bot")
         .set_thumbnail(user.avatar_url)
-        .set_image(
-            (
-                "https://media.discordapp.net/attachments"
-                "/1005948828484108340/1108082051246198824/69886913365.png"
-            )
-        )
         .set_footer(f"Made by: {data.owner}", icon=data.owner.avatar_url),
         components=view,
     )
