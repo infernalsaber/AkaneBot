@@ -15,6 +15,9 @@ from functions.utils import verbose_timedelta
 
 dotenv.load_dotenv()
 
+
+# Setting the prefix as , for windows (where i run the test bot)
+# and - for others (where it's deployed :) )
 def return_prefix() -> list:
     if os.name == "nt":
         return [","]
@@ -92,9 +95,6 @@ async def on_starting(event: hk.StartingEvent) -> None:
         pass
 
     setup_logging()
-
-
-
 
 
 @bot.listen()

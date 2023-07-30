@@ -101,6 +101,7 @@ def rss2json(url):
 
     return json.dumps(feedsdict)
 
+
 def verbose_timedelta(delta):
     d = delta.days
     h, s = divmod(delta.seconds, 3600)
@@ -119,15 +120,18 @@ def verbose_timedelta(delta):
     return ", ".join(dhms[start : end + 1])
 
 
-
 def iso_to_timestamp(iso_date):
     try:
-        return int(datetime.datetime.fromisoformat(iso_date[:-1] + '+00:00').astimezone().timestamp())
-    
-    except ValueError: # Incase the datetime is not in the iso format, return it as is
+        return int(
+            datetime.datetime.fromisoformat(iso_date[:-1] + "+00:00")
+            .astimezone()
+            .timestamp()
+        )
+
+    except ValueError:  # Incase the datetime is not in the iso format, return it as is
         return iso_date
 
-    
+
 class PeristentViewTest(miru.View):
     def __init__(self) -> None:
         super().__init__(autodefer=True, timeout=None)

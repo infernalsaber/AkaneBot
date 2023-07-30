@@ -84,3 +84,7 @@ def get_chapter(link: str, latest_chapter: int = 0):
 
     driver.quit()
     return ans
+
+
+if __name__ == "__main__":
+    print(get_chapter("https://mangaplus.shueisha.co.jp/titles/100037", 123))

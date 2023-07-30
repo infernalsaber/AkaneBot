@@ -412,7 +412,7 @@ async def complex_parsing(ctx: lb.Context, data: dict):
             if item not in ["source", "ext_urls"] and not "id" in item:
                 if item == "created_at":
                     data["data"][item] = f"<t:{iso_to_timestamp(data['data'][item])}:D>"
-                
+
                 if item == "creator":
                     if not isinstance(data["data"]["creator"], str):
                         data["data"]["creator"] = ", ".join(data["data"]["creator"])
