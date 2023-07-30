@@ -19,6 +19,8 @@ from extensions.ping import (
 )
 from functions.errors import RequestsFailedError
 
+from functions.utils import verbose_timedelta
+
 al_listener = lb.Plugin(
     "Weeb", "Search functions for anime, manga and characters (with an easter egg)"
 )
@@ -45,6 +47,7 @@ def parse_description(description: str) -> str:
     if len(description) > 400:
         description = description[0:400]
 
+        # If the trimmed description has a missing spoiler tag, add one
         if description.count("||") % 2:
             description = description + "||"
 
@@ -193,9 +196,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
     else:
         params = {"limit": num}
 
-    if filter in ["upcoming"]:
-        await ctx.respond("Filter is currently broken <a:AkaneBow:1109245003823317052>")
-        return
+
 
     async with ctx.bot.d.aio_session.get(
         "https://api.jikan.moe/v4/top/anime", params=params, timeout=3
@@ -207,7 +208,7 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
                 .set_author(name="Top Anime")
                 .set_footer(
                     "Fetched via MyAnimeList.net",
-                    icon="https://i.imgur.com/deFPj7Z.png",
+                    icon="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png",
                 )
             )
 
@@ -306,6 +307,7 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
 
 
 @al_listener.command
+@lb.add_checks(lb.owner_only)
 @lb.option(
     "map", "The vnchara to search", modifier=lb.commands.OptionModifier.CONSUME_REST
 )
@@ -324,6 +326,7 @@ async def add_trait_map(ctx: lb.PrefixContext, person: str, map: str):
         print(e)
 
 @al_listener.command
+@lb.add_checks(lb.owner_only)
 @lb.option(
     "person", "The vnchara to search")
 @lb.command("rmtrait", "Search a vn character", pass_options=True)
@@ -408,7 +411,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
     response = await response.json()
 
     response = response["data"]["Character"]
-    # print(response)
+
 
     title = response["name"]["full"]
 
@@ -443,7 +446,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             .set_author(url=response["siteUrl"], name=title)
             .set_footer(
                 text="Source: AniList",
-                icon="https://i.imgur.com/NYfHiuu.png",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             ),
             components=view,
         )
@@ -539,7 +542,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         .set_author(url=response["siteUrl"], name=title)
         .set_footer(
             text="Source: AniList",
-            icon="https://i.imgur.com/NYfHiuu.png",
+            icon="https://anilist.co/img/icons/android-chrome-512x512.png",
         ),
         components=view,
     )
@@ -557,18 +560,18 @@ async def search_anime(ctx, anime: str):
     query = """
 query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used (id)
   Page (perPage: 5) {
-  media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # The sort param was POPULARITY_DESC
+  media (id: $id, search: $search, type: $type) { # The sort param was POPULARITY_DESC
     id
     idMal
     title {
         english
         romaji
     }
+    duration
     type
     averageScore
     format
     meanScore
-    chapters
     episodes
     startDate {
         year
@@ -614,11 +617,9 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             color=0x43408A,
             timestamp=datetime.datetime.now().astimezone(),
         )
-        # for item in response.json()['data']['Page']['media']:
-        # print(response.json()['data']['Page']['media'])
+
         for count, item in enumerate((await response.json())["data"]["Page"]["media"]):
-            # print("\n")
-            # print(item)
+
             embed.add_field(
                 count + 1, item["title"]["english"] or item["title"]["romaji"]
             )
@@ -639,7 +640,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         if hasattr(view, "answer"):  # Check if there is an answer
             print(f"Received an answer! It is: {view.answer}")
             num = f"{view.answer}"
-            # await ctx.delete_last_response()
+
         else:
             await ctx.edit_last_response(views=[])
             return
@@ -650,7 +651,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
-    no_of_items = response["chapters"] or response["episodes"] or "NA"
+    no_of_items = response["episodes"] if response["episodes"] != 1 else verbose_timedelta(datetime.timedelta(minutes=response["duration"]))
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -672,14 +673,14 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             .add_field("Rating", response["meanScore"] or "NA")
             .add_field("Genres", ", ".join(response["genres"][:4]))
             .add_field("Status", response["status"].replace("_", " "), inline=True)
-            .add_field("Episodes", no_of_items, inline=True)
+            .add_field("Episodes" if response["episodes"] != 1 else "Duration", no_of_items, inline=True)
             .add_field("Summary", response["description"])
             .set_thumbnail(response["coverImage"]["large"])
             .set_image(response["bannerImage"])
             .set_author(url=response["siteUrl"], name=title)
             .set_footer(
                 text="Source: AniList",
-                icon="https://i.imgur.com/NYfHiuu.png",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             )
         )
         if response["trailer"]:
@@ -847,7 +848,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             .set_author(url=response["siteUrl"], name=title)
             .set_footer(
                 text="Source: AniList",
-                icon="https://i.imgur.com/NYfHiuu.png",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             )
         ]
 
@@ -864,8 +865,6 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
     else:
         await navigator.send(
             ctx.channel_id,
-            # ephemeral=True,
-            # flags=hk.MessageFlag.EPHEMERAL
         )
 
     print("NavigatoID", navigator.message_id)
@@ -899,14 +898,14 @@ async def search_vn(ctx: lb.Context, query: str):
 
         print(await req.json())
         req = await req.json()
-        # await ctx.respond(req)
+
         print(list(tag["name"] for tag in req["results"][0]["tags"])[:3])
         if req["results"][0]["description"]:
             description = parse_vndb_desciption(req["results"][0]["description"])
         else:
             description = "NA"
         view = CustomView(user_id=ctx.author.id)
-        view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
+        view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
         choice = await ctx.respond(
             hk.Embed(color=0x948782, timestamp=datetime.datetime.now().astimezone())
             .add_field("Rating", req["results"][0]["rating"] or "NA")
@@ -920,7 +919,8 @@ async def search_vn(ctx: lb.Context, query: str):
             )
             .add_field(
                 "Est. Time",
-                f"{req['results'][0]['length_minutes']//60}h{req['results'][0]['length_minutes']%60}m"
+                verbose_timedelta(datetime.timedelta(minutes=req['results'][0]['length_minutes']))
+                # f"{req['results'][0]['length_minutes']//60}h{req['results'][0]['length_minutes']%60}m"
                 if req["results"][0]["length_minutes"]
                 else "NA",
                 inline=True,
@@ -932,13 +932,13 @@ async def search_vn(ctx: lb.Context, query: str):
                 url=f"https://vndb.org/{req['results'][0]['id']}",
             )
             .set_footer(
-                text="Source: VNDB", icon="https://files.catbox.moe/3gg4nn.jpg"
+                text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg"
             ),
             components=view,
         )
         await view.start(choice)
         await view.wait()
-        # view.from_message(message)
+
         if hasattr(view, "answer"):  # Check if there is an answer
             print(f"Received an answer! It is: {view.answer}")
         else:
@@ -965,6 +965,8 @@ def parse_vndb_desciption(description: str) -> str:
         .replace("[/i]", "")
     )
 
+    print("\n\n\n", description, "\n\n\n")
+
     if "[url=/" in description:
         print("ok")
     description.replace("[url=/", "[url=https://vndb.org/")
@@ -978,17 +980,16 @@ def parse_vndb_desciption(description: str) -> str:
     # Replace BBCode links with Markdown links in the text
     description = re.sub(pattern, replace_bbcode_with_markdown, description)
 
-    # return markdown_text
+
 
     if len(description) > 300:
         description = description[0:300]
-        # if len(spoiler_str.findall(description)) % 2:
+
         if description.count("||") % 2:
             description = description + "||"
 
         description = description + "..."
 
-    # description = f"{description}||"
 
     return description
 
@@ -1015,7 +1016,7 @@ async def search_vnchara(ctx: lb.Context, query: str):
         description = "NA"
 
     view = CustomView(user_id=ctx.author.id)
-    view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
+    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY,label="❌"))
 
     choice = await ctx.respond(
         hk.Embed(color=0x948782, timestamp=datetime.datetime.now().astimezone())
@@ -1068,7 +1069,7 @@ async def search_vntag(ctx: lb.Context, query: str):
     tags = ", ".join(req["results"][0]["aliases"]) or "NA"
 
     view = CustomView(user_id=ctx.author.id)
-    view.add_item(KillButton(style=hk.ButtonStyle.PRIMARY, label="❌"))
+    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY,label="❌"))
     choice = await ctx.respond(
         hk.Embed(color=0x948782, timestamp=datetime.datetime.now().astimezone())
         .add_field("Aliases", tags)
@@ -1094,10 +1095,11 @@ async def search_vntrait(ctx: lb.Context, query: str):
     url = "https://api.vndb.org/kana/trait"
     headers = {"Content-Type": "application/json"}
     
-    db_check = await fetch_trait_map(query.lower())
+    if ctx.guild_id == 695200821910044783:
+        db_check = await fetch_trait_map(query.lower())
 
-    if db_check is not None:
-        query = db_check[0]
+        if db_check is not None:
+            query = db_check[0]
     
 
     data = {
@@ -1153,11 +1155,11 @@ async def search_vntrait(ctx: lb.Context, query: str):
 @al_listener.listener(hk.StartedEvent)
 async def on_starting(event: hk.StartedEvent) -> None:
     """Event fired on start of bot"""
-    # return
+
     # asyncio.sleep(0.5)
     conn = al_listener.bot.d.con
     cursor = conn.cursor()
-    # updates.bot.d.con = conn
+
 
     cursor.execute(
         """
@@ -1182,6 +1184,106 @@ async def al_error_handler(event: lb.CommandErrorEvent) -> bool:
         )
 
     return False
+
+@al_listener.listener(hk.ReactionAddEvent)
+async def al_link_finder(event: hk.ReactionAddEvent) -> None:
+    """Check if a message contains an animanga link and display it's info"""
+
+    try:
+        channel = await al_listener.bot.rest.fetch_channel(event.channel_id)
+        message = await al_listener.bot.rest.fetch_message(event.channel_id, event.message_id)
+        if not event.emoji_name == "🔍":
+            return
+        list_of_series = pattern.findall(message.content) or []
+    except Exception as e:
+        print(e)
+
+    if len(list_of_series) != 0:
+        
+        await channel.send("Beep, bop. AniList link found")
+        # await al_listener.bot.rest.edit_message(
+        #     event.channel_id, event.message, flags=hk.MessageFlag.SUPPRESS_EMBEDS
+        # )
+
+        for series in list_of_series:
+
+            query = """
+query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
+  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+    id
+    idMal
+    title {
+        english
+        romaji
+    }
+    type
+    averageScore
+    format
+    meanScore
+    chapters
+    episodes
+    startDate {
+        year
+    }
+    coverImage {
+        large
+    }
+    bannerImage
+    genres
+    status
+    description (asHtml: false)
+    siteUrl
+  }
+}
+
+"""
+
+            variables = {"id": series[3], "type": series[2].upper()}
+
+            response = await al_listener.bot.d.aio_session.post(
+                "https://graphql.anilist.co",
+                json={"query": query, "variables": variables},
+                timeout=10,
+            )
+            if not response.ok:
+                print(response.json())
+                await event.message.respond(
+                    f"Nvm 😵, error `code: {response.status_code}`"
+                )
+                return
+            response = (await response.json())["data"]["Media"]
+
+            title = response["title"]["english"] or response["title"]["romaji"]
+
+            no_of_items = response["chapters"] or response["episodes"] or "NA"
+
+            await channel.send(
+                content="Here are it's details",
+                embed=hk.Embed(
+                    description="\n\n",
+                    color=0x2B2D42,
+                    timestamp=datetime.datetime.now().astimezone(),
+                )
+                .add_field("Rating", response["averageScore"])
+                .add_field("Genres", ",".join(response["genres"]))
+                .add_field("Status", response["status"], inline=True)
+                .add_field(
+                    "Chapters" if response["type"] == "MANGA" else "ANIME",
+                    no_of_items,
+                    inline=True,
+                )
+                .add_field(
+                    "Summary",
+                    f"{response['description'][0:250].replace('<br>', '') if len(response['description']) > 250 else response['description'].replace('<br>', '')}...",
+                )
+                .set_thumbnail(response["coverImage"]["large"])
+                .set_image(response["bannerImage"])
+                .set_author(url=response["siteUrl"], name=title)
+                .set_footer(
+                    text="Source: AniList",
+                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                ),
+            )
 
 
 def load(bot: lb.BotApp) -> None:
