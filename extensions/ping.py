@@ -1,4 +1,4 @@
-"""Plugin running the background tasks and utilities for the bot"""
+"""Plugin housing the classes for the bot"""
 import datetime
 
 import hikari as hk
@@ -7,7 +7,6 @@ import lightbulb as lb
 ping_plugin = lb.Plugin("Ping", "Pong")
 
 
-"""Commonly used functions to ease utility"""
 from typing import Optional, Union
 
 import hikari as hk
@@ -43,7 +42,9 @@ async def preview_maker(base_url, data_id, title, manga_id, cover):
                 color=0xFF6740,
                 url=f"https://mangadex.org/title/{manga_id}",
             )
-            .set_image(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
+            .set_image(
+                hk.URL(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
+            )
             .set_footer(
                 "Fetched via: MangaDex",
                 icon="https://avatars.githubusercontent.com/u/100574686?s=280&v=4",
@@ -338,9 +339,11 @@ class TrailerButton(miru.Button):
         if self.label == "🔍":
             self.label = "Trailer"
             self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
-            
-            await ctx.edit_response(content=None, embeds=[self.other_page], components=self.view)
-            
+
+            await ctx.edit_response(
+                content=None, embeds=[self.other_page], components=self.view
+            )
+
             # await self.view.swap_pages(ctx, self.other_page)
 
             return
@@ -350,7 +353,6 @@ class TrailerButton(miru.Button):
 
         await ctx.edit_response(content=self.trailer, embeds=[])
         # await self.view.swap_pages(ctx, [self.trailer])
-
 
         await ctx.edit_response(components=self.view)
 
@@ -442,7 +444,7 @@ class CustomView(miru.View):
     ) -> None:
         self.user_id = user_id
         super().__init__(autodefer=autodefer, timeout=timeout)
-    
+
     async def on_timeout(self) -> None:
         ...
         # await self.message.edit(components=[])

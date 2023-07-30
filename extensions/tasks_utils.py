@@ -193,6 +193,7 @@ async def delete_msg(ctx: lb.Context, channel: hk.GuildChannel, message: int) ->
     await ctx.respond("Deleted", delete_after=1)
     await ctx.event.message.delete()
 
+
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
 @lb.option("sticker", "The channel where the message is", hk.GuildSticker)
@@ -200,9 +201,7 @@ async def delete_msg(ctx: lb.Context, channel: hk.GuildChannel, message: int) ->
 @lb.implements(lb.PrefixCommand)
 async def sticker_info(ctx: lb.Context, sticker: hk.GuildSticker) -> None:
     await ctx.respond(
-        embed=hk.Embed(
-            color=0x00FFFF
-        )
+        embed=hk.Embed(color=0x00FFFF)
         .add_field("Tag", sticker.tag)
         .add_field("Type", sticker.type)
         .add_field("Description", sticker.description)
@@ -211,6 +210,7 @@ async def sticker_info(ctx: lb.Context, sticker: hk.GuildSticker) -> None:
         .set_image(sticker.image_url)
     )
     # ctx.bot.rest.sched
+
 
 @task_plugin.listener(hk.StartedEvent)
 async def prefix_invocation(event: hk.StartedEvent) -> None:
@@ -227,6 +227,7 @@ async def prefix_invocation(event: hk.StartedEvent) -> None:
         )
     """
     )
+    conn.commit()
 
 
 @task_plugin.listener(lb.CommandInvocationEvent)

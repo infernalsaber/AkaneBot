@@ -62,7 +62,9 @@ async def get_anime_updates() -> list:
         item_dict["link"] = i["link"]
         item_dict["file"] = i["title"]
         item_dict["data"] = {}
-        item_dict["data"] = await return_anime_info(i["title"][13:-13].split("(")[0][:-6])
+        item_dict["data"] = await return_anime_info(
+            i["title"][13:-13].split("(")[0][:-6]
+        )
         if not item_dict["data"]:
             print("Not on AL")
             continue
@@ -160,7 +162,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
 async def return_anime_info(anime):
     query = """
   query ($search: String) { # Define which variables will be used (id)
-    Media (search: $search, type: ANIME, sort: START_DATE_DESC) { # The sort param was POPULARITY_DESC
+    Media (search: $search, type: ANIME) { # The sort param was POPULARITY_DESC
       id
       title {
           english
@@ -180,11 +182,15 @@ async def return_anime_info(anime):
 
     variables = {"search": anime}
 
-    return (await (await aniupdates.bot.d.aio_session.post(
-        "https://graphql.anilist.co",
-        json={"query": query, "variables": variables},
-        timeout=10,
-    )).json())["data"]["Media"]
+    return (
+        await (
+            await aniupdates.bot.d.aio_session.post(
+                "https://graphql.anilist.co",
+                json={"query": query, "variables": variables},
+                timeout=10,
+            )
+        ).json()
+    )["data"]["Media"]
 
 
 def get_episode_number(name):
