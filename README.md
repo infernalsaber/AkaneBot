@@ -52,7 +52,7 @@ Before you start, you'll need to have [Python](https://www.python.org/downloads/
 
 Configuring the app is covered in detail in the [getting started guide](https://discord.com/developers/docs/getting-started).
 
-Note: Remember to enable the text messages intent to enable prefix commands
+Note: Remember to enable the text messages intent as it's required for prefix commands
 
 ### Setup project
 
@@ -85,21 +85,13 @@ You're all set up now.
 
 Run the following to get the bot running
 ```
-python -OO bot.py
+$ python -OO main.py
 ```
 
 
-Note: If you're running off a VM running
-```
-nohup python -OO bot.py &
-```
-might be a better option since your bot wouldn't get killed when the terminal is closed
-
-
-Btw:
-i. replacing the owner id with your own would be a good idea
-ii. the emotes will break on your instance, so do replace them with equivalent ones
-
+Btw: <br>
+i. replacing the owner id with your own would be a good idea <br>
+ii. the emotes will break on your instance, so do replace them with equivalent ones 
 <!-- ## Credits
 
 **NOTE**: This bot bears no affiliation to Akane, the character from the Oshi no Ko series -->
