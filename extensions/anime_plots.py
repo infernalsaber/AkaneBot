@@ -10,9 +10,11 @@ from plotly.subplots import make_subplots
 from functions.fetch_trends import search_it
 
 plot_plugin = lb.Plugin(
-    "plot", "A set of commands that are used to plot anime's trends"
+    "Plots", "A set of commands that are used to plot anime's trends", include_datastore=True
 )
-
+plot_plugin.d.help_image =  "https://i.imgur.com/dTvGa1t.png"
+plot_plugin.d.help = True
+plot_plugin.d.help_emoji =  "📈"
 
 @plot_plugin.command
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
@@ -35,16 +37,16 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
 
     # print(os.listdir("./pictures/"))
     print("\n\n\n")
-    if f"{query}.png" in os.listdir("./pictures/"):
-        # await ctx.respond("Found")
-        await ctx.respond(
-            embed=hk.Embed(
-                title=f"Popularity Chart: {query}", color=0x7DF9FF
-            ).set_image(hk.File(f"pictures/{query.upper()}.png"))
-            # , attachments = None
-        )
+    # if f"{query}.png" in os.listdir("./pictures/"):
+    #     # await ctx.respond("Found")
+    #     await ctx.respond(
+    #         embed=hk.Embed(
+    #             title=f"Popularity Chart: {query}", color=0x7DF9FF
+    #         ).set_image(hk.File(f"pictures/{query.upper()}.png"))
+    #         # , attachments = None
+    #     )
 
-        return
+        # return
     series = query.split("vs")
     if not len(series) in [1, 2]:
         await ctx.respond("The command only works for one or two series.")
