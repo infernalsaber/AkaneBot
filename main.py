@@ -16,14 +16,15 @@ while True:
         stdout, stderr = process.communicate()
         if not int.from_bytes(stdout, byteorder="big"):
             print("Starting bot.")
-
+            if not os.path.exists("logs"):
+                os.mkdir("logs")
             if os.name == "nt":
                 os.system("nohup python -OO bot.py >> logs/output.log 2>&1 &")
             else:
                 os.system("nohup python3 -OO bot.py >> logs/output.log 2>&1 &")
 
         else:
-            print("Bot is already up")
+            # print("Bot is already up")
             time.sleep(10)
     except Exception as e:
         print(e)
