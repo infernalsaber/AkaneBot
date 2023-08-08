@@ -6,15 +6,15 @@ import re
 
 import hikari as hk
 import lightbulb as lb
-import requests
 from dateutil import parser
 
-from functions.views import PeristentViewTest
 from functions.buttons import GenericButton, NewButton
 from functions.utils import rss2json
+from functions.views import PeristentViewTest
 
-
-aniupdates = lb.Plugin("Anime Updates", "Keep a track of seasonal anime", include_datastore=True)
+aniupdates = lb.Plugin(
+    "Anime Updates", "Keep a track of seasonal anime", include_datastore=True
+)
 aniupdates.d.help = False
 
 
@@ -194,7 +194,6 @@ def get_episode_number(name):
         return 1
 
     return ep
-
 
 
 def load(bot: lb.BotApp) -> None:

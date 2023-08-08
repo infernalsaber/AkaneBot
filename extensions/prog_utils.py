@@ -4,7 +4,9 @@ import subprocess
 import hikari as hk
 import lightbulb as lb
 
-compiler_plugin = lb.Plugin("Compiler", "An interpreter for Python", include_datastore=True)
+compiler_plugin = lb.Plugin(
+    "Compiler", "An interpreter for Python", include_datastore=True
+)
 compiler_plugin.d.help = False
 
 DSC_SYNTAX_GIST = (
@@ -62,9 +64,6 @@ async def compiler(ctx: lb.Context, code: str) -> None:
                 await ctx.respond(
                     f"This is the output ```ansi\n{str(output, 'UTF-8')}```"
                 )
-
-
-
 
 
 def load(bot: lb.BotApp) -> None:

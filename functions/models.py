@@ -53,6 +53,7 @@ class YTVideo:
             ).total_seconds()
         )
 
+
 # class Genshin:
 #     def __init__(self, character: str = None):
 #         ...

@@ -1,6 +1,5 @@
 """Plugin running the background tasks and utilities for the bot"""
 import asyncio
-import datetime
 import glob
 import os
 import subprocess
@@ -15,8 +14,6 @@ from lightbulb.ext import tasks
 #     CustomPrevButton,
 #     KillNavButton,
 # )
-from functions.views import CustomNavi
-from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
@@ -119,8 +116,9 @@ async def update_code(ctx: lb.Context) -> None:
             await ctx.respond("Updated source.")
 
     await ctx.edit_last_response("Restarting the bot...")
-    
+
     os.kill(os.getpid())
+
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
@@ -141,7 +139,6 @@ async def update_code(ctx: lb.Context) -> None:
             await ctx.respond("Updated source.")
 
     os.kill(os.getpgid())
-
 
 
 @task_plugin.command
@@ -167,9 +164,6 @@ async def delete_msg(ctx: lb.Context, channel: hk.GuildChannel, message: int) ->
     await ctx.event.message.delete()
 
 
-
-
-
 @task_plugin.listener(hk.StartedEvent)
 async def prefix_invocation(event: hk.StartedEvent) -> None:
     await asyncio.sleep(0.5)
@@ -187,6 +181,7 @@ async def prefix_invocation(event: hk.StartedEvent) -> None:
     )
     conn.commit()
 
+
 # @task_plugin.listener(hk.InteractionCreateEvent)
 # async def global_killer(event: hk.InteractionCreateEvent) -> None:
 #     if not isinstance(event.interaction, hk.ComponentInteraction):
@@ -196,8 +191,8 @@ async def prefix_invocation(event: hk.StartedEvent) -> None:
 #     print(event.interaction.component_type)
 #     print(event.interaction.values)
 #     print("\n\n\n")
-    # if isinstance():
-    #     ...
+# if isinstance():
+#     ...
 
 
 @task_plugin.listener(lb.CommandInvocationEvent)
