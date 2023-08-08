@@ -10,6 +10,6 @@ services:
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - SAUCENAO_KEY=${SAUCENAO_KEY}
-      - YT_KEY=${YT_KEY}
+      - yt_key=${yt_key}
 
     restart: always
