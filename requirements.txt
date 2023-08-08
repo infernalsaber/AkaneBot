@@ -15,4 +15,3 @@ feedparser
 kaleido==0.2.1
 requests-cache
 aiohttp-client-cache==0.8.1
-beautifulsoup4
