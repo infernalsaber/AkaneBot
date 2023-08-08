@@ -89,8 +89,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.update_channels = ["1127609035374461070"]
-    if not os.path.exists("logs"):
-        os.mkdir("logs")
+    if not os.path.exists("pictures"):
         os.mkdir("pictures")
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
         pass
