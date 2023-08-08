@@ -70,19 +70,19 @@ async def inrole_cmd(ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent])
             for member_id in ctx.get_guild().get_members():
                 member = ctx.get_guild().get_member(member_id)
                 if role.id in member.role_ids:
-                    d1 += f"`{member.id: <20}`\n"
+                    d1 += f"{member.id: <20}\n"
                     d2 += f"{member.username}\n"
                     counter +=1
 
 
-            basic_embed = (
-                hk.Embed(
-                title=f"List of users in {role.name} role ({counter})",
-                timestamp=datetime.now().astimezone(),
-                color=role.color or 0xFFFFFF
-                )
-                .set_thumbnail(role.icon_url)
-            )
+            # basic_embed = (
+            #     hk.Embed(
+            #     title=f"List of users in {role.name} role ({counter})",
+            #     timestamp=datetime.now().astimezone(),
+            #     color=role.color or 0xFFFFFF
+            #     )
+            #     .set_thumbnail(role.icon_url)
+            # )
 
             if counter == 0:
                 await ctx.respond(basic_embed)
@@ -92,9 +92,20 @@ async def inrole_cmd(ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent])
             mem_ids = [d1.split("\n")[i: i+20] for i in range(0, len(d1.split("\n")), 20)]
             mem_names = [d2.split("\n")[i: i+20] for i in range(0, len(d2.split("\n")), 20)]
 
+            # await ctx.author.send("test")
+            # await ctx.author.send(mem_ids)
+            # await ctx.author.send(mem_names)
+
             for i, item in enumerate(mem_ids):
+                # embed = basic_embed
+                # await ctx.respond(embed)
                 pages.append(
-                    basic_embed
+                    hk.Embed(
+                    title=f"List of users in {role.name} role ({counter})",
+                    timestamp=datetime.now().astimezone(),
+                    color=role.color or 0xFFFFFF
+                    )
+                    .set_thumbnail(role.icon_url)
                     .add_field("UID", "\n".join(item), inline=True)
                     .add_field("Name", "\n".join(mem_names[i]), inline=True)
                 )
@@ -106,14 +117,15 @@ async def inrole_cmd(ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent])
                 return
 
 
-            await ctx.respond('made pages')
-
+            # await ctx.respond('made pages')
+            for page in pages:
+                ctx.author.send(page)
 
             view = CustomNavi(
                 pages=pages, user_id=ctx.author.id,
             )
 
-            await ctx.respond('okokok pages')
+            # await ctx.respond('okokok pages')
             await view.send(ctx.channel_id)
             return
         except Exception as e:
@@ -147,14 +159,14 @@ async def inrole_cmd(ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent])
         paginated_members = [event_members[i:i + 20] for i in range(0, len(event_members), 20)]
         pages = []
 
-        base_embed= (
-            hk.Embed(
-            title=f"List of users interested in {event.name} ({len(event_members)})",
-            timestamp=datetime.now().astimezone(),
-            color=0x43408A
-            )
-            .set_image(event.image_url)
-        )
+        # base_embed= (
+        #     hk.Embed(
+        #     title=f"List of users interested in {event.name} ({len(event_members)})",
+        #     timestamp=datetime.now().astimezone(),
+        #     color=0x43408A
+        #     )
+        #     .set_image(event.image_url)
+        # )
 
         if len(event_members) == 0:
             await ctx.respond(base_embed)
@@ -162,7 +174,12 @@ async def inrole_cmd(ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent])
 
         for item in paginated_members:
             pages.append(
-                base_embed
+                hk.Embed(
+                    title=f"List of users interested in {event.name} ({len(event_members)})",
+                    timestamp=datetime.now().astimezone(),
+                    color=0x43408A
+                )
+                .set_image(event.image_url)
                 .add_field("​", "\n".join(item))
             )
 
@@ -445,6 +462,7 @@ async def emote_removal(
                 attachment=emote
             )
             await ctx.bot.rest.delete_emoji(ctx.guild_id, emote)
+            await ctx.respond(f"Removed emote: `{emote.name}`")
         except Exception as e:
             await ctx.respond(f"Error: {e}")
 
