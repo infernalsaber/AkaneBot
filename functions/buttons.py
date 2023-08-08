@@ -3,6 +3,7 @@ import typing as t
 
 import hikari as hk
 import miru
+
 # import requests
 # import requests_cache
 from miru.ext import nav
@@ -16,9 +17,7 @@ from miru.ext import nav
 
 
 async def preview_maker(base_url, data_id, title, manga_id, cover, session):
-    req = await session.get(
-        f"{base_url}/at-home/server/{data_id}", timeout=10
-    )
+    req = await session.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
 
     if not req.ok:
         return
@@ -27,9 +26,7 @@ async def preview_maker(base_url, data_id, title, manga_id, cover, session):
     pages = []
 
     try:
-        if (
-            await session.get(r_json["chapter"]["dataSaver"][0])
-        ).ok:
+        if (await session.get(r_json["chapter"]["dataSaver"][0])).ok:
             print("OK\n\n\n")
         else:
             print("NOTOK\n\n\n")
@@ -66,7 +63,6 @@ async def preview_maker(base_url, data_id, title, manga_id, cover, session):
     return pages
 
 
-
 class GenericButton(miru.Button):
     """A custom next general class"""
 
@@ -75,8 +71,6 @@ class GenericButton(miru.Button):
         super().__init__(*args, **kwargs)
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-
-
         self.view.answer = self.label
         self.view.stop()
 
@@ -99,8 +93,6 @@ class KillNavButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-
-
         await self.view.message.delete()
 
     async def before_page_change(self) -> None:
@@ -127,7 +119,6 @@ class CustomPrevButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext):
-
         if self.view.current_page == 0:
             self.view.current_page = len(self.view.pages) - 1
         else:
@@ -157,7 +148,6 @@ class CustomNextButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext):
-
         if self.view.current_page == len(self.view.pages) - 1:
             self.view.current_page = 0
         else:
@@ -234,7 +224,9 @@ class PreviewButton(nav.NavButton):
                     self.view.remove_item(item)
             data = ctx.bot.d.chapter_info[self.view.message_id]
             swap_pages = None
-            swap_pages = await preview_maker(data[0], data[1], data[2], data[3], data[4], self.view.session)
+            swap_pages = await preview_maker(
+                data[0], data[1], data[2], data[3], data[4], self.view.session
+            )
             # await self.view.swap_pages(
             #     ctx, )
             # )
@@ -266,9 +258,7 @@ class PreviewButton(nav.NavButton):
         self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
-        await self.view.swap_pages(
-            ctx, swap_pages
-        )
+        await self.view.swap_pages(ctx, swap_pages)
         # await ctx.edit_response(components=self.view)
 
     async def before_page_change(self) -> None:
@@ -335,8 +325,6 @@ class TrailerButton(miru.Button):
         ...
 
 
-
-
 class KillButton(miru.Button):
     """A custom next kill class"""
 
@@ -345,8 +333,6 @@ class KillButton(miru.Button):
         super().__init__(*args, **kwargs)
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-
-
         await self.view.message.delete()
 
 
@@ -368,6 +354,7 @@ class NewButton(miru.Button):
             await ctx.respond(f"{self.link}", flags=hk.MessageFlag.EPHEMERAL)
         except Exception as e:
             print(e)
+
 
 class SwapButton(miru.Button):
     """A custom next button class"""
@@ -409,15 +396,13 @@ class SwapButton(miru.Button):
         #     return
 
         if self.emoji == self.emoji1:
-            
             if self.label2 or self.emoji2:
                 self.label = self.label2
                 self.emoji = self.emoji2
 
             # await ctx.respond("Page 1 -> 2")
-            
-            if isinstance(self.swap_page, str):
 
+            if isinstance(self.swap_page, str):
                 await ctx.edit_response(
                     content=self.swap_page, embeds=[], components=self.view
                 )
@@ -427,8 +412,6 @@ class SwapButton(miru.Button):
                 )
             # await self.view.swap_pages(ctx, self.other_page)
 
-
-
             return
 
         # await ctx.respond("Page 2 -> 1")
@@ -436,10 +419,8 @@ class SwapButton(miru.Button):
         # await ctx.respond(self.emoji)
         self.label = self.label1
         self.emoji = self.emoji1
-        
 
         if isinstance(self.original_page, str):
-
             await ctx.edit_response(
                 content=self.original_page, embeds=[], components=self.view
             )
@@ -447,8 +428,6 @@ class SwapButton(miru.Button):
             await ctx.edit_response(
                 content=None, embeds=[self.original_page], components=self.view
             )
-
-
 
     async def before_page_change(self) -> None:
         ...

@@ -1,39 +1,33 @@
-import typing as t
-from lightbulb.help_command import BaseHelpCommand
-from datetime import datetime
-import hikari as hk
-
-import abc
 import collections
 import typing as t
+from datetime import datetime
 
-from lightbulb import commands
-from lightbulb import errors
+import hikari as hk
+import miru
 
 # if t.TYPE_CHECKING:
-from lightbulb import app as app_
+from lightbulb import commands
 from lightbulb import context as context_
-from lightbulb import plugins
-
-import miru
+from lightbulb import errors, plugins
+from lightbulb.help_command import BaseHelpCommand
 
 from functions.components import HelpTextSelect
 from functions.views import SelectView
-        # except Exception as e:
-            # await ctx.respond(e)
-        # await ctx.respond("Test")
+
+# except Exception as e:
+# await ctx.respond(e)
+# await ctx.respond("Test")
 
 
+# async def get_text(self, select: miru.TextSelect, ctx: miru.Context) -> None:
+#     """Create the selection menu"""
+#     print(select)
+#     await ctx.respond("I exist")
+#     self.answer = select.values[0]
 
-    # async def get_text(self, select: miru.TextSelect, ctx: miru.Context) -> None:
-    #     """Create the selection menu"""
-    #     print(select)
-    #     await ctx.respond("I exist")
-    #     self.answer = select.values[0]
-    
-    # async def callback(self, ctx: miru.ViewContext):
-    #     await ctx.respond("this that badabing badabong")
-        
+# async def callback(self, ctx: miru.ViewContext):
+#     await ctx.respond("this that badabing badabong")
+
 
 # class AnimalView(miru.View):
 #     """The view class for the animals command"""
@@ -121,6 +115,7 @@ async def filter_commands(
         new_cmds.append(cmd)
     return new_cmds
 
+
 class BotHelpCommand(BaseHelpCommand):
     """
     An implementation of the :obj:`~BaseHelpCommand` but prettier and useful
@@ -147,7 +142,6 @@ class BotHelpCommand(BaseHelpCommand):
             for cmd in set(cmds):
                 pages[plugin].append(f"- {cmd.name} - {cmd.description}")
 
-
     async def send_bot_help(self, ctx: context_.base.Context) -> None:
         pages = {}
         # lines = [
@@ -159,41 +153,45 @@ class BotHelpCommand(BaseHelpCommand):
         #     "==== Categories ====",
         # ]
         try:
-            main_embed = ( 
+            main_embed = (
                 hk.Embed(
-                title="Akane Bot Help Menu",
-                color=0x000000,
-                description=(
-                    "An animanga search and sauce bot \n\n"
-                    "### Plugins"
-                    ),
-                timestamp=datetime.now().astimezone()
-            )
-            .set_thumbnail(
-                (
-                    "https://media.discordapp.net/attachments/980479966389096460"
-                    "/1125810202277597266/rubyhelp.png?width=663&height=662"
+                    title="Akane Bot Help Menu",
+                    color=0x000000,
+                    description=("An animanga search and sauce bot \n\n" "### Plugins"),
+                    timestamp=datetime.now().astimezone(),
                 )
+                .set_thumbnail(
+                    (
+                        "https://media.discordapp.net/attachments/980479966389096460"
+                        "/1125810202277597266/rubyhelp.png?width=663&height=662"
+                    )
+                )
+                .set_image("https://i.imgur.com/LJ1t4wD.png")
             )
-            .set_image("https://i.imgur.com/LJ1t4wD.png") )
             # import os
 
-            p_commands = await self._get_command_plugin_map(self.app._prefix_commands, ctx)
-            s_commands = await self._get_command_plugin_map(self.app._slash_commands, ctx)
+            p_commands = await self._get_command_plugin_map(
+                self.app._prefix_commands, ctx
+            )
+            s_commands = await self._get_command_plugin_map(
+                self.app._slash_commands, ctx
+            )
             # m_commands = await self._get_command_plugin_map(self.app._message_commands, context)
             # u_commands = await self._get_command_plugin_map(self.app._user_commands, context)
 
-            plugin_pages: t.MutableMapping[t.Optional[plugins.Plugin], t.List[str]] = collections.defaultdict(list)
+            plugin_pages: t.MutableMapping[
+                t.Optional[plugins.Plugin], t.List[str]
+            ] = collections.defaultdict(list)
             self._add_cmds_to_plugin_pages(plugin_pages, p_commands, "Prefix")
             self._add_cmds_to_plugin_pages(plugin_pages, s_commands, "Slash")
             # self._add_cmds_to_plugin_pages(plugin_pages, m_commands, "Message")
             # self._add_cmds_to_plugin_pages(plugin_pages, u_commands, "User")
 
             for plugin, page in plugin_pages.items():
-                if not plugin: 
+                if not plugin:
                     continue
                 if not plugin.d.help == True:
-                        continue
+                    continue
                 # if plugin:
                 main_embed.add_field(plugin.name, plugin.description)
                 # """Start of tragedy"""
@@ -216,12 +214,13 @@ class BotHelpCommand(BaseHelpCommand):
                     # (u_cmds, "User"),
                 ]
                 embed = hk.Embed(
-                    color=0x000000, title=f"{plugin.name} Help", 
+                    color=0x000000,
+                    title=f"{plugin.name} Help",
                     description=f"{plugin.description or 'No additional details provided.'}\n",
-                    timestamp=datetime.now().astimezone()
-                    )
+                    timestamp=datetime.now().astimezone(),
+                )
 
-            # embed.add_field("")
+                # embed.add_field("")
                 for cmd_list, header in cmds:
                     # field1 = ""
                     # field2 = ""
@@ -232,7 +231,7 @@ class BotHelpCommand(BaseHelpCommand):
                         for cmd in set(cmd_list):
                             desc += f"`{cmd.name}"
                             # print(" "*14-len(cmd.name))
-                            desc += ' '*(14-len(cmd.name))
+                            desc += " " * (14 - len(cmd.name))
                             desc += f"` {cmd.description} \n"
                             # lines.append(f"- {cmd.name} - {cmd.description}, {cmd.aliases}")
                             # field1 += f"```{cmd.name}```"
@@ -244,30 +243,30 @@ class BotHelpCommand(BaseHelpCommand):
                     #     embed.add_field("\u200B", field3, inline=True)
                     # else:
                     #     embed.add_field("\u200B", "\u200B", inline=True)
-                    
-                embed.set_image(plugin.d.help_image)   
+
+                embed.set_image(plugin.d.help_image)
                 pages[plugin.name.replace(" ", "_")] = embed
                 # )
-                
-                    # "\n".join(
-                    #     [
-                    #         ">>> ```adoc",
-                    #         f"==== {plugin.name if plugin is not None else 'Uncategorised'} ====",
-                    #         (f"{plugin.description}\n" if plugin.description else "No description provided\n")
-                    #         if plugin is not None
-                    #         else "",
-                    #         *page,
-                    #         "```",
-                    #     ]
-                    # )
-                
-        # lines.append("```")
-        # pages.insert(0, "\n".join(lines))
-        # try:
+
+                # "\n".join(
+                #     [
+                #         ">>> ```adoc",
+                #         f"==== {plugin.name if plugin is not None else 'Uncategorised'} ====",
+                #         (f"{plugin.description}\n" if plugin.description else "No description provided\n")
+                #         if plugin is not None
+                #         else "",
+                #         *page,
+                #         "```",
+                #     ]
+                # )
+
+            # lines.append("```")
+            # pages.insert(0, "\n".join(lines))
+            # try:
             view = SelectView(user_id=ctx.author.id, pages=pages)
             options = []
             for plugin, _ in plugin_pages.items():
-                if not plugin: 
+                if not plugin:
                     continue
                 if not plugin.d.help == True:
                     continue
@@ -276,10 +275,9 @@ class BotHelpCommand(BaseHelpCommand):
                         label=plugin.name, value=plugin.name, emoji=plugin.d.help_emoji
                     )
                 )
-            # selector = 
+            # selector =
             view.add_item(HelpTextSelect(options=options, placeholder="Select Plugin"))
             resp = await ctx.respond(embed=main_embed, components=view)
-            
 
             # print("\n\n", pages, "\n\n")
             await view.start(resp)
@@ -292,7 +290,7 @@ class BotHelpCommand(BaseHelpCommand):
             # # await ctx.respond(dir(resp))
             # # await context.respond(pages)
             # print(dir(resp), "\n\n\n\n\n\n\n")
-            
+
             # if hasattr(view, "answer"):  # Check if there is an answer
             #     print(f"Received an answer! It is: {view.answer}")
             #     await context.edit_last_response(embeds=[pages[view.answer]], components=view)
@@ -302,9 +300,9 @@ class BotHelpCommand(BaseHelpCommand):
         # navigator = nav.ButtonNavigator(pages)
         # await navigator.run(context)
 
-
-
-    async def send_command_help(self, ctx: context_.base.Context, command: commands.base.Command) -> None:
+    async def send_command_help(
+        self, ctx: context_.base.Context, command: commands.base.Command
+    ) -> None:
         long_help = command.get_help(ctx)
         prefix = (
             ctx.prefix
@@ -314,9 +312,8 @@ class BotHelpCommand(BaseHelpCommand):
             else "🖱️"
         )
 
-
         # embed = (
-            
+
         # )
         # lines = [
         #     ">>> ```adoc",
@@ -330,19 +327,17 @@ class BotHelpCommand(BaseHelpCommand):
         # ]
         await ctx.respond(
             embed=hk.Embed(
-                color=0x000000, title="Command Help",
-                description= (
+                color=0x000000,
+                title="Command Help",
+                description=(
                     f"**{command.name}** \n"
                     f"{command.description} \n\n"
                     f"Usage: `{prefix}{command.signature}` \n\n"
-
                     f"Aliases: {', '.join(command.aliases)}\n\n"
                     f"{long_help or ''}"
-                )
+                ),
             )
         )
-
-
 
     async def send_group_help(
         self,
@@ -354,7 +349,6 @@ class BotHelpCommand(BaseHelpCommand):
             commands.slash.SlashSubGroup,
         ],
     ) -> None:
-
         long_help = group.get_help(ctx)
         prefix = (
             ctx.prefix
@@ -368,7 +362,9 @@ class BotHelpCommand(BaseHelpCommand):
             filter(
                 None,
                 [
-                    f"{prefix}{group.signature}" if isinstance(group, commands.prefix.PrefixCommand) else None,
+                    f"{prefix}{group.signature}"
+                    if isinstance(group, commands.prefix.PrefixCommand)
+                    else None,
                     f"{prefix}{group.qualname} [subcommand]",
                 ],
             )
@@ -395,9 +391,9 @@ class BotHelpCommand(BaseHelpCommand):
         lines.append("```")
         await ctx.respond("\n".join(lines))
 
-
-
-    async def send_plugin_help(self, ctx: context_.base.Context, plugin: plugins.Plugin) -> None:
+    async def send_plugin_help(
+        self, ctx: context_.base.Context, plugin: plugins.Plugin
+    ) -> None:
         # lines = [
         #     ">>> ```adoc",
         #     "==== Category Help ====",
@@ -424,10 +420,11 @@ class BotHelpCommand(BaseHelpCommand):
                 # (u_cmds, "User"),
             ]
             embed = hk.Embed(
-                color=0x000000, title=f"{plugin.name} Help", 
+                color=0x000000,
+                title=f"{plugin.name} Help",
                 description=f"{plugin.description or 'No additional details provided.'}\n",
-                timestamp=datetime.now().astimezone()
-                )
+                timestamp=datetime.now().astimezone(),
+            )
 
             # embed.add_field("")
             for cmd_list, header in cmds:
@@ -440,7 +437,7 @@ class BotHelpCommand(BaseHelpCommand):
                     for cmd in set(cmd_list):
                         desc += f"`{cmd.name}"
                         # print(" "*14-len(cmd.name))
-                        desc += ' '*(14-len(cmd.name))
+                        desc += " " * (14 - len(cmd.name))
                         desc += f"` {cmd.description} \n"
                         # lines.append(f"- {cmd.name} - {cmd.description}, {cmd.aliases}")
                         # field1 += f"```{cmd.name}```"
@@ -452,8 +449,8 @@ class BotHelpCommand(BaseHelpCommand):
                     #     embed.add_field("\u200B", field3, inline=True)
                     # else:
                     #     embed.add_field("\u200B", "\u200B", inline=True)
-                    
-            embed.set_image(plugin.d.help_image)            
+
+            embed.set_image(plugin.d.help_image)
             # lines.append("```")
             await ctx.respond(embed)
         except Exception as e:

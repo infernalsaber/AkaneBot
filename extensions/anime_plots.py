@@ -1,7 +1,5 @@
 """Make cool plot charts"""
-import os
 
-import hikari as hk
 import lightbulb as lb
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -10,11 +8,14 @@ from plotly.subplots import make_subplots
 from functions.fetch_trends import search_it
 
 plot_plugin = lb.Plugin(
-    "Plots", "A set of commands that are used to plot anime's trends", include_datastore=True
+    "Plots",
+    "A set of commands that are used to plot anime's trends",
+    include_datastore=True,
 )
-plot_plugin.d.help_image =  "https://i.imgur.com/dTvGa1t.png"
+plot_plugin.d.help_image = "https://i.imgur.com/dTvGa1t.png"
 plot_plugin.d.help = True
-plot_plugin.d.help_emoji =  "📈"
+plot_plugin.d.help_emoji = "📈"
+
 
 @plot_plugin.command
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
@@ -46,7 +47,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
     #         # , attachments = None
     #     )
 
-        # return
+    # return
     series = query.split("vs")
     if not len(series) in [1, 2]:
         await ctx.respond("The command only works for one or two series.")
