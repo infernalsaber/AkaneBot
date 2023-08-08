@@ -8,132 +8,37 @@ import lightbulb as lb
 import miru
 import requests
 
-from extensions.ping import CustomView, GenericButton, KillButton
+# from extensions.ping import CustomView, GenericButton, KillButton
+from functions.views import CustomView
+from functions.buttons import GenericButton, KillButton
+from functions.models import YTVideo
+
 
 dotenv.load_dotenv()
 
-YT_KEY = os.environ["yt_key"]
+YT_KEY = os.environ["YT_KEY"]
 
 
-# TDL
-# 1. Add kill butttons on -yts views ✅
-# 2. Add back button on the second view of -yts
-# 3. Remove view on timeout
 
 
-class YTVideo:
-    """YouTube search video class"""
-
-    def __init__(self, search_results: dict, i: int) -> None:
-        """Initializing the class"""
-        self.vid_name: str = search_results["items"][i]["snippet"]["title"]
-        self.vid_id: str = search_results["items"][i]["id"]["videoId"]
-        self.vid_thumb: str = search_results["items"][i]["snippet"]["thumbnails"][
-            "high"
-        ][
-            "url"
-        ]  # make it medium later
-        self.vid_channel: str = search_results["items"][i]["snippet"]["channelTitle"]
-        self.vid_duration: str = ""
-        # pprint(search_results["items"][i])
-
-    def get_link(self) -> str:
-        """Getting a link to the vid"""
-        return f"https://www.youtube.com/watch?v={self.vid_id}"
-
-    def set_duration(self, req) -> str:
-        """Make an API call and set the duration property"""
-        ytapi2 = req.get(
-            (
-                f"https://youtube.googleapis.com/youtube/v3/videos?part=snippet%2Ccontent"
-                f"Details%2Cstatistics&id={self.vid_id}&regionCode=US&key={YT_KEY}"
-            )
-        )
-        ytapi2 = ytapi2.json()
-        self.vid_duration = str(
-            isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
-        )
-        if self.vid_duration.startswith("0:"):
-            self.vid_duration = str(
-                isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
-            )[2:]
-            return self.vid_duration[2:]
-        return self.vid_duration
-
-    def get_duration_secs(self) -> int:
-        """Get the duration in seconds"""
-        ytapi2 = requests.get(
-            (
-                f"https://youtube.googleapis.com/youtube/v3/videos?part=snippet%2Ccontent"
-                f"Details%2Cstatistics&id={self.vid_id}&regionCode=US&key={YT_KEY}"
-            ),
-            timeout=10,
-        )
-        ytapi2 = ytapi2.json()
-        return int(
-            isodate.parse_duration(
-                (ytapi2["items"][0]["contentDetails"]["duration"])
-            ).total_seconds()
-        )
 
 
-# class boolButton(miru.View):
-#     @miru.button(label="✅", style=hk.ButtonStyle.SUCCESS)
-#     async def first(self, button: miru.Button, ctx: miru.ViewContext) -> None:
-#         await ctx.respond("You clicked me!", flags=hk.MessageFlag.EPHEMERAL)
-
-#     @miru.button(label="❌", style=hk.ButtonStyle.SECONDARY)
-#     async def first(self, button: miru.Button, ctx: miru.ViewContext) -> None:
-#         await ctx.respond("You clicked me!", flags=hk.MessageFlag.EPHEMERAL)
 
 
-class YesButton(miru.Button):
-    """Make a Yes Button class"""
-
-    def __init__(self) -> None:
-        # Initialize our button with some pre-defined properties
-        super().__init__(style=hk.ButtonStyle.SUCCESS, label="Yes")
-
-    # The callback is the function that gets called when the button is pressed
-    # If you are subclassing, you must use the name "callback" when defining it.
-    async def callback(self, ctx: miru.ViewContext) -> None:
-        # You can specify the ephemeral message flag to make your response ephemeral
-        # await ctx.respond("I'm sorry but this is unacceptable.", flags=hk.MessageFlag.EPHEMERAL)
-        # You can access the view an item is attached to by accessing it's view property
-        self.view.answer = True
-        self.view.stop()
 
 
-class NoButton(miru.Button):
-    """Make a no button class"""
-
-    # Let's leave our arguments dynamic this time, instead of hard-coding them
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-    async def callback(self, ctx: miru.ViewContext) -> None:
-        # await ctx.respond("This is the only correct answer.", flags=hk.MessageFlag.EPHEMERAL)
-        self.view.answer = False
-        self.view.stop()
 
 
-# class choiceButtons(miru.View):
-#     # def __init__(self) -> None:
-#     #     super.__init__(timeout=None)
-
-#     @miru.button(label="1", style=hk.ButtonStyle.SECONDARY)
-#     async def callback(self, button: miru.Button, ctx: miru.ViewContext) -> None:
-#         await ctx.respond("You clicked me!", flags=hk.MessageFlag.EPHEMERAL)
-
-#     @miru.button(label="new button", style=hk.ButtonStyle.SUCCESS)
-#     async def second(self, button: miru.Button, ctx: miru.ViewContext) -> None:
-#         await ctx.respond("You clicked neeww")
-
-
-yt_plugin = lb.Plugin("YouTube", "Search and get songs")
+yt_plugin = lb.Plugin("YouTube", "Search and get songs", include_datastore=True)
+yt_plugin.d.help_image = "https://i.imgur.com/dTvGa1t.png"
+yt_plugin.d.help = True
+yt_plugin.d.help_emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
 
 
 @yt_plugin.command
+@lb.set_help(
+    "**Enter a topic and get videos relating to it, pick the one you find the most suitable**"
+)
 @lb.option(
     "query", "The topic to search for", modifier=lb.commands.OptionModifier.CONSUME_REST
 )

@@ -179,11 +179,15 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
         # Image.open(io.BytesIO(img_bytes)).save(f"pictures/{query}.png")
         fig.write_image(f"pictures/{query}.png")
         # image_to_send = hk.File(f"pictures/{query}.png")
+        # hk.File.stra
         await ctx.respond(
-            embed=hk.Embed(title=embed_title, color=0x7DF9FF).set_image(
-                hk.File(f"pictures/{query}.png")
-            ),
-            attachments=[],
+            content=f"## {embed_title}",
+            attachment=f"pictures/{query}.png"
+            # embed=hk.Embed(
+            #     title=embed_title, color=0x7DF9FF
+            # )
+            # .set_image(hk.bytes f"pictures/{query}.png"),
+            # attachments=[],
         )
 
 

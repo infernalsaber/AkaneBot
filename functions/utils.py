@@ -8,44 +8,33 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
+import requests
+from bs4 import BeautifulSoup
 
-class CustomNavi(nav.NavigatorView):
-    def __init__(
-        self,
-        *,
-        pages: Sequence[Union[str, hk.Embed, Sequence[hk.Embed]]],
-        buttons: Optional[Sequence[nav.NavButton]] = None,
-        timeout: Optional[Union[float, int, datetime.timedelta]] = 180.0,
-        user_id: hk.Snowflake = None,
-    ) -> None:
-        self.user_id = user_id
-        super().__init__(pages=pages, buttons=buttons, timeout=timeout)
-
-    async def on_timeout(self) -> None:
-        await self.message.edit(components=[])
-        if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
-            self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
-            print("Cleared cache\n\n\n")
-
-
-class CustomView(miru.View):
-    def __init__(
-        self,
-        *,
-        autodefer: bool = True,
-        timeout: Optional[Union[float, int, datetime.timedelta]] = 180.0,
-        user_id: hk.Snowflake = None,
-    ) -> None:
-        self.user_id = user_id
-        super().__init__(autodefer=autodefer, timeout=timeout)
-
+import random
 
 def check_if_url(link: str) -> bool:
+    """Simple code to see if the given string is a url or not"""
     parsed = urlparse(link)
     if parsed.scheme and parsed.netloc:
         return True
     return False
 
+def is_image(link: str) -> int:
+    """Tells if a function is an image or not
+
+    Args:
+        link (str): The link to check
+
+    Returns:
+        int: 0 if not, 1 if yes, 2 if yes but not PIL compatible (gif/webp)
+    """
+    r = requests.head(link)
+    if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
+        return 1
+    if r.headers["content-type"] in ["image/webp", "image/gif"]:
+        return 2
+    return 0
 
 def rss2json(url):
     """
@@ -121,6 +110,7 @@ def verbose_timedelta(delta):
 
 
 def iso_to_timestamp(iso_date):
+    """Convert ISO datetime to timestamp"""
     try:
         return int(
             datetime.datetime.fromisoformat(iso_date[:-1] + "+00:00")
@@ -132,6 +122,31 @@ def iso_to_timestamp(iso_date):
         return iso_date
 
 
-class PeristentViewTest(miru.View):
-    def __init__(self) -> None:
-        super().__init__(autodefer=True, timeout=None)
+def tenor_link_from_gif(link: str):
+    """Scrape the tenor GIF url from the page link"""
+    try:
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)',
+        }
+
+        response = requests.get(link, headers=headers)
+
+        soup = BeautifulSoup(response.content, "lxml")
+
+        return soup.find("meta", {"itemprop": "contentUrl"})["content"]
+
+
+    except:
+        return link
+
+
+def get_random_quote():
+    return random.choice(
+        [
+            "Don't we have a job to do?",
+            "One, two, three, four. Two, two, three, four...",
+            "Whenever you need me, I'll be there.",
+            "I Hear The Voice Of Fate, Speaking My Name In Humble Supplication…"
+        ]
+    )
