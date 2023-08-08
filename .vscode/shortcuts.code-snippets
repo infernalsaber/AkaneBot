@@ -1,0 +1,55 @@
+{
+	// Place your AkaneBot workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
+	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
+	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is 
+	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are: 
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. 
+	// Placeholders with the same ids are connected.
+	// Example:
+	// "Print to console": {
+	// 	"scope": "javascript,typescript",
+	// 	"prefix": "log",
+	// 	"body": [
+	// 		"console.log('$1');",
+	// 		"$2"
+	// 	],
+	// 	"description": "Log output to console"
+	// }
+	"Lightbulb Plugin Maker": {
+		"prefix": "lb-plugin",
+		"body": [
+			"import hikari as hk",
+			"import lightbulb as lb",
+			"",
+			"$1 = lb.Plugin('$2', '$3')",
+			"",
+			"@$1.command",
+			"@lb.set_help('${4: }')",
+			"@lb.option(",
+			"\t'$5'",
+			"\t'${6:  }'",
+			")",
+			"@lb.command('$7', '$8', pass_options=True)",
+			"@lb.implements(lb.PrefixCommand)",
+			"async def ${9: function_name}(ctx: lb.Context, $5: str) -> None:",
+			"\t${10: # Your code in here}",
+			"",
+			"def load(bot: lb.BotApp) -> None:",
+			"# Load the plugin",
+			"\tbot.add_plugin($1)",
+			"",
+			"",
+			"def unload(bot: lb.BotApp) -> None:",
+			"# Unload the plugin",
+			"\tbot.remove_plugin($1)"
+		],
+		"description": "Make a hikari-lightbulb plugin"
+	},
+	"Context Responder": {
+		"prefix": "dprint",
+		"body": [
+			"await ctx.respond('$1')",
+		],
+		"description": "Respond to a bot context"
+	},
+}

@@ -3,7 +3,8 @@ import glob
 
 import lightbulb as lb
 
-reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins")
+reloader_plugin = lb.Plugin("Loader", "Load, unload and reload plugins", include_datastore=True)
+reloader_plugin.d.help = False
 
 
 @reloader_plugin.command

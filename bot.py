@@ -15,6 +15,7 @@ from functions.utils import verbose_timedelta
 
 dotenv.load_dotenv()
 
+from functions.help import BotHelpCommand
 
 # Setting the prefix as , for windows (where i run the test bot)
 # and - for others (where it's deployed :) )
@@ -57,9 +58,9 @@ def setup_logging() -> None:
 
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
-    intents=hk.Intents.ALL_UNPRIVILEGED | hk.Intents.MESSAGE_CONTENT,
-    prefix=return_prefix(),
-    help_class=None,
+    intents=hk.Intents.ALL_UNPRIVILEGED | hk.Intents.MESSAGE_CONTENT | hk.Intents.GUILD_MEMBERS,
+    prefix=lb.when_mentioned_or(return_prefix()),
+    help_class=BotHelpCommand,
     logs="INFO",
     owner_ids=[1002964172360929343, 701090852243505212],
 )
@@ -75,15 +76,15 @@ async def on_starting(event: hk.StartingEvent) -> None:
     """Code which is executed once when the bot starts"""
 
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
-        cache_name="cache_db.db",  # For SQLite, this will be used as the filename
-        expire_after=24 * 60 * 60,  # By default, cached responses expire in an hour
+        cache_name="cache_db.db",  
+        expire_after=24 * 60 * 60,  
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
-        include_headers=True,  # Cache requests with different headers separately
+        include_headers=True, 
         ignored_params=[
             "auth_token"
         ],  # Keep using the cached response even if this param changes
-        timeout=2,
+        timeout=3,
     )
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
@@ -158,18 +159,59 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
     elif isinstance(exception, lb.BotMissingRequiredPermission):
         await event.context.respond("I don't have the permissions to do this 😔")
 
-    elif isinstance(exception, NotImplementedError):
-        await event.context.respond(
-            "This command has not been implemented or is not open."
-        )
+    
 
     elif isinstance(exception, lb.NotEnoughArguments):
-        await event.context.respond(
-            (
-                f"Missing arguments, use `-help {event.context.command.name}`"
-                f"for the correct invocation"
-            )
-        )
+        
+        # await event.context.respond(
+        #     (
+        #         f"Missing arguments, use `-help {event.context.command.name}`"
+        #         f"for the correct invocation"
+        #     )
+        # )\
+        try:
+            ctx = event.context
+
+            await ctx.respond("Missing arguments, initializing command help...")
+            await asyncio.sleep(0.3)
+
+            command = ctx.command
+
+
+            long_help = command.get_help(ctx)
+
+            if len(command.aliases) > 0:
+                aliases = f"Aliases: {', '.join(command.aliases)}\n\n"
+            else:
+                aliases = ""
+
+            # embed = (
+            
+            # )
+            # lines = [
+            #     ">>> ```adoc",
+            #     "==== Command Help ====",
+            #     f"{command.name} - {command.description}",
+            #     "",
+            #     f"Usage: {prefix}{command.signature}",
+            #     "",
+            #     long_help if long_help else "No additional details provided.",
+            #     "```",
+            # ]
+            await ctx.edit_last_response(
+                content=None, embed=hk.Embed(
+                color=0x000000, title="Command Help",
+                description= (
+                    f"**{command.name}** \n"
+                    f"{command.description} \n\n"
+                    f"Usage: `{ctx.prefix}{command.signature}` \n\n"
+                    f"{aliases}"
+                    f"{long_help or ''}"
+                )
+            ))
+        
+        except Exception as e:
+            await event.context.respond(f"Stop, {e}")
 
 
 if __name__ == "__main__":

@@ -9,9 +9,13 @@ import lightbulb as lb
 import requests
 from dateutil import parser
 
-from extensions.ping import GenericButton, NewButton, PeristentViewTest, rss2json
+from functions.views import PeristentViewTest
+from functions.buttons import GenericButton, NewButton
+from functions.utils import rss2json
 
-aniupdates = lb.Plugin("Anime Updates", "Keep a track of seasonal anime")
+
+aniupdates = lb.Plugin("Anime Updates", "Keep a track of seasonal anime", include_datastore=True)
+aniupdates.d.help = False
 
 
 async def get_magnet_for(query: str):
@@ -103,7 +107,6 @@ async def on_starting(event: hk.StartedEvent) -> None:
             view.add_item(
                 NewButton(
                     style=hk.ButtonStyle.SECONDARY,
-                    # label="🧲",
                     custom_id=f"{int(datetime.datetime.now().timestamp())}",
                     emoji=hk.Emoji.parse("🧲"),
                     link=await get_magnet_for(update["file"]),
@@ -112,8 +115,6 @@ async def on_starting(event: hk.StartedEvent) -> None:
             view.add_item(
                 GenericButton(
                     style=hk.ButtonStyle.SECONDARY,
-                    # label="🧲",
-                    # custom_id=f"{int(datetime.datetime.now().timestamp())}",
                     emoji=hk.Emoji.parse("<:nyaasi:1127717935968952440>"),
                     url=update["link"],
                 )
@@ -129,13 +130,11 @@ async def on_starting(event: hk.StartedEvent) -> None:
             for channel in aniupdates.bot.d.update_channels:
                 check = await aniupdates.bot.rest.create_message(
                     channel=channel,
-                    # content=update,
                     embed=hk.Embed(
                         color=0x7DF9FF,
                         description=update["file"][13:],
                         timestamp=update["timestamp"],
                         title=f"Episode {get_episode_number(update['file'])}: {update['data']['title']['romaji']} out",
-                        # url=update["link"],
                     )
                     .add_field(
                         "Rating", update["data"]["meanScore"] or "NA", inline=True
@@ -144,18 +143,10 @@ async def on_starting(event: hk.StartedEvent) -> None:
                         "Genres", ", ".join(update["data"]["genres"][:3]), inline=True
                     )
                     .set_footer("Via: SubsPlease.org")
-                    # .add_field("Episode", get_episode_number(update["file"]))
-                    # .add_field("Filler", "This is some random filler text to take the space")
-                    # .add_field("🧲", f"```{update['link']}```")
-                    # .set_author(
-                    #     name=f"New Episode of {update['data']['title']['romaji']} out",
-                    #     url=update['data']['siteUrl']
-                    # )
                     .set_thumbnail(update["data"]["coverImage"]["extraLarge"]),
                     components=view,
                 )
                 await view.start(check)
-                # await view.wait()
         await asyncio.sleep(720)
 
 
@@ -203,12 +194,7 @@ def get_episode_number(name):
         return 1
 
     return ep
-    # num = name[13:-23].split("-")[-1].strip()
-    # try:
-    #     num = int(num)
-    # except:
-    #     num = 1
-    # return num
+
 
 
 def load(bot: lb.BotApp) -> None:

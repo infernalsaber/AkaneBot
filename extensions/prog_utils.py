@@ -4,7 +4,8 @@ import subprocess
 import hikari as hk
 import lightbulb as lb
 
-compiler_plugin = lb.Plugin("Compiler", "An interpreter for Python")
+compiler_plugin = lb.Plugin("Compiler", "An interpreter for Python", include_datastore=True)
+compiler_plugin.d.help = False
 
 DSC_SYNTAX_GIST = (
     "https://gist.github.com/matthewzring"
@@ -29,7 +30,7 @@ async def compiler(ctx: lb.Context, code: str) -> None:
     Use print() to print whatever output you desire
 
     Args:
-        ctx (lb.Context): The event context (irrelevant to the user)
+        ctx (lb.Context): The message context
         code (str): The code to execute
     """
 
@@ -63,30 +64,7 @@ async def compiler(ctx: lb.Context, code: str) -> None:
                 )
 
 
-@compiler.set_error_handler
-async def compile_error(event: lb.CommandErrorEvent) -> bool:
-    """Error handler"""
 
-    exception = event.exception.__cause__ or event.exception
-
-    if isinstance(exception, lb.MissingRequiredPermission):
-        await event.context.respond("You're missing some perms there, bub.")
-        return True
-
-    if isinstance(exception, lb.CommandIsOnCooldown):
-        await event.context.respond(
-            f"The command is on cooldown, you can use it after {int(exception.retry_after)}s",
-            delete_after=int(exception.retry_after),
-        )
-        return True
-
-    if isinstance(exception, lb.errors.NotEnoughArguments):
-        await event.context.respond(
-            "Kindly specify the number of messages to be deleted", delete_after=3
-        )
-        return True
-
-    return False
 
 
 def load(bot: lb.BotApp) -> None:
