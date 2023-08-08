@@ -3,30 +3,18 @@ import os
 
 import dotenv
 import hikari as hk
-import isodate
 import lightbulb as lb
-import miru
 import requests
 
-# from extensions.ping import CustomView, GenericButton, KillButton
-from functions.views import CustomView
 from functions.buttons import GenericButton, KillButton
 from functions.models import YTVideo
 
+# from extensions.ping import CustomView, GenericButton, KillButton
+from functions.views import CustomView
 
 dotenv.load_dotenv()
 
 YT_KEY = os.environ["YT_KEY"]
-
-
-
-
-
-
-
-
-
-
 
 
 yt_plugin = lb.Plugin("YouTube", "Search and get songs", include_datastore=True)

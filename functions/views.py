@@ -1,33 +1,33 @@
 """Custom view classes"""
-import typing as t 
+import typing as t
+from datetime import timedelta
+
+import aiohttp_client_cache
 import hikari as hk
 import miru
 from miru.ext import nav
 
-from datetime import timedelta
-import aiohttp_client_cache
-
 from functions.buttons import *
-from datetime import datetime
 
 
 class SelectView(miru.View):
     def __init__(self, user_id: hk.Snowflake, pages: t.Collection[hk.Embed]) -> None:
         self.user_id = user_id
         self.pages = pages
-        super().__init__(timeout=60*60)
+        super().__init__(timeout=60 * 60)
 
     async def view_check(self, ctx: miru.Context) -> bool:
         if ctx.user.id == self.user_id:
             return True
         await ctx.respond(
-                (
-                    "You can't interact with this button as "
-                    "you are not the invoker of the command."
-                ),
-                flags=hk.MessageFlag.EPHEMERAL,
-            )
+            (
+                "You can't interact with this button as "
+                "you are not the invoker of the command."
+            ),
+            flags=hk.MessageFlag.EPHEMERAL,
+        )
         return False
+
 
 class PeristentViewTest(miru.View):
     def __init__(self) -> None:
@@ -43,30 +43,34 @@ class CustomNavi(nav.NavigatorView):
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
         user_id: hk.Snowflake = None,
     ) -> None:
-
         self.user_id = user_id
         if not buttons:
-            buttons = [CustomPrevButton(), nav.IndicatorButton(), CustomNextButton(), KillNavButton()]
+            buttons = [
+                CustomPrevButton(),
+                nav.IndicatorButton(),
+                CustomNextButton(),
+                KillNavButton(),
+            ]
         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
 
     async def view_check(self, ctx: miru.Context) -> bool:
         if ctx.user.id == self.user_id:
             return True
         await ctx.respond(
-                (
-                    "You can't interact with this button as "
-                    "you are not the invoker of the command."
-                ),
-                flags=hk.MessageFlag.EPHEMERAL,
-            )
+            (
+                "You can't interact with this button as "
+                "you are not the invoker of the command."
+            ),
+            flags=hk.MessageFlag.EPHEMERAL,
+        )
         return False
-    
+
     async def on_timeout(self) -> None:
         await self.message.edit(components=[])
 
-        #Clearing the memory occupied by the preview
+        # Clearing the memory occupied by the preview
         # if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
-            # self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
+        # self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
 
 
 class CustomView(miru.View):
@@ -77,7 +81,6 @@ class CustomView(miru.View):
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
         user_id: hk.Snowflake = None,
     ) -> None:
-
         self.user_id = user_id
         super().__init__(autodefer=autodefer, timeout=timeout)
 
@@ -88,13 +91,14 @@ class CustomView(miru.View):
         if ctx.user.id == self.user_id:
             return True
         await ctx.respond(
-                (
-                    "You can't interact with this button as "
-                    "you are not the invoker of the command."
-                ),
-                flags=hk.MessageFlag.EPHEMERAL,
-            )
+            (
+                "You can't interact with this button as "
+                "you are not the invoker of the command."
+            ),
+            flags=hk.MessageFlag.EPHEMERAL,
+        )
         return False
+
 
 class PreView(nav.NavigatorView):
     def __init__(
@@ -106,12 +110,10 @@ class PreView(nav.NavigatorView):
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
         user_id: hk.Snowflake = None,
     ) -> None:
-
         self.user_id = user_id
         self.session = session
 
         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
-
 
     async def on_timeout(self) -> None:
         await self.message.edit(components=[])
@@ -124,13 +126,14 @@ class PreView(nav.NavigatorView):
         if ctx.user.id == self.user_id:
             return True
         await ctx.respond(
-                (
-                    "You can't interact with this button as "
-                    "you are not the invoker of the command."
-                ),
-                flags=hk.MessageFlag.EPHEMERAL,
-            )
+            (
+                "You can't interact with this button as "
+                "you are not the invoker of the command."
+            ),
+            flags=hk.MessageFlag.EPHEMERAL,
+        )
         return False
+
 
 # class AutoPaginator(CustomNavi):
 #     def __init__(
@@ -169,9 +172,6 @@ class PreView(nav.NavigatorView):
 #                     base_embed.add_field("check", col1).add_field("ok", col2)
 #                 )
 #         return pages
-    
+
 #     async def on_timeout(self) -> None:
 #         await self.message.edit(components=[])
-
-
-        

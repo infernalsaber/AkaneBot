@@ -3,19 +3,21 @@ import asyncio
 import datetime
 import logging
 import os
+import sqlite3
 
+import aiohttp_client_cache
 import dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
 from lightbulb.ext import tasks
 
-import aiohttp_client_cache
 from functions.utils import verbose_timedelta
 
 dotenv.load_dotenv()
 
 from functions.help import BotHelpCommand
+
 
 # Setting the prefix as , for windows (where i run the test bot)
 # and - for others (where it's deployed :) )
@@ -58,7 +60,9 @@ def setup_logging() -> None:
 
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
-    intents=hk.Intents.ALL_UNPRIVILEGED | hk.Intents.MESSAGE_CONTENT | hk.Intents.GUILD_MEMBERS,
+    intents=hk.Intents.ALL_UNPRIVILEGED
+    | hk.Intents.MESSAGE_CONTENT
+    | hk.Intents.GUILD_MEMBERS,
     prefix=lb.when_mentioned_or(return_prefix()),
     help_class=BotHelpCommand,
     logs="INFO",
@@ -76,11 +80,11 @@ async def on_starting(event: hk.StartingEvent) -> None:
     """Code which is executed once when the bot starts"""
 
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
-        cache_name="cache_db.db",  
-        expire_after=24 * 60 * 60,  
+        cache_name="cache_db.db",
+        expire_after=24 * 60 * 60,
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
-        include_headers=True, 
+        include_headers=True,
         ignored_params=[
             "auth_token"
         ],  # Keep using the cached response even if this param changes
@@ -89,6 +93,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.timeup = datetime.datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.update_channels = ["1127609035374461070"]
+    bot.d.con = sqlite3.connect("akane_db.db")
     if not os.path.exists("pictures"):
         os.mkdir("pictures")
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
@@ -158,10 +163,7 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
     elif isinstance(exception, lb.BotMissingRequiredPermission):
         await event.context.respond("I don't have the permissions to do this 😔")
 
-    
-
     elif isinstance(exception, lb.NotEnoughArguments):
-        
         # await event.context.respond(
         #     (
         #         f"Missing arguments, use `-help {event.context.command.name}`"
@@ -176,7 +178,6 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
 
             command = ctx.command
 
-
             long_help = command.get_help(ctx)
 
             if len(command.aliases) > 0:
@@ -185,7 +186,7 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
                 aliases = ""
 
             # embed = (
-            
+
             # )
             # lines = [
             #     ">>> ```adoc",
@@ -198,17 +199,20 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
             #     "```",
             # ]
             await ctx.edit_last_response(
-                content=None, embed=hk.Embed(
-                color=0x000000, title="Command Help",
-                description= (
-                    f"**{command.name}** \n"
-                    f"{command.description} \n\n"
-                    f"Usage: `{ctx.prefix}{command.signature}` \n\n"
-                    f"{aliases}"
-                    f"{long_help or ''}"
-                )
-            ))
-        
+                content=None,
+                embed=hk.Embed(
+                    color=0x000000,
+                    title="Command Help",
+                    description=(
+                        f"**{command.name}** \n"
+                        f"{command.description} \n\n"
+                        f"Usage: `{ctx.prefix}{command.signature}` \n\n"
+                        f"{aliases}"
+                        f"{long_help or ''}"
+                    ),
+                ),
+            )
+
         except Exception as e:
             await event.context.respond(f"Stop, {e}")
 
