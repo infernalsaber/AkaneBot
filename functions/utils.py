@@ -1,17 +1,12 @@
 import datetime
 import json
-from typing import Optional, Sequence, Union
+import random
 from urllib.parse import urlparse
 
 import feedparser
-import hikari as hk
-import miru
-from miru.ext import nav
-
 import requests
 from bs4 import BeautifulSoup
 
-import random
 
 def check_if_url(link: str) -> bool:
     """Simple code to see if the given string is a url or not"""
@@ -19,6 +14,7 @@ def check_if_url(link: str) -> bool:
     if parsed.scheme and parsed.netloc:
         return True
     return False
+
 
 def is_image(link: str) -> int:
     """Tells if a function is an image or not
@@ -35,6 +31,7 @@ def is_image(link: str) -> int:
     if r.headers["content-type"] in ["image/webp", "image/gif"]:
         return 2
     return 0
+
 
 def rss2json(url):
     """
@@ -125,9 +122,8 @@ def iso_to_timestamp(iso_date):
 def tenor_link_from_gif(link: str):
     """Scrape the tenor GIF url from the page link"""
     try:
-
         headers = {
-            'User-Agent': 'Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)',
+            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
         }
 
         response = requests.get(link, headers=headers)
@@ -135,7 +131,6 @@ def tenor_link_from_gif(link: str):
         soup = BeautifulSoup(response.content, "lxml")
 
         return soup.find("meta", {"itemprop": "contentUrl"})["content"]
-
 
     except:
         return link
@@ -147,6 +142,6 @@ def get_random_quote():
             "Don't we have a job to do?",
             "One, two, three, four. Two, two, three, four...",
             "Whenever you need me, I'll be there.",
-            "I Hear The Voice Of Fate, Speaking My Name In Humble Supplication…"
+            "I Hear The Voice Of Fate, Speaking My Name In Humble Supplication…",
         ]
     )
