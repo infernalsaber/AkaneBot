@@ -31,7 +31,7 @@ sauce_plugin.d.help = True
 async def pfp_sauce(ctx: lb.UserContext):
     # try:
     url = await _find_the_url(ctx)
-    await ctx.respond(url)
+    # await ctx.respond(url)
 
     if url["errorMessage"]:
         await ctx.respond(url["errorMessage"])
