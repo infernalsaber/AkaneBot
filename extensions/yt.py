@@ -1,4 +1,4 @@
-"""Search and/or download youtube videos"""
+"""Search youtube videos"""
 import os
 
 import dotenv
