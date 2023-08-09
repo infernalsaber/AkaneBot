@@ -62,6 +62,7 @@ async def inrole_cmd(
                     d2 += f"{member.username}\n"
                     counter += 1
 
+
             # basic_embed = (
             #     hk.Embed(
             #     title=f"List of users in {role.name} role ({counter})",
@@ -82,6 +83,9 @@ async def inrole_cmd(
                 d2.split("\n")[i : i + 20] for i in range(0, len(d2.split("\n")), 20)
             ]
 
+            mem_ids = [d1.split("\n")[i: i+20] for i in range(0, len(d1.split("\n")), 20)]
+            mem_names = [d2.split("\n")[i: i+20] for i in range(0, len(d2.split("\n")), 20)]
+
             # await ctx.author.send("test")
             # await ctx.author.send(mem_ids)
             # await ctx.author.send(mem_names)
@@ -89,11 +93,13 @@ async def inrole_cmd(
             for i, item in enumerate(mem_ids):
                 # embed = basic_embed
                 # await ctx.respond(embed)
+                # embed = basic_embed
+                # await ctx.respond(embed)
                 pages.append(
                     hk.Embed(
-                        title=f"List of users in {role.name} role ({counter})",
-                        timestamp=datetime.now().astimezone(),
-                        color=role.color or 0xFFFFFF,
+                    title=f"List of users in {role.name} role ({counter})",
+                    timestamp=datetime.now().astimezone(),
+                    color=role.color or 0xFFFFFF
                     )
                     .set_thumbnail(role.icon_url)
                     .add_field("UID", "\n".join(item), inline=True)
@@ -103,6 +109,7 @@ async def inrole_cmd(
             if len(pages) == 1:
                 await ctx.respond(pages[0])
                 return
+
 
             # await ctx.respond('made pages')
             for page in pages:
@@ -158,6 +165,14 @@ async def inrole_cmd(
         #     )
         #     .set_image(event.image_url)
         # )
+        # base_embed= (
+        #     hk.Embed(
+        #     title=f"List of users interested in {event.name} ({len(event_members)})",
+        #     timestamp=datetime.now().astimezone(),
+        #     color=0x43408A
+        #     )
+        #     .set_image(event.image_url)
+        # )
 
         if len(event_members) == 0:
             await ctx.respond(base_embed)
@@ -168,7 +183,7 @@ async def inrole_cmd(
                 hk.Embed(
                     title=f"List of users interested in {event.name} ({len(event_members)})",
                     timestamp=datetime.now().astimezone(),
-                    color=0x43408A,
+                    color=0x43408A
                 )
                 .set_image(event.image_url)
                 .add_field("​", "\n".join(item))
@@ -467,6 +482,7 @@ async def emote_removal(
                 attachment=emote,
             )
             await ctx.bot.rest.delete_emoji(ctx.guild_id, emote)
+            await ctx.respond(f"Removed emote: `{emote.name}`")
             await ctx.respond(f"Removed emote: `{emote.name}`")
         except Exception as e:
             await ctx.respond(f"Error: {e}")
