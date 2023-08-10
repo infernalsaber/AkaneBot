@@ -43,7 +43,7 @@ async def inrole_cmd(
                     break
         else:
             for role_ in await ctx.bot.rest.fetch_roles(ctx.guild_id):
-                if role == role_.name:
+                if role.lower() == role_.name.lower():
                     role = role_
                     break
 
@@ -63,17 +63,17 @@ async def inrole_cmd(
                     counter += 1
 
 
-            # basic_embed = (
-            #     hk.Embed(
-            #     title=f"List of users in {role.name} role ({counter})",
-            #     timestamp=datetime.now().astimezone(),
-            #     color=role.color or 0xFFFFFF
-            #     )
-            #     .set_thumbnail(role.icon_url)
-            # )
 
             if counter == 0:
-                await ctx.respond(basic_embed)
+                await ctx.respond(
+                    hk.Embed(
+                        title=f"List of users in {role.name} role ({counter})",
+                        timestamp=datetime.now().astimezone(),
+                        color=role.color or 0xFFFFFF
+                        )
+                        .set_thumbnail(role.icon_url)
+                )
+                
                 return
 
             mem_ids = [
@@ -86,15 +86,10 @@ async def inrole_cmd(
             mem_ids = [d1.split("\n")[i: i+20] for i in range(0, len(d1.split("\n")), 20)]
             mem_names = [d2.split("\n")[i: i+20] for i in range(0, len(d2.split("\n")), 20)]
 
-            # await ctx.author.send("test")
-            # await ctx.author.send(mem_ids)
-            # await ctx.author.send(mem_names)
+
 
             for i, item in enumerate(mem_ids):
-                # embed = basic_embed
-                # await ctx.respond(embed)
-                # embed = basic_embed
-                # await ctx.respond(embed)
+
                 pages.append(
                     hk.Embed(
                     title=f"List of users in {role.name} role ({counter})",
@@ -111,7 +106,6 @@ async def inrole_cmd(
                 return
 
 
-            # await ctx.respond('made pages')
             for page in pages:
                 ctx.author.send(page)
 
@@ -120,7 +114,6 @@ async def inrole_cmd(
                 user_id=ctx.author.id,
             )
 
-            # await ctx.respond('okokok pages')
             await view.send(ctx.channel_id)
             return
         except Exception as e:
@@ -157,25 +150,18 @@ async def inrole_cmd(
         ]
         pages = []
 
-        # base_embed= (
-        #     hk.Embed(
-        #     title=f"List of users interested in {event.name} ({len(event_members)})",
-        #     timestamp=datetime.now().astimezone(),
-        #     color=0x43408A
-        #     )
-        #     .set_image(event.image_url)
-        # )
-        # base_embed= (
-        #     hk.Embed(
-        #     title=f"List of users interested in {event.name} ({len(event_members)})",
-        #     timestamp=datetime.now().astimezone(),
-        #     color=0x43408A
-        #     )
-        #     .set_image(event.image_url)
-        # )
+
 
         if len(event_members) == 0:
-            await ctx.respond(base_embed)
+            await ctx.respond(
+                hk.Embed(
+                title=f"List of users interested in {event.name} ({len(event_members)})",
+                timestamp=datetime.now().astimezone(),
+                color=0x43408A
+                )
+                .set_image(event.image_url)
+            )
+            
             return
 
         for item in paginated_members:
@@ -201,6 +187,9 @@ async def inrole_cmd(
 
     except Exception as e:
         await ctx.respond(e)
+    
+    if len(ctx.responses) == 0:
+        await ctx.respond(f"No role `{role}` found.")
 
 
 @info_plugin.command
@@ -455,16 +444,16 @@ async def emote_removal(
     emotes = []
     for word in words:
         try:
-            # hk.Emoji.
             emote = hk.Emoji.parse(word)
             emote = await ctx.bot.rest.fetch_emoji(ctx.guild_id, emoji=emote)
-            # if isinstance(emote, hk.KnownCustomEmoji):
 
             emotes.append(emote)
-            # print(emote.url)
+
         except:
             continue
-    # print(emotes, "\n\n\n\n\n")
+
+    emotes = list(set(emotes))
+
     if len(emotes) == 0:
         await ctx.respond("No emotes found")
         return
@@ -482,7 +471,6 @@ async def emote_removal(
                 attachment=emote,
             )
             await ctx.bot.rest.delete_emoji(ctx.guild_id, emote)
-            await ctx.respond(f"Removed emote: `{emote.name}`")
             await ctx.respond(f"Removed emote: `{emote.name}`")
         except Exception as e:
             await ctx.respond(f"Error: {e}")
