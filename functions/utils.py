@@ -7,6 +7,10 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 
+import typing as t
+# if t.TYPE_CHECKING:
+from aiohttp_client_cache import CachedSession
+
 
 def check_if_url(link: str) -> bool:
     """Simple code to see if the given string is a url or not"""
@@ -16,21 +20,38 @@ def check_if_url(link: str) -> bool:
     return False
 
 
-def is_image(link: str) -> int:
-    """Tells if a function is an image or not
+# def is_image(link: str) -> int:
+#     """Tells if a function is an image or not
+
+#     Args:
+#         link (str): The link to check
+
+#     Returns:
+#         int: 0 if not, 1 if yes, 2 if yes but not PIL compatible (gif/webp)
+#     """
+#     r = requests.head(link)
+#     if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
+#         return 1
+#     if r.headers["content-type"] in ["image/webp", "image/gif"]:
+#         return 2
+#     return 0
+
+async def is_image(link: str, session: CachedSession) -> int:
+    """Using headers check if a link is of an image or not
 
     Args:
         link (str): The link to check
+        session (CachedSession): The async. (cached or otherwise) session
 
     Returns:
-        int: 0 if not, 1 if yes, 2 if yes but not PIL compatible (gif/webp)
+        int: 0 if not image, 1/2 if yes
     """
-    r = requests.head(link)
-    if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
-        return 1
-    if r.headers["content-type"] in ["image/webp", "image/gif"]:
-        return 2
-    return 0
+    async with session.head(link, timeout=2) as r:
+        if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
+            return 1
+        if r.headers["content-type"] in ["image/webp", "image/gif"]:
+            return 2
+        return 0
 
 
 def rss2json(url):
@@ -119,20 +140,20 @@ def iso_to_timestamp(iso_date):
         return iso_date
 
 
-def tenor_link_from_gif(link: str):
+async def tenor_link_from_gif(link: str, session: CachedSession):
     """Scrape the tenor GIF url from the page link"""
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
         }
 
-        response = requests.get(link, headers=headers)
-
-        soup = BeautifulSoup(response.content, "lxml")
+        async with session.get(link, headers=headers, timeout=2) as response:
+            soup = BeautifulSoup(await response.read(), "lxml")
 
         return soup.find("meta", {"itemprop": "contentUrl"})["content"]
 
-    except:
+    except Exception as e:
+        print(e)
         return link
 
 
@@ -143,5 +164,7 @@ def get_random_quote():
             "One, two, three, four. Two, two, three, four...",
             "Whenever you need me, I'll be there.",
             "I Hear The Voice Of Fate, Speaking My Name In Humble Supplication…",
+            "There's Something In The Air… Something Tells Me A New Case Is Brewing.",
+            "Now this is what I call 'a moment of solitude.'"
         ]
     )
