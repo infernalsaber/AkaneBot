@@ -29,9 +29,13 @@ sauce_plugin.d.help = True
 @lb.command("User pfp Sauce", "Sauce of user pfp")
 @lb.implements(lb.UserCommand)
 async def pfp_sauce(ctx: lb.UserContext):
-    # try:
+    """Find the sauce of a user's pfp
+
+    Args:
+        ctx (lb.UserContext): The context the command is invoked in
+    """
+
     url = await _find_the_url(ctx)
-    # await ctx.respond(url)
 
     if url["errorMessage"]:
         await ctx.respond(url["errorMessage"])
@@ -72,10 +76,14 @@ async def pfp_sauce(ctx: lb.UserContext):
 @lb.command("Find the Sauce", "Search the sauce of the image")
 @lb.implements(lb.MessageCommand)
 async def find_sauce_menu(ctx: lb.MessageContext):
-    # await ctx.respond(f"{get_random_quote()} <a:Loading_:1061933696648740945>")
+    """Find the image from a message and then its sauce
+
+    Args:
+        ctx (lb.MessageContext): The context the command is invoked in
+    """
+
 
     url = await _find_the_url(ctx)
-    # await ctx.edit_last_response(url)
 
     if not url["errorMessage"]:
         link = url["url"]
@@ -102,25 +110,24 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 
             try:
                 embed, view = await _complex_parsing(ctx, res["results"][0])
-                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                # try:
+
                 if float(res["results"][0]["header"]["similarity"]) < 55.0:
                     view.add_item(
                         GenericButton(
-                            # url=f"https://yandex.com/images/search?url={url}&rpt=imageview"
-                            url=f"https://yandex.com/images/search?url={url}&rpt=imageview",
+                            url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
                             label="Search Yandex",
                         )
                     )
-                # except Exception as e:
-                # await ctx.respond(e)
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+
                 choice = await ctx.respond(embed=embed, components=view)
                 await view.start(choice)
                 await view.wait()
-            except:
+            except Exception as e:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 choice = await ctx.respond(embed=embed, components=view)
+                await ctx.respond(e)
                 await view.start(choice)
                 await view.wait()
         else:
@@ -142,21 +149,25 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 @lb.command("sauce", "Show ya sauce for the image", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashCommand)
 async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
-    try:
-        await ctx.respond(f"{get_random_quote()} <a:Loading_:1061933696648740945>")
-    except Exception as e:
-        await ctx.respond(e)
-        return
+    """Find the sauce of an image
+
+    Args:
+        ctx (lb.Context): The context the command is invoked in
+        link (str): The url of the image
+        service (str, optional): The service to choose. Defaults to None.
+    """
+
+    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse('<a:Loading_:1061933696648740945>')}")
+
 
     url = await _find_the_url(ctx)
-    # await ctx.respond(url)
+
 
     if not url["errorMessage"]:
         link = url["url"]
     else:
         await ctx.edit_last_response(url["errorMessage"])
         return
-        # pass
 
     params = {"api_key": SAUCENAO_KEY, "output_type": 2, "numres": 5, "url": link}
 
@@ -174,15 +185,15 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
             data = res["results"][0]
             try:
                 embed, view = await _complex_parsing(ctx, data)
-                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 if float(data["header"]["similarity"]) < 55.0:
                     view.add_item(
                         GenericButton(
-                            # url=f"https://yandex.com/images/search?url={url}&rpt=imageview"
-                            url=f"https://yandex.com/images/search?url={url}&rpt=imageview",
+
+                            url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
                             label="Search Yandex",
                         )
                     )
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 choice = await ctx.edit_last_response(
                     content=None, embed=embed, components=view
                 )
@@ -214,7 +225,8 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
                     view = CustomView(user_id=ctx.author.id)
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
-                    choice = await ctx.respond(
+                    choice = await ctx.edit_last_response(
+                        content=None,
                         embed=hk.Embed(color=0x000000)
                         .add_field(
                             "Similarity", f"{round(res[0]['similarity']*100, 2)}"
@@ -249,25 +261,36 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
 @lb.command("pingu", "Check if site alive", pass_options=True, hidden=True)
 @lb.implements(lb.PrefixCommand)
 async def pingu(ctx: lb.Context, link: str) -> None:
+    """A function to check if a site returns an OK status
+
+    Args:
+        ctx (lb.Context): The context in which the command is invoked
+        link (str): The URL of the site
+    """
+    
     if not check_if_url(link):
         await ctx.respond("That's... not a link <:AkanePoutColor:852847827826376736>")
         return
 
-    if requests.get(link).ok:
-        await ctx.respond(f"The site `{link}` is up and running ✅")
-    else:
-        await ctx.respond(
-            f"The site `{link}` is either down or has blocked the client ❌"
-        )
+    try:
+        if (await ctx.bot.d.aio_session.get(link, timeout=2)).ok:
+            await ctx.respond(f"The site `{link}` is up and running ✅")
+        else:
+            await ctx.respond(
+                f"The site `{link}` is either down or has blocked the client ❌"
+            )
+    except Exception as e:
+        await ctx.respond(e)
 
 
 async def _complex_parsing(ctx: lb.Context, data: dict):
+    """A usually stable method to form an embed via sauce results"""
     sauce = "😵"
 
     view = CustomView(user_id=ctx.author.id, timeout=10 * 60)
 
     if "MangaDex" in data["header"]["index_name"]:
-        # view = CustomView(user_id=ctx.author.id, timeout=None)
+
         try:
             if "mal_id" in data["data"].keys():
                 view.add_item(
@@ -309,12 +332,10 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
             ),
             view,
         )
-        # except Exception as e:
-        #     print(e)
+
 
     elif "Anime" in data["header"]["index_name"]:
-        # try:
-        # view = CustomView(user_id=ctx.author.id, timeout=None)
+
         if len(data["data"]["ext_urls"]) > 1:
             view.add_item(
                 GenericButton(
@@ -333,15 +354,11 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                 res = await ctx.bot.d.aio_session.get(
                     f"https://arm.haglund.dev/api/v2/ids", params=params, timeout=2
                 )
-                # await ctx.respond(res)
+
                 if res.ok:
-                    # await ctx.respond('ok')
-                    # print("\n\n\n\n\n\n\n")
-                    # print(res)
-                    # await ctx.respond(res)
+
                     res = await res.json()
-                    # await ctx.respond(res)
-                    # if "anilist" in res.items():
+
                     view.add_item(
                         GenericButton(
                             style=hk.ButtonStyle.LINK,
@@ -374,12 +391,10 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
             ),
             view,
         )
-        # except Exception as e:
-        #     print(e)
+
 
     elif "Danbooru" in data["header"]["index_name"]:
-        # try:
-        # view = CustomView(user_id=ctx.author.id, timeout=None)
+
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
@@ -415,12 +430,10 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
             ),
             view,
         )
-        # except Exception as e:
-        #     print(e)
+
 
     elif "Pixiv" in data["header"]["index_name"]:
-        # try:
-        # view = CustomView(user_id=ctx.author.id, timeout=None)
+
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
@@ -523,6 +536,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
 
 
 async def _simple_parsing(ctx: lb.Context, data: dict):
+    """A mostly stable method to form an embed via sauce results"""
     sauce = "😵"
     if "source" in data["data"].keys():
         if "ext_urls" in data["data"].keys():
@@ -545,10 +559,12 @@ async def _simple_parsing(ctx: lb.Context, data: dict):
 
 
 def sanitize_field(name: str) -> str:
+    """Replacing _ with space"""
     return name.replace("_", " ").capitalize()
 
 
 async def al_from_mal(mal_id: int = None, type: str = None, name: str = None) -> str:
+    """Anilist URL from MAL id"""
     query = """
   query ($mal_id: Int, $search: String) { # Define which variables will be used (id)
     Media (idMal: $mal_id, search: $search, type: MANGA) {
@@ -598,7 +614,6 @@ async def vndb_url(text: str) -> str:
 
     req = await req.json()
     return f"https://vndb.org/{req['results'][0]['id']}"
-    # return result_text
 
 
 pattern = r"https?://\S+|www\.\S+"
@@ -641,22 +656,18 @@ async def _find_the_url(ctx) -> dict:
             }
         try:
             if _is_tenor_link(url):
-                # await ctx.respond('Tenor!!')
-                link = tenor_link_from_gif(url)
+            # If the tenor scrapping fails, then it sends the original link back
+                link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
-                    # await ctx.respond('Could not scrape')
                     return {"url": None, "errorMessage": "Unknown error"}
-                # await ctx.respond('could scrape')
                 return {"url": link, "errorMessage": None}
 
-            if not is_image(url):
-                # await ctx.respond('failed image check')
+            if not await is_image(url, ctx.bot.d.aio_session):
                 return {
                     "url": url,
                     "errorMessage": "Please enter a valid image link <:AkaneSmile:872675969041846272>",
                 }
 
-            # await ctx.respond('All checks passed')
             return {"url": url, "errorMessage": None}
         except Exception as e:
             return {"url": None, "errorMessage": f"Exception: ```{e}```"}
@@ -669,14 +680,13 @@ async def _find_the_url(ctx) -> dict:
             match = url_regex.search(ctx.options["target"].content)
             if match:
                 url = match.group()
-            # print(url)
 
         if url:
-            if is_image(url):
+            if await is_image(url, ctx.bot.d.aio_session):
                 return {"url": url, "errorMessage": None}
 
             if _is_tenor_link(url):
-                link = tenor_link_from_gif(url)
+                link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
                     return {"url": url, "errorMessage": "Unknown error"}
                 return {"url": link, "errorMessage": None}
@@ -690,36 +700,21 @@ async def _find_the_url(ctx) -> dict:
                 "errorMessage": "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>",
             }
 
-        # If no url in text, try
-        # if not url:
-        #     if len(ctx.options["target"].attachments):
-        if is_image(ctx.options["target"].attachments[0].url):
-            # await ctx.respond('fucking image')
+
+        if await is_image(ctx.options["target"].attachments[0].url, ctx.bot.d.aio_session):
+
             return {
                 "url": ctx.options["target"].attachments[0].url,
                 "errorMessage": None,
             }
 
-        # await ctx.respond('no fucking image')
-
-        # else: # Don't think this should ever trigger but precautionary
         return {"url": url, "errorMessage": errorMessage}
 
-        # if not is_image(url):
-        #     return {
-        #         url: None,
-        #         errorMessage: "Please enter a valid image link <:AkaneSmile:872675969041846272>"
-        #     }
 
-        # return {
-        #     "url": url,
-        #     "errorMessage": None
-        # }
-
-    # else:
 
 
 def _is_tenor_link(link) -> bool:
+    """Very barebones way to check if a confirmed link is a tenor gif"""
     if "//tenor.com/view" in link:
         return True
     return False
