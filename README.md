@@ -7,14 +7,14 @@
 
 <img src="https://cdn.discordapp.com/attachments/980479966389096460/1130626054302744688/akanebotround.png" width="250" />
 
-[![Python 3.10](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 An discord bot for animanga related search and feed functions
 
-Written in Python 3.10 in the [hikari](https://github.com/hikari-py/hikari) microframework,
-using [hikari-lightbulb](https://github.com/tandemdude/hikari-lightbulb) and [hikari-miru](https://github.com/HyperGH/hikari-miru) to extend functionality.
+Written in Python 3.10 in the [`hikari`](https://github.com/hikari-py/hikari) microframework,
+using [`hikari-lightbulb`](https://github.com/tandemdude/hikari-lightbulb) and [`hikari-miru`](https://github.com/HyperGH/hikari-miru) to extend functionality.
 
 </div>
 
