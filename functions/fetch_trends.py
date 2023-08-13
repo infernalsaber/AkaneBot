@@ -8,7 +8,7 @@ import requests_cache
 requests_cache.install_cache("my_cache", expire_after=3600)
 
 
-async def search_it(search_query: str) -> dict | int:
+async def search_it(search_query: str, session) -> dict | int:
     """Search for the anime"""
     # Here we define our query as a multi-line string
     query = """
@@ -41,14 +41,15 @@ query ($id: Int, $search: String) {
     """
 
     # Make the HTTP Api request
-    response = requests.post(
+    # try:
+    response = await session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": {"search": search_query}},
         timeout=10,
     )
-    if response.status_code == 200:
-        print("Successfull connection")
-        data = response.json()["data"]["Media"]
+    if response.ok:
+        # print("Successfull connection")
+        data = (await response.json())["data"]["Media"]
         al_id = data["id"]
         name = data["title"]["english"] or data["title"]["romaji"]
         lower_limit = datetime.datetime(
@@ -74,11 +75,16 @@ query ($id: Int, $search: String) {
             upper_limit = datetime.datetime.now()
 
     else:
-        print(response.json()["errors"])
-        return response.status_code
+        print((await response.json())["errors"])
+        return response.status
+    # except Exception as e:
+    #     print("\n\n\n\n\n\n")
+    #     print(e)
+    # print(name, "\n\n\n\n")
+    # return name
 
     """Fetching the trend values """
-    req = requests.Session()
+    # req = requests.Session()
     # id = input("Enter id. ")
     trend_score = []
     flag = True
@@ -111,23 +117,23 @@ query ($id: Int, $search: String) {
             "date_lesser": int(upper_limit.timestamp()),
         }
 
-        response = req.post(
-            "https://graphql.anilist.co", json={"query": query, "variables": variables}
+        response = await session.post(
+            "https://graphql.anilist.co", json={"query": query, "variables": variables}, timeout=2
         )
 
-        if response.status_code == 200:
+        if response.ok:
             # print(response.json())
-            if not response.json()["data"]["Page"]["pageInfo"]["hasNextPage"]:
+            if not (await response.json())["data"]["Page"]["pageInfo"]["hasNextPage"]:
                 flag = False
             else:
                 counter = counter + 1
 
-            for item in response.json()["data"]["Page"]["mediaTrends"]:
+            for item in (await response.json())["data"]["Page"]["mediaTrends"]:
                 trend_score.append(item)
         else:
             # print("ERROR")
-            print(response.json()["errors"])
-            return response.status_code
+            print((await response.json())["errors"])
+            return response.status
 
     # Parsing the values
 
@@ -157,5 +163,19 @@ query ($id: Int, $search: String) {
 
     return {
         "name": name,
-        "data": [dates, trends, dates2, trends2, dates[-len(scores) :], scores],
+        "data": {
+            "activity": {
+                "dates": dates,
+                "values": trends
+            },
+            "episodes": {
+                "dates": dates2,
+                "values": trends2
+            },
+            "scores": {
+                "dates": dates[-len(scores) :],
+                "values": scores
+            }
+        },
+        # [dates, trends, dates2, trends2, dates[-len(scores) :], scores],
     }
