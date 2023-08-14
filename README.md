@@ -1,5 +1,3 @@
-
-
 # Akane Bot
 
 
@@ -8,6 +6,7 @@
 <img src="https://cdn.discordapp.com/attachments/980479966389096460/1130626054302744688/akanebotround.png" width="250" />
 
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Finfernalsaber%2FAkaneBot.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Finfernalsaber%2FAkaneBot?ref=badge_shield)
  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -17,6 +16,9 @@ Written in Python 3.10 in the [`hikari`](https://github.com/hikari-py/hikari) mi
 using [`hikari-lightbulb`](https://github.com/tandemdude/hikari-lightbulb) and [`hikari-miru`](https://github.com/HyperGH/hikari-miru) to extend functionality.
 
 </div>
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Finfernalsaber%2FAkaneBot.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Finfernalsaber%2FAkaneBot?ref=badge_large)
 
 ## Navigation
 
