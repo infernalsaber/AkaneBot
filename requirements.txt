@@ -16,6 +16,7 @@ aiohttp-client-cache==0.8.1
 beautifulsoup4
 lxml
 fuzzywuzzy[speedup]
+pandas
 
 # Putting this at the end coz W*ndows doesn't need it
 uvloop
