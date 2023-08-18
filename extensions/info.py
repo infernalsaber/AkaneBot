@@ -46,18 +46,18 @@ async def inrole_cmd(
 
     if not isinstance(role, hk.Role):
         if isinstance(role, int):
-            for role_ in await ctx.bot.rest.fetch_roles(ctx.guild_id):
-                if role == role_.id:
-                    role = role_
+            for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id):
+                if role == role_[0]:
+                    role = role_[1]
                     break
         elif role[0] == "<":
-            for role_ in await ctx.bot.rest.fetch_roles(ctx.guild_id):
+            for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
                 if role == role_.mention:
                     role = role_
                     break
         else:
             guild_roles = {}
-            for role_ in await ctx.bot.rest.fetch_roles(ctx.guild_id):
+            for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
                 guild_roles[role_.name] = role_
 
             ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=91)
@@ -79,12 +79,12 @@ async def inrole_cmd(
 
             pages = []
 
-            for member_id in ctx.get_guild().get_members():
-                member = ctx.get_guild().get_member(member_id)
+            for member in ctx.bot.cache.get_members_view_for_guild(ctx.guild_id).values():
                 if role.id in member.role_ids:
                     d1 += f"{member.id: <20}\n"
                     d2 += f"{member.username}\n"
                     counter += 1
+
 
             if counter == 0:
                 await ctx.respond(
@@ -501,13 +501,13 @@ async def botinfo(ctx: lb.Context) -> None:
     """Get info about the bot"""
 
     try:
-        user = info_plugin.bot.get_me()
-        data = await info_plugin.bot.rest.fetch_application()
-        guilds = list(await info_plugin.bot.rest.fetch_my_guilds())
+        user = ctx.bot.get_me()
+        data = await ctx.bot.rest.fetch_application()
+        guilds = list(ctx.bot.cache.get_guilds_view().values())
 
         member = 0
-        for guild in list(info_plugin.bot.cache.get_members_view()):
-            guild_obj = info_plugin.bot.cache.get_guild(guild)
+        for guild in list(ctx.bot.cache.get_members_view()):
+            guild_obj = ctx.bot.cache.get_guild(guild)
             member = member + guild_obj.member_count
 
         process = subprocess.Popen(
@@ -553,7 +553,7 @@ async def botinfo(ctx: lb.Context) -> None:
             )
             .add_field(
                 "Up since",
-                f"<t:{int(info_plugin.bot.d.timeup.timestamp())}:R>",
+                f"<t:{int(ctx.bot.d.timeup.timestamp())}:R>",
                 inline=True,
             )
             .add_field(
