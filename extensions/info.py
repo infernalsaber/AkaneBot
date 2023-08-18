@@ -4,6 +4,8 @@ import subprocess
 import typing as t
 from datetime import datetime
 from math import floor
+import pandas as pd
+
 
 import hikari as hk
 import lightbulb as lb
@@ -144,6 +146,16 @@ async def inrole_cmd(
 @lb.implements(lb.PrefixCommand)
 async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
     # try:
+
+    event = event.split()
+    if event[-1] == "--export":  # Whether to export the data as a csv
+        export = True
+        event = " ".join(event[:-1])
+    else:
+        export = False
+        event = " ".join(event)
+
+
     probable_event = event
 
     try:
@@ -182,48 +194,78 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
 
     event_members = []
     members = list(await ctx.bot.rest.fetch_scheduled_event_users(ctx.guild_id, event_))
-    for member in members:
-        if member.member:
-            event_members.append(member.member.username)
+    
+    
+    
+    if not export:
+        for member in members:
+            if member.member:
+                event_members.append(
+                    f"`{member.member.id: <19}`  {member.member.username}"
+                )
 
-    paginated_members = [
-        event_members[i : i + 20] for i in range(0, len(event_members), 20)
-    ]
-    pages = []
+        paginated_members = [
+            event_members[i : i + 20] for i in range(0, len(event_members), 20)
+        ]
+        pages = []
 
-    if len(event_members) == 0:
-        # await ctx.respond(event)
-        await ctx.respond(
-            hk.Embed(
-                title=f"List of users interested in {event.name} ({len(event_members)})",
-                timestamp=datetime.now().astimezone(),
-                color=colors.DEFAULT,
-            ).set_image(event.image_url.url)
-        )
-
-        return
-
-    for item in paginated_members:
-        pages.append(
-            hk.Embed(
-                title=f"List of users interested in {event.name} ({len(event_members)})",
-                timestamp=datetime.now().astimezone(),
-                color=colors.DEFAULT,
+        if len(event_members) == 0:
+            # await ctx.respond(event)
+            await ctx.respond(
+                hk.Embed(
+                    title=f"List of users interested in {event.name} ({len(event_members)})",
+                    timestamp=datetime.now().astimezone(),
+                    color=colors.DEFAULT,
+                ).set_image(event.image_url.url)
             )
-            .set_image(event.image_url.url)
-            .add_field("​", "\n".join(item))
+
+            return
+
+        for item in paginated_members:
+            pages.append(
+                hk.Embed(
+                    title=f"List of users interested in {event.name} ({len(event_members)})",
+                    timestamp=datetime.now().astimezone(),
+                    color=colors.DEFAULT,
+                )
+                .set_image(event.image_url.url)
+                .add_field("​", "\n".join(item))
+            )
+
+        if len(pages) == 1:
+
+            await ctx.respond(pages[0])
+            return
+
+        view = AuthorNavi(
+            pages=pages,
+            user_id=ctx.author.id,
         )
+        await view.send(ctx.channel_id)
 
-    if len(pages) == 1:
+    else:
+        try:
+            mem_ids, mem_names = [], []
+            for member in members:
+                if member.member:
+                    mem_ids.append(member.member.id)
+                    mem_names.append(member.member.username)
+            
+            test_bytes = io.BytesIO()
 
-        await ctx.respond(pages[0])
-        return
+            pd.DataFrame(
+                {"User IDs": mem_ids, "User Names": mem_names}
+                ).to_csv(test_bytes, index=False)
 
-    view = AuthorNavi(
-        pages=pages,
-        user_id=ctx.author.id,
-    )
-    await view.send(ctx.channel_id)
+            await ctx.respond(hk.Bytes(test_bytes.getvalue(), "event.csv"))
+
+        except Exception as e:
+            await ctx.respond(f'Erra: {e}')
+    # test_bytes = io.BytesIO()
+    # pd.DataFrame([ 10, 15, 20], dtype='u1', columns=['a']).to_csv(test_bytes, index=False)
+    # await ctx.respond(hk.Bytes(test_bytes.getvalue(), "lol.csv"))
+        
+
 
 
 
@@ -341,6 +383,17 @@ async def add_emote(
     except Exception as e:
         await ctx.respond(f"Error: {e}")
 
+
+@info_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.command("text", "uoogh")
+@lb.implements(lb.PrefixCommand)
+async def guilds(ctx: lb.Context) -> None:
+
+    import pandas as pd
+    test_bytes = io.BytesIO()
+    pd.DataFrame([ 10, 15, 20], dtype='u1', columns=['a']).to_csv(test_bytes, index=False)
+    await ctx.respond(hk.Bytes(test_bytes.getvalue(), "lol.csv"))
 
 @info_plugin.command
 @lb.add_checks(lb.owner_only)
