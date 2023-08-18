@@ -1,14 +1,15 @@
-"""To make text or message logs"""
+"""Seasonal anime releases feed"""
 import asyncio
-import datetime
 import json
 import re
+from datetime import datetime
 
 import hikari as hk
 import lightbulb as lb
 from dateutil import parser
 
 from functions.buttons import GenericButton, NewButton
+from functions.models import ColorPalette as colors
 from functions.utils import rss2json
 from functions.views import PeristentViewTest
 
@@ -18,7 +19,7 @@ aniupdates = lb.Plugin(
 aniupdates.d.help = False
 
 
-async def get_magnet_for(query: str):
+async def _get_magnet_for(query: str):
     magnet_feed = "https://subsplease.org/rss/?r=1080"
     items = rss2json(magnet_feed)
     items = json.loads(items)
@@ -28,7 +29,7 @@ async def get_magnet_for(query: str):
             return i["link"]
 
 
-async def get_anime_updates() -> list:
+async def _get_anime_updates() -> list:
     link = "https://www.toptal.com/developers/feed2json/convert"
 
     # magnet_feed = "https://subsplease.org/rss/?r=1080"
@@ -43,24 +44,16 @@ async def get_anime_updates() -> list:
 
     for i in items["feeds"]:
         item_dict = {}
-        # if not "1080" in i["title"]:
-        #     continue
 
-        print(datetime.datetime.now(datetime.timezone.utc))
-        print(i["title"])
-        print(i["published"])
-
-        # try:
         if (
             int(
                 (
-                    datetime.datetime.now(datetime.timezone.utc)
-                    - parser.parse(i["published"])
+                    datetime.now(datetime.timezone.utc) - parser.parse(i["published"])
                 ).total_seconds()
             )
             > 720
         ):
-            print("short")
+            # Series didn't release in the last 12 minutes, so continue to loop
             continue
         item_dict["timestamp"] = parser.parse(i["published"])
         item_dict["link"] = i["link"]
@@ -70,13 +63,11 @@ async def get_anime_updates() -> list:
             i["title"][13:-13].split("(")[0][:-6]
         )
         if not item_dict["data"]:
-            print("Not on AL")
+            # Series not on AL, hence skipping it
             continue
-        print(item_dict)
+
         updates.append(item_dict)
 
-        # except Exception as e:
-        #     print(e)
     return updates
 
 
@@ -85,31 +76,21 @@ async def on_starting(event: hk.StartedEvent) -> None:
     """Event fired on start of bot"""
     view = PeristentViewTest()
     await view.start()
-    # conn = sqlite3.connect("akane_db.db")
-    # cursor = conn.cursor()
-    # aniupdates.bot.d.con = conn
-
-    #     cursor.execute('''
-    #     CREATE TABLE IF NOT EXISTS aniupdates (
-    #         id INTEGER PRIMARY KEY AUTOINCREMENT,
-    #         guild_channel INTEGER,
-    #     )
-    # ''')
 
     while True:
         print("Getting anime updates")
-        updates = await get_anime_updates()
+        updates = await _get_anime_updates()
         if not updates:
             print("\n\nNOTHING\n\n")
-        # print(updates)
+
         for update in updates:
             view = PeristentViewTest()
             view.add_item(
                 NewButton(
                     style=hk.ButtonStyle.SECONDARY,
-                    custom_id=f"{int(datetime.datetime.now().timestamp())}",
+                    custom_id=f"{int(datetime.now().timestamp())}",
                     emoji=hk.Emoji.parse("🧲"),
-                    link=await get_magnet_for(update["file"]),
+                    link=await _get_magnet_for(update["file"]),
                 )
             )
             view.add_item(
@@ -122,7 +103,6 @@ async def on_starting(event: hk.StartedEvent) -> None:
             view.add_item(
                 GenericButton(
                     style=hk.ButtonStyle.LINK,
-                    # label = "Anilist",
                     emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
                     url=update["data"]["siteUrl"],
                 )
@@ -131,7 +111,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                 check = await aniupdates.bot.rest.create_message(
                     channel=channel,
                     embed=hk.Embed(
-                        color=0x7DF9FF,
+                        color=colors.ELECTRIC_BLUE,
                         description=update["file"][13:],
                         timestamp=update["timestamp"],
                         title=f"Episode {get_episode_number(update['file'])}: {update['data']['title']['romaji']} out",

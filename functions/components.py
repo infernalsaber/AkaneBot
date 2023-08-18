@@ -1,10 +1,15 @@
 """Misc component classes"""
 import typing as t
 
+import hikari as hk
 import miru
 
+from functions.models import ALCharacter
 
-class HelpTextSelect(miru.TextSelect):
+
+class SimpleTextSelect(miru.TextSelect):
+    """A simple text select which switches between a pages dictionary based on user choice"""
+
     def __init__(
         self,
         *,
@@ -14,7 +19,7 @@ class HelpTextSelect(miru.TextSelect):
         min_values: int = 1,
         max_values: int = 1,
         disabled: bool = False,
-        row: int | None = None
+        row: int | None = None,
     ) -> None:
         super().__init__(
             options=options,
@@ -30,3 +35,18 @@ class HelpTextSelect(miru.TextSelect):
         # self.view.answer = self.values[0]
         # try:
         await ctx.edit_response(embeds=[self.view.pages[self.values[0]]])
+
+
+class CharacterSelect(miru.TextSelect):
+    """A text select made for the character command's dropdown"""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        try:
+            chara = await ALCharacter.from_id(self.values[0], self.view.session)
+            await ctx.edit_response(embeds=[await chara.make_embed()])
+
+        except Exception as e:
+            await ctx.respond(content=f"Error: {e}", flags=hk.MessageFlag.EPHEMERAL)

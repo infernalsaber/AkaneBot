@@ -3,25 +3,25 @@ import asyncio
 import glob
 import os
 import subprocess
+import typing as t
+from datetime import datetime
 
 import hikari as hk
 import lightbulb as lb
+from fuzzywuzzy import process
 from lightbulb.ext import tasks
 
-# from extensions.ping import (
-#     CustomNavi,
-#     CustomNextButton,
-#     CustomPrevButton,
-#     KillNavButton,
-# )
+from functions.models import ColorPalette as colors
+from functions.utils import check_if_url
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
 
 
-@tasks.task(d=1)
-async def remove_lookup_data():
-    task_plugin.bot.d.chapter_info = {}
+@tasks.task(d=2)
+async def clear_session_cache():
+    """Clear the bot's request session cache"""
+    await task_plugin.bot.d.aio_session.delete_expired_responses()
 
 
 @tasks.task(d=10)
@@ -34,67 +34,78 @@ async def clear_pic_files():
     print("Cleared")
 
 
-# @task_plugin.command
-# @lb.add_checks(lb.owner_only)
-# @lb.command("dir", "Upload media files from the cwd", hidden=True)
-# @lb.implements(lb.PrefixCommand)
-# async def directory(ctx: lb.Context) -> None:
-#     """Get media files from the directory, this to be used is if a command fails
+@task_plugin.listener(hk.GuildMessageCreateEvent)
+async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
+    """Listener to listen for fuzzy command matching
 
-#     Args:
-#         ctx (lb.Context): The event context (irrelevant to the user)
-#     """
+    Args:
+        event (hk.GuildMessageCreateEvent): The event to listen for
+    """
 
-#     if not (guild := ctx.get_guild()):
-#         await ctx.respond("This command may only be used in servers.")
-#         return
+    if event.is_bot or not event.content:
+        return
 
-#     embed = hk.Embed()
-#     view = miru.View()
+    app = task_plugin.bot
+    prefixes = await app.get_prefix(app, event.message)
 
-#     if len(os.listdir("./pictures")) > 20:
-#         await ctx.respond("Too many items. Can't list")
-#         return
+    ctx_prefix = None
 
-#     for i, item in enumerate(["./pictures"]):
-#         embed.add_field(f"`{i+1}.`", f"```ansi\n\u001b[0;35m{item} ```")
-#         view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=str(item)))
-#     view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
+    for prefix in prefixes:
+        if event.content.startswith(prefix):
+            ctx_prefix = prefix
+            break
 
-#     choice = await ctx.respond(embed=embed, components=view)
+    if not ctx_prefix:
+        return
 
-#     await view.start(choice)
-#     await view.wait()
+    try:
+        commandish = event.content[len(ctx_prefix) :].split()[0]
+    except IndexError:  # Executed if the message is only the prefix
+        
+        # The idea being that any prefix must be under 5 characters (this will be enforced)
+        prefixes_string = "\n".join(filter(lambda x: len(x) < 5, prefixes))
 
-#     if not hasattr(view, "answer"):
-#         await ctx.edit_last_response("Process timed out", embeds=[], components=[])
-#         return
+        await app.rest.create_message(
+            event.channel_id,
+            embed=hk.Embed(
+                color=colors.ELECTRIC_BLUE, timestamp=datetime.now().astimezone()
+            )
+            .add_field("Global Prefixes", f"```{prefixes_string}```")
+            .add_field("Server Prefixes", f"```ansi\n\u001b[0;30mComing Soon...```")
+            .add_field("Additional", "- Pinging the bot always works :)")
+            .set_author(
+                name="Akane Bot Prefix Configuration", icon=app.get_me().avatar_url
+            ),
+        )
+        return
 
-#     folder = view.answer
+    async with app.rest.trigger_typing(event.channel_id):
+        prefix_commands_and_aliases = [
+            command[0] for command in app.prefix_commands.items()
+        ]
 
-#     embed2 = hk.Embed()
-#     view2 = miru.View()
+        if commandish in prefix_commands_and_aliases:
+            pass
+        else:
+            close_matches: t.Optional[t.Tuple[str, int]] = process.extractBests(
+                commandish, prefix_commands_and_aliases, score_cutoff=60, limit=3
+            )
 
-#     for i, item in enumerate(os.listdir(f"./{folder}")):
-#         embed2.add_field(f"`{i+1}.`", f"```ansi\n\u001b[0;35m{item} ```")
+            possible_commands: t.Sequence = []
 
-#         view2.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=f"{i+1}"))
-#     view2.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
-#     # view.
+            if close_matches:
+                possible_commands = [i for i, _ in close_matches]
+            else:
+                possible_commands = [" "]
 
-#     choice = await ctx.edit_last_response(embed=embed2, components=view2)
-
-#     await view2.start(choice)
-#     await view2.wait()
-
-#     if hasattr(view2, "answer"):  # Check if there is an answer
-#         await ctx.edit_last_response(content="Here it is.", embeds=[], components=[])
-#         filez = os.listdir(f"./{folder}")[int(view2.answer) - 1]
-#     else:
-#         await ctx.edit_last_response("Process timed out.", embeds=[], components=[])
-#         return
-
-#     await ctx.respond(attachment=f"{folder}/{filez}")
+            await app.rest.create_message(
+                event.channel_id,
+                (
+                    f"No command with the name `{commandish}` could be found. "
+                    f"Did you mean: `{'` or `'.join(possible_commands)}`"
+                ),
+            )
+            return
 
 
 @task_plugin.command
@@ -106,7 +117,7 @@ async def update_code(ctx: lb.Context) -> None:
         ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as result:
         output, error = result.communicate(timeout=12)
-        print(output, error)
+
         if error:
             await ctx.respond(
                 f"Process returned with error: ```{(str(error, 'UTF-8'))}```"
@@ -117,7 +128,57 @@ async def update_code(ctx: lb.Context) -> None:
 
     await ctx.edit_last_response("Restarting the bot...")
 
-    os.kill(os.getpid())
+    await ctx.bot.close()
+
+    # try:
+    #     os.kill(os.getpid(), signal.SIGTERM)
+    # except Exception as e:
+    #     await ctx.respond(e)
+
+
+@task_plugin.command
+@lb.option("color", "The colour to embed", hk.Color)
+@lb.command("embed", "Make embed of a color", pass_options=True, hidden=True)
+@lb.implements(lb.PrefixCommand)
+async def embed_color(ctx: lb.Context, color: hk.Color) -> None:
+    await ctx.respond(
+        embed=hk.Embed(
+            color=color,
+            title="Test Embed",
+            description="Testing the appropriate colours for embed",
+            timestamp=datetime.now().astimezone(),
+        )
+    )
+
+
+@task_plugin.command
+@lb.option(
+    "link",
+    "The link to check",
+)
+@lb.command("pingu", "Check if site alive", pass_options=True, hidden=True)
+@lb.implements(lb.PrefixCommand)
+async def pingu(ctx: lb.Context, link: str) -> None:
+    """A function to check if a site returns an OK status
+
+    Args:
+        ctx (lb.Context): The context in which the command is invoked
+        link (str): The URL of the site
+    """
+
+    if not check_if_url(link):
+        await ctx.respond("That's... not a link <:AkanePoutColor:852847827826376736>")
+        return
+
+    try:
+        if (await ctx.bot.d.aio_session.get(link, timeout=2)).ok:
+            await ctx.respond(f"The site `{link}` is up and running ✅")
+        else:
+            await ctx.respond(
+                f"The site `{link}` is either down or has blocked the client ❌"
+            )
+    except Exception as e:
+        await ctx.respond(f"Hit an exception: `{e}`")
 
 
 @task_plugin.command
@@ -129,7 +190,7 @@ async def update_code(ctx: lb.Context) -> None:
         ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as result:
         output, error = result.communicate(timeout=12)
-        print(output, error)
+
         if error:
             await ctx.respond(
                 f"Process returned with error: ```{(str(error, 'UTF-8'))}```"
@@ -143,7 +204,7 @@ async def update_code(ctx: lb.Context) -> None:
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
-@lb.command("shutdown", "shut down")
+@lb.command("shutdown", "shut down", aliases=["kms"])
 @lb.implements(lb.PrefixCommand)
 async def guilds(ctx: lb.Context) -> None:
     with open("ded.txt", "w+", encoding="UTF-8") as ded:
@@ -219,37 +280,27 @@ async def prefix_invocation(event: lb.CommandInvocationEvent) -> None:
 @lb.command("stats", "Bot usage stats")
 @lb.implements(lb.PrefixCommand)
 async def bot_stats(ctx: lb.Context) -> None:
-    try:
-        conn = task_plugin.bot.d.con
-        cursor = conn.cursor()
-        cursor.execute("SELECT command, usage FROM botstats")
-        result = cursor.fetchall()
+    conn = task_plugin.bot.d.con
+    cursor = conn.cursor()
+    cursor.execute("SELECT command, usage FROM botstats")
+    result = cursor.fetchall()
 
-        command, usage = ("```", "```")
+    command, usage = ("```", "```")
 
-        for item in result:
-            command += item[0]
-            command += "\n"
-            usage += str(item[1])
-            usage += "\n"
+    for item in result:
+        command += item[0]
+        command += "\n"
+        usage += str(item[1])
+        usage += "\n"
 
-        command += "```"
-        usage += "```"
+    command += "```"
+    usage += "```"
 
-        await ctx.respond(
-            embed=hk.Embed(title="Bot Usage Stats")
-            .add_field("Command", command, inline=True)
-            .add_field("Usage", usage, inline=True)
-        )
-
-    except Exception as e:
-        print(e)
-
-    # if result is None:
-
-    #     cursor.execute("INSERT INTO botstats (command, usage) VALUES (?, 1)", (command,))
-
-    # conn.commit()
+    await ctx.respond(
+        embed=hk.Embed(title="Bot Usage Stats")
+        .add_field("Command", command, inline=True)
+        .add_field("Usage", usage, inline=True)
+    )
 
 
 def load(bot: lb.BotApp) -> None:

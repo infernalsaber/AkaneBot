@@ -16,6 +16,12 @@ DSC_SYNTAX_GIST = (
 
 
 @compiler_plugin.command
+@lb.set_help(
+    (
+        "A function to return the output of your code. "
+        "\nUse print() to print whatever output you desire"
+    )
+)
 @lb.option(
     "code", "The code to test", str, modifier=lb.commands.OptionModifier.CONSUME_REST
 )
@@ -52,7 +58,7 @@ async def compiler(ctx: lb.Context, code: str) -> None:
         ["python3", "ntfc.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as result:
         output, error = result.communicate(timeout=12)
-        print(output, error)
+
         if error:
             await ctx.respond(
                 f"Process returned with error: ```{(str(error, 'UTF-8')).split('ntfc.py')[1][3:]}```"

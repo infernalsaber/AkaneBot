@@ -1,22 +1,21 @@
 """Custom Button classes"""
+import io
 import typing as t
 
 import hikari as hk
 import miru
-
-# import requests
-# import requests_cache
 from miru.ext import nav
 
+
 # from bs4 import BeautifulSoup
-
-
-# requests_cache.install_cache(
-#     "my_cache", expire_after=3600
-# )  # Cache expires after 1 hour (3600 seconds)
+async def poor_mans_proxy(link: str, session):
+    resp = await session.get(link, timeout=2)
+    return io.BytesIO(await resp.read())
 
 
 async def preview_maker(base_url, data_id, title, manga_id, cover, session):
+    """A preview maker function for the manga previews"""
+
     req = await session.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
 
     if not req.ok:
@@ -33,7 +32,8 @@ async def preview_maker(base_url, data_id, title, manga_id, cover, session):
     except Exception as e:
         print("ERra\n\n\n", e)
 
-    for page in r_json["chapter"]["data"]:
+    for page in r_json["chapter"]["data"][:5]:
+        # Proxy the first five at first
         pages.append(
             hk.Embed(
                 title=title,
@@ -41,7 +41,10 @@ async def preview_maker(base_url, data_id, title, manga_id, cover, session):
                 url=f"https://mangadex.org/title/{manga_id}",
             )
             .set_image(
-                hk.URL(f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}")
+                await poor_mans_proxy(
+                    f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}",
+                    session,
+                )
             )
             .set_footer(
                 "Fetched via: MangaDex",
@@ -64,7 +67,7 @@ async def preview_maker(base_url, data_id, title, manga_id, cover, session):
 
 
 class GenericButton(miru.Button):
-    """A custom next general class"""
+    """A general button class"""
 
     # Let's leave our arguments dynamic this time, instead of hard-coding them
     def __init__(self, *args, **kwargs) -> None:
@@ -76,9 +79,8 @@ class GenericButton(miru.Button):
 
 
 class KillNavButton(nav.NavButton):
-    """A custom next kill class"""
+    """A custom navigator kill button class"""
 
-    # Let's leave our arguments dynamic this time, instead of hard-coding them
     def __init__(
         self,
         *,
@@ -100,7 +102,7 @@ class KillNavButton(nav.NavButton):
 
 
 class CustomPrevButton(nav.NavButton):
-    """A custom previous button class"""
+    """A custom previous button class to make a rotating navigator"""
 
     def __init__(
         self,
@@ -130,7 +132,7 @@ class CustomPrevButton(nav.NavButton):
 
 
 class CustomNextButton(nav.NavButton):
-    """A custom next button class"""
+    """A custom next button class to make a rotating navigator"""
 
     def __init__(
         self,
@@ -158,7 +160,7 @@ class CustomNextButton(nav.NavButton):
         ...
 
 
-class NavLinkButton(nav.NavButton):
+class NavButton(nav.NavButton):
     """A custom next button class"""
 
     def __init__(
@@ -183,7 +185,7 @@ class NavLinkButton(nav.NavButton):
 
 
 class PreviewButton(nav.NavButton):
-    """A custom next button class"""
+    """A custom button for the manga preview"""
 
     def __init__(
         self,
@@ -204,7 +206,7 @@ class PreviewButton(nav.NavButton):
         if self.label == "🔍":
             self.label = "Preview"
             self.emoji = hk.Emoji.parse("<a:peek:1061709886712455308>")
-            print(self.view.children)
+
             for item in self.view.children:
                 if not item == self:
                     self.view.remove_item(item)
@@ -230,7 +232,7 @@ class PreviewButton(nav.NavButton):
             # await self.view.swap_pages(
             #     ctx, )
             # )
-        except:
+        except Exception as e:
             await ctx.respond(
                 (
                     f"Looks like MangaDex doesn't have this series "
@@ -326,17 +328,28 @@ class TrailerButton(miru.Button):
 
 
 class KillButton(miru.Button):
-    """A custom next kill class"""
+    """A custom kill button class"""
 
-    # Leaving our arguments dynamic, instead of hard-coding them
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        *,
+        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        label: t.Optional[str] = "❌",
+        custom_id: t.Optional[str] = None,
+        emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
+        row: t.Optional[int] = None,
+    ):
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
+        )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         await self.view.message.delete()
 
 
 class NewButton(miru.Button):
+    """A spitter button for the releases feed"""
+
     def __init__(
         self,
         style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
@@ -347,7 +360,6 @@ class NewButton(miru.Button):
     ) -> None:
         self.link = link
         super().__init__(style=style, label=label, emoji=emoji, custom_id=custom_id)
-        print(self.link)
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         try:
@@ -357,7 +369,7 @@ class NewButton(miru.Button):
 
 
 class SwapButton(miru.Button):
-    """A custom next button class"""
+    """A button to switch between a two-paged view"""
 
     def __init__(
         self,
@@ -385,22 +397,14 @@ class SwapButton(miru.Button):
         )
 
     async def callback(self, ctx: miru.ViewContext):
-        # if not ctx.author.id == self.view.user_id:
-        #     await ctx.respond(
-        #         (
-        #             "You can't interact with this button as "
-        #             "you are not the invoker of the command."
-        #         ),
-        #         flags=hk.MessageFlag.EPHEMERAL,
-        #     )
-        #     return
+
 
         if self.emoji == self.emoji1:
             if self.label2 or self.emoji2:
                 self.label = self.label2
                 self.emoji = self.emoji2
 
-            # await ctx.respond("Page 1 -> 2")
+            # Page 1 -> 2
 
             if isinstance(self.swap_page, str):
                 await ctx.edit_response(
@@ -410,13 +414,12 @@ class SwapButton(miru.Button):
                 await ctx.edit_response(
                     content=None, embeds=[self.swap_page], components=self.view
                 )
-            # await self.view.swap_pages(ctx, self.other_page)
+
 
             return
 
-        # await ctx.respond("Page 2 -> 1")
-        # await ctx.respond(self.emoji1)
-        # await ctx.respond(self.emoji)
+        # Page 2 -> 1
+
         self.label = self.label1
         self.emoji = self.emoji1
 

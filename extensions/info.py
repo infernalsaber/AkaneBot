@@ -1,4 +1,5 @@
 """Get information about a role, server, user, bot etc."""
+import io
 import subprocess
 import typing as t
 from datetime import datetime
@@ -7,9 +8,13 @@ from math import floor
 import hikari as hk
 import lightbulb as lb
 import psutil
+from fuzzywuzzy import process
+from PIL import Image, ImageOps
 
 from functions.buttons import SwapButton
-from functions.views import CustomNavi, CustomView
+from functions.models import ColorPalette as colors
+from functions.utils import is_image
+from functions.views import AuthorNavi, AuthorView
 
 info_plugin = lb.Plugin("Utility", "Utility and info commands", include_datastore=True)
 info_plugin.d.help = True
@@ -18,13 +23,20 @@ info_plugin.d.help_image = "https://i.imgur.com/nsg3lZJ.png"
 
 
 @info_plugin.command
-@lb.set_help("Find the list of users in a role")
 @lb.option("role", "The role", modifier=lb.OptionModifier.CONSUME_REST)
 @lb.command("inrole", "List of users in role", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def inrole_cmd(
     ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent]
 ) -> None:
+    """List of members in a role or interested in an event
+
+    Args:
+        ctx (lb.Context): Context for the command
+        role (t.Union[hk.Role, hk.ScheduledEvent]): The role/event
+    """
+
+    # Trying to convert it into an int (hk.SnowFlake) basically, if possible
     try:
         role = int(role)
     except ValueError:
@@ -42,10 +54,20 @@ async def inrole_cmd(
                     role = role_
                     break
         else:
+            guild_roles = {}
             for role_ in await ctx.bot.rest.fetch_roles(ctx.guild_id):
-                if role.lower() == role_.name.lower():
-                    role = role_
-                    break
+                guild_roles[role_.name] = role_
+
+            ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=91)
+
+            # Unpacking the closest value, if it exists
+            if ans:
+                closest_role_match, _ = ans
+
+                role = guild_roles[closest_role_match]
+            else:
+                await ctx.respond("No matching roles found")
+                return
 
     if isinstance(role, hk.Role):
         try:
@@ -62,18 +84,15 @@ async def inrole_cmd(
                     d2 += f"{member.username}\n"
                     counter += 1
 
-
-
             if counter == 0:
                 await ctx.respond(
                     hk.Embed(
                         title=f"List of users in {role.name} role ({counter})",
                         timestamp=datetime.now().astimezone(),
-                        color=role.color or 0xFFFFFF
-                        )
-                        .set_thumbnail(role.icon_url)
+                        color=role.color or 0xFFFFFF,
+                    ).set_thumbnail(role.icon_url)
                 )
-                
+
                 return
 
             mem_ids = [
@@ -83,18 +102,12 @@ async def inrole_cmd(
                 d2.split("\n")[i : i + 20] for i in range(0, len(d2.split("\n")), 20)
             ]
 
-            mem_ids = [d1.split("\n")[i: i+20] for i in range(0, len(d1.split("\n")), 20)]
-            mem_names = [d2.split("\n")[i: i+20] for i in range(0, len(d2.split("\n")), 20)]
-
-
-
             for i, item in enumerate(mem_ids):
-
                 pages.append(
                     hk.Embed(
-                    title=f"List of users in {role.name} role ({counter})",
-                    timestamp=datetime.now().astimezone(),
-                    color=role.color or 0xFFFFFF
+                        title=f"List of users in {role.name} role ({counter})",
+                        timestamp=datetime.now().astimezone(),
+                        color=role.color or 0xFFFFFF,
                     )
                     .set_thumbnail(role.icon_url)
                     .add_field("UID", "\n".join(item), inline=True)
@@ -105,11 +118,10 @@ async def inrole_cmd(
                 await ctx.respond(pages[0])
                 return
 
-
             for page in pages:
                 ctx.author.send(page)
 
-            view = CustomNavi(
+            view = AuthorNavi(
                 pages=pages,
                 user_id=ctx.author.id,
             )
@@ -119,77 +131,215 @@ async def inrole_cmd(
         except Exception as e:
             await ctx.respond(e)
             return
+    else:
+        await ctx.respond("No matching roles found")
+
+
+@info_plugin.command
+@lb.add_checks(lb.has_guild_permissions(hk.Permissions.MANAGE_EVENTS) | lb.owner_only)
+@lb.option("event", "The event", modifier=lb.OptionModifier.CONSUME_REST)
+@lb.command(
+    "inevent", "Fetch the list of members interested in an event", pass_options=True
+)
+@lb.implements(lb.PrefixCommand)
+async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
+    # try:
+    probable_event = event
+
     try:
-        event_ = None
-        events = await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
-        if isinstance(role, int):
-            for event in events:
-                if role == event.id:
-                    event_ = event
-                    break
-        else:
-            for event in events:
-                if role == event.name:
-                    event_ = event
-                    break
+        probable_event = int(probable_event)
+    except ValueError:
+        pass
 
-        if not event_:
-            return
+    event_: t.Optional[hk.ScheduledEvent] = None
+    events = await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
+    if isinstance(probable_event, int):
+        for event in events:
+            if probable_event == event.id:
+                event_ = event
+                break
+    else:
 
-        event_members = []
-        await ctx.respond(f"{ctx.guild_id}, {event_.id}")
-        members = list(
-            await ctx.bot.rest.fetch_scheduled_event_users(ctx.guild_id, event_)
+
+        guild_events = {}
+        for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id):
+            guild_events[event.name] = event
+
+        ans = process.extractOne(
+            probable_event, list(guild_events.keys()), score_cutoff=80
         )
-        for member in members:
-            if member.member:
-                event_members.append(member.member.username)
 
-        paginated_members = [
-            event_members[i : i + 20] for i in range(0, len(event_members), 20)
-        ]
-        pages = []
+        # Unpacking the closest value, if it exists
+        if ans:
+            closest_role_match, _ = ans
+
+            event_ = guild_events[closest_role_match]
 
 
+    if not event_:
+        await ctx.respond("No matching events found")
+        return
 
-        if len(event_members) == 0:
-            await ctx.respond(
-                hk.Embed(
+    event_members = []
+    members = list(await ctx.bot.rest.fetch_scheduled_event_users(ctx.guild_id, event_))
+    for member in members:
+        if member.member:
+            event_members.append(member.member.username)
+
+    paginated_members = [
+        event_members[i : i + 20] for i in range(0, len(event_members), 20)
+    ]
+    pages = []
+
+    if len(event_members) == 0:
+        # await ctx.respond(event)
+        await ctx.respond(
+            hk.Embed(
                 title=f"List of users interested in {event.name} ({len(event_members)})",
                 timestamp=datetime.now().astimezone(),
-                color=0x43408A
-                )
-                .set_image(event.image_url)
-            )
-            
-            return
-
-        for item in paginated_members:
-            pages.append(
-                hk.Embed(
-                    title=f"List of users interested in {event.name} ({len(event_members)})",
-                    timestamp=datetime.now().astimezone(),
-                    color=0x43408A
-                )
-                .set_image(event.image_url)
-                .add_field("​", "\n".join(item))
-            )
-
-        if len(pages) == 1:
-            await ctx.respond(pages[0])
-            return
-
-        view = CustomNavi(
-            pages=pages,
-            user_id=ctx.author.id,
+                color=colors.DEFAULT,
+            ).set_image(event.image_url.url)
         )
-        await view.send(ctx.channel_id)
+
+        return
+
+    for item in paginated_members:
+        pages.append(
+            hk.Embed(
+                title=f"List of users interested in {event.name} ({len(event_members)})",
+                timestamp=datetime.now().astimezone(),
+                color=colors.DEFAULT,
+            )
+            .set_image(event.image_url.url)
+            .add_field("​", "\n".join(item))
+        )
+
+    if len(pages) == 1:
+
+        await ctx.respond(pages[0])
+        return
+
+    view = AuthorNavi(
+        pages=pages,
+        user_id=ctx.author.id,
+    )
+    await view.send(ctx.channel_id)
+
+
+
+@info_plugin.command
+@lb.add_checks(
+    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS) | lb.guild_only
+)
+@lb.option(
+    "processor",
+    "Pre processors for the image",
+    required=False,
+    modifier=lb.OptionModifier.GREEDY,
+)
+@lb.option("emote", "The emote to add")
+@lb.option("name", "Name of the emote to add")
+@lb.command("addemote", "Add an emote to the server", aliases=["ae"], pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def add_emote(
+    ctx: lb.Context,
+    name: str,
+    emote: t.Union[hk.Emoji, str],
+    processor: t.Optional[t.List[str]],
+) -> None:
+    try:
+        if len(name) < 2 or len(name) > 32:
+            await ctx.respond(
+                "Invalid emote name length. Must be between 2 and 32 characters"
+            )
+            return
+
+        try:
+            possible_emote = hk.Emoji.parse(emote)
+        except ValueError:
+            pass
+
+        if isinstance(possible_emote, hk.CustomEmoji):
+            await ctx.respond("Adding...")
+            try:
+                emoji = await ctx.bot.rest.create_emoji(
+                    ctx.guild_id, name=name, image=possible_emote
+                )
+                await ctx.respond(f"Added emote: {emoji.mention}")
+            except Exception as e:
+                await ctx.respond(f"Error: {e}")
+
+            return
+
+        await ctx.respond(ctx.raw_options)
+
+        image_type = await is_image(
+            emote, ctx.bot.d.aio_session
+        )  # 1 if PIL friendly image, 2 if not, 0 if not image
+
+        if not image_type:
+            await ctx.respond("Invalid image url")
+            return
+
+        elif image_type == 2:
+            try:
+                emoji = await ctx.bot.rest.create_emoji(
+                    ctx.guild_id, name=name, image=emote
+                )
+                await ctx.respond(f"Added emote: {emoji.mention}")
+
+            except hk.RateLimitTooLongError:
+                await ctx.respond("Rate limit hit. Please try again shortly.")
+
+            except hk.BadRequestError:
+                # Reason being server emotes full or invalid value
+                await ctx.respond("Can't add this emote")
+
+            except hk.InternalServerError:
+                await ctx.respond("Discord went buggy oops")
+
+        elif image_type == 1:
+            try:
+                async with ctx.bot.d.aio_session.get(emote, timeout=2) as resp:
+                    img_bytes = await resp.read()
+
+                    ratio = len(img_bytes) / (1024 * 256)
+                    await ctx.respond(ratio)
+
+                    if ratio > 1:
+                        await ctx.respond(
+                            "Image size possibly too large, attempting compression..."
+                        )
+
+                        im = Image.open(io.BytesIO(img_bytes))
+                        im = ImageOps.contain(im, (128, 128), Image.Resampling.LANCZOS)
+
+                        new_pixels = io.BytesIO()
+                        im.save(new_pixels, format="PNG", optimize=True)
+                        emote = new_pixels.getvalue()
+                        # emote = io.BytesIO(im.resize((new_w, new_h)).tobytes())
+
+                    else:
+                        pass
+
+                await ctx.respond(hk.Embed(title="Test").set_image(emote))
+                emoji = await ctx.bot.rest.create_emoji(
+                    ctx.guild_id, name=name, image=emote
+                )
+                await ctx.respond(f"Added emote: {emoji.mention}")
+
+            except hk.RateLimitTooLongError:
+                await ctx.respond("Rate limit hit. Please try again shortly.")
+
+            except hk.BadRequestError:
+                # Reason being server emotes full or invalid value
+                await ctx.respond("Can't add this emote")
+
+            except hk.InternalServerError:
+                await ctx.respond("Discord went buggy oops")
 
     except Exception as e:
-        await ctx.respond(e)
-    
-    if len(ctx.responses) == 0:
-        await ctx.respond(f"No role `{role}` found.")
+        await ctx.respond(f"Error: {e}")
 
 
 @info_plugin.command
@@ -197,15 +347,21 @@ async def inrole_cmd(
 @lb.command("guilds", "See the servers the bot's in")
 @lb.implements(lb.PrefixCommand)
 async def guilds(ctx: lb.Context) -> None:
+    """Fetch a list of guilds the bot is in
+
+    Args:
+        ctx (lb.Context): The context for the command
+    """
+
     pages = []
-    buttons = [CustomPrevButton(), KillNavButton(), CustomNextButton()]
+
     for gld in list([guild for guild in ctx.bot.cache.get_guilds_view().values()]):
         pages.append(
             hk.Embed(
-                color=0xF4EAE9,
+                color=colors.DAWN_PINK,
                 title=f"Server: {gld.name}",
                 description=f"Server ID: `{gld.id}`",
-                timestamp=datetime.datetime.now().astimezone(),
+                timestamp=datetime.now().astimezone(),
             )
             .add_field("Owner", await gld.fetch_owner(), inline=True)
             .add_field(
@@ -220,8 +376,67 @@ async def guilds(ctx: lb.Context) -> None:
             .set_image(gld.banner_url)
         )
 
-    navigator = CustomNavi(pages=pages, buttons=buttons, user_id=ctx.author.id)
+    navigator = AuthorNavi(pages=pages, user_id=ctx.author.id)
     await navigator.send(ctx.channel_id)
+
+
+@info_plugin.command
+@lb.add_checks(lb.owner_only | lb.guild_only)
+@lb.option("user", "The user duh", t.Optional[hk.Member], required=False)
+@lb.command("userinfo", "Find information about a user", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def user_info(ctx: lb.Context, user: hk.Member) -> None:
+    user = user or ctx.member
+
+    try:
+        presence = user.get_presence()
+
+        if presence.activities and len(presence.activities) != 0:
+            activity = f"{presence.activity.type} {presence.activity.name}"
+        else:
+            activity = presence.visible_status
+
+        roles = (await user.fetch_roles())[1:]
+
+        await ctx.respond(
+            hk.Embed(
+                title=f"User: {user.display_name}",
+                description=f"User ID: `{user.id}`",
+                colour=colors.DEFAULT,
+                timestamp=datetime.now().astimezone(),
+            )
+            .set_footer(
+                text=f"Requested by {ctx.author.username}",
+                icon=ctx.author.display_avatar_url,
+            )
+            .add_field(
+                "Bot?",
+                "Yes" if user.is_bot else "No",
+                inline=True,
+            )
+            .add_field(
+                "Account Created",
+                f"<t:{int(user.created_at.timestamp())}:R>",
+                inline=True,
+            )
+            .add_field(
+                "Server Joined",
+                f"<t:{int(user.joined_at.timestamp())}:R>",
+                inline=True,
+            )
+            .add_field(
+                "Roles",
+                ", ".join(r.mention for r in roles),
+                inline=False,
+            )
+            .set_thumbnail(user.avatar_url)
+            .set_image(user.banner_url)
+        )
+
+        await ctx.respond(activity)
+        # await ctx.respond(f"{activity.type} {activity.name}")
+    except Exception as e:
+        await ctx.respond(e)
 
 
 @info_plugin.command
@@ -251,13 +466,10 @@ async def botinfo(ctx: lb.Context) -> None:
         )
         num_commits, _ = process.communicate()
 
-        try:
-            num_commits = int(num_commits)
-        except ValueError:
-            return
+        num_commits = int(num_commits)
 
         process = subprocess.Popen(
-            'git log -5 --format="<t:%at:D> %s"',
+            'git log -5 --format="<t:%at:D>: %s"',
             text=True,
             shell=True,
             stdout=subprocess.PIPE,
@@ -265,11 +477,17 @@ async def botinfo(ctx: lb.Context) -> None:
         )
         changes, _ = process.communicate()
 
+        change_list: t.List[str] = [
+            f"{i+1}. {item}" for i, item in enumerate(changes.split("\n")[:5])
+        ]
+
+        changes = "\n".join(change_list)
+
         version = f"{floor(num_commits/1000)}.{floor(num_commits/100)}.{floor(num_commits/10)}"
 
         pages = [
             hk.Embed(
-                color=0x43408A,
+                color=colors.DEFAULT,
                 description="A multi-purpose discord bot \
                     written in hikari-py.",
             )
@@ -292,12 +510,12 @@ async def botinfo(ctx: lb.Context) -> None:
             .set_author(name=f"{user.username} Bot")
             .set_thumbnail(user.avatar_url)
             .set_footer(f"Made by: {data.owner}", icon=data.owner.avatar_url),
-            hk.Embed(description=changes, color=0x43408A).set_author(
+            hk.Embed(description=changes, color=colors.DEFAULT).set_author(
                 name="Bot Changelog (Recent)"
             ),
         ]
 
-        view = CustomView(user_id=ctx.author.id)
+        view = AuthorView(user_id=ctx.author.id)
         view.add_item(
             SwapButton(
                 label1="Changelogs",
@@ -326,11 +544,16 @@ async def botinfo(ctx: lb.Context) -> None:
 
 @info_plugin.command
 @lb.add_checks(
-    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS),
+    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS) | lb.guild_only
 )
 @lb.command("stickerinfo", "Get info about a sticker", aliases=["sticker"])
 @lb.implements(lb.PrefixCommand)
 async def sticker_info(ctx: lb.Context) -> None:
+    """Fetch info about a sticker (guild or otherwise)
+
+    Args:
+        ctx (lb.Context): The context (should have a sticker in the message)
+    """
     resp_embed = []
     if not ctx.event.message.stickers:
         await ctx.respond("No sticker in your message, I'm afraid")
@@ -345,7 +568,7 @@ async def sticker_info(ctx: lb.Context) -> None:
         except hk.NotFoundError:
             resp_embed.append(
                 hk.Embed(
-                    color=0x000000,
+                    color=colors.WARN,
                     title=f"Sticker: {sticker.name}",
                     timestamp=datetime.now().astimezone(),
                 )
@@ -356,7 +579,7 @@ async def sticker_info(ctx: lb.Context) -> None:
         else:
             resp_embed.append(
                 hk.Embed(
-                    color=0x43408A,
+                    color=colors.DEFAULT,
                     title=f"Sticker: {sticker.name}",
                     timestamp=datetime.now().astimezone(),
                 )
@@ -367,7 +590,7 @@ async def sticker_info(ctx: lb.Context) -> None:
                     inline=True,
                 )
                 .add_field("Type", sticker.type, inline=True)
-                .add_field("Tag", sticker.tag)
+                .add_field("Tag", f":{sticker.tag}:")
                 .set_thumbnail(ctx.get_guild().icon_url)
                 .set_image(sticker.image_url)
             )
@@ -383,16 +606,23 @@ async def sticker_info(ctx: lb.Context) -> None:
 async def emote_info(
     ctx: lb.Context,
 ) -> None:
+    """Fetch basic info about upto 5 emotes
+
+    Args:
+        ctx (lb.Context): The context in which the command is invoked
+    """
     emotes = []
     for word in ctx.event.message.content.split(" "):
         try:
             emote = hk.Emoji.parse(word)
             if isinstance(emote, hk.CustomEmoji):
                 emotes.append(emote)
-                print(emote.url)
+
         except:
             continue
-    print(emotes, "\n\n\n\n\n")
+
+    emotes = list(set(emotes))
+
     if len(emotes) == 0:
         await ctx.respond("No emotes found")
         return
@@ -413,6 +643,60 @@ async def emote_info(
 
 
 @info_plugin.command
+@lb.add_checks(lb.has_guild_permissions(hk.Permissions.ADMINISTRATOR) | lb.guild_only)
+@lb.command("removesticker", "Remove a sticker", aliases=["rst"])
+@lb.implements(lb.PrefixCommand)
+async def sticker_removal(ctx: lb.MessageContext):
+    # ctx.event.message
+    if not ctx.event.message.stickers:
+        await ctx.respond("No sticker in your message, I'm afraid")
+        return
+
+    stickers = []
+    sticker_partial = ctx.event.message.stickers[0]
+
+    if isinstance(sticker_partial, hk.GuildSticker):
+        await ctx.respond("Dance")
+
+    try:
+        sticker = await ctx.bot.rest.fetch_sticker(sticker_partial.id)
+        # await ctx.respond(dir(sticker))
+
+        # io.BytesIO(await ctx.bot.d.aio_session.get(sticker.image_url).read())
+
+        # await ctx.respond(sticker.image_url.url)
+
+        sticker_image = await ctx.bot.d.aio_session.get(
+            sticker.image_url.url, timeout=2
+        )
+
+        # await ctx.respond("can fetch sticker")
+
+        await ctx.author.send(
+            hk.Embed(
+                title="STICKER REMOVAL NOTIFICATION",
+                color=colors.ERROR,
+                description=f"Sticker `{sticker.name}` removed from `{ctx.get_guild()}`",
+                timestamp=datetime.now().astimezone(),
+            ).set_image(
+                hk.Bytes(
+                    io.BytesIO(await sticker_image.read()),
+                    f"{sticker.name}_archive.png",
+                )
+            )
+        )
+
+        await ctx.bot.rest.delete_sticker(ctx.guild_id, sticker_partial)
+        await ctx.respond(f"Removed sticker: `{sticker.name}`")
+
+    except hk.NotFoundError:
+        await ctx.respond("Sticker not present in the server")
+
+    except hk.InternalServerError:
+        await ctx.respond("A hiccup from discord's side, please try again")
+
+
+@info_plugin.command
 @lb.add_checks(
     lb.bot_has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS),
     lb.has_guild_permissions(hk.Permissions.ADMINISTRATOR),
@@ -427,8 +711,13 @@ async def emote_info(
 @lb.implements(lb.PrefixCommand)
 async def emote_removal(
     ctx: lb.Context,
-    # emotes: t.Sequence[hk.Emoji]
 ) -> None:
+    """Remove multiple emotes from a guild
+
+    Args:
+        ctx (lb.Context): The context in which the command is invoked (should have the emotes in the message)
+    """
+
     words = ctx.event.message.content.split(" ")
     if len(words) == 1:
         await ctx.respond(
@@ -441,6 +730,7 @@ async def emote_removal(
                 ),
             )
         )
+        return
     emotes = []
     for word in words:
         try:
@@ -463,12 +753,24 @@ async def emote_removal(
 
     for emote in emotes[:5]:
         try:
+            # await ctx.author.send(
+            #     content=(
+            #         "## EMOTE REMOVAL NOTIFICATION\n"
+            #         f"Emote `{emote.name}` removed from `{ctx.get_guild()}`"
+            #     ),
+            #     attachment=emote,
+            # )
             await ctx.author.send(
-                content=(
-                    "## EMOTE REMOVAL NOTIFICATION\n"
-                    f"Emote `{emote.name}` removed from `{ctx.get_guild()}`"
-                ),
-                attachment=emote,
+                hk.Embed(
+                    title="EMOTE REMOVAL NOTIFICATION",
+                    color=colors.ERROR,
+                    description=f"Emote `{emote.name}` removed from `{ctx.get_guild()}`",
+                    timestamp=datetime.now().astimezone(),
+                ).set_image(
+                    hk.Bytes(
+                        io.BytesIO(await emote.read()), f"{emote.name}_archive.png"
+                    )
+                )
             )
             await ctx.bot.rest.delete_emoji(ctx.guild_id, emote)
             await ctx.respond(f"Removed emote: `{emote.name}`")

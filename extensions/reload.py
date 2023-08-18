@@ -14,9 +14,10 @@ reloader_plugin.d.help = False
 @lb.option(
     "extension",
     "The extension to reload",
+    choices=[i[13:-3].replace("/", ".") for i in glob.glob("./extensions/*.py")],
 )
 @lb.command("reload", "Reload an extension", pass_options=True, aliases=["rl"])
-@lb.implements(lb.PrefixCommand)
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
 async def reload_plugin(ctx: lb.Context, extension: str) -> None:
     """Reload an extension"""
 
@@ -27,7 +28,7 @@ async def reload_plugin(ctx: lb.Context, extension: str) -> None:
             await ctx.respond("Reloaded all extensions")
             return
     except Exception as e:
-        print(e)
+        await ctx.respond(f"Error: `{e}`")
 
     ctx.bot.reload_extensions(f"extensions.{extension}")
     await ctx.respond("Extension reloaded successfully.")
@@ -55,29 +56,6 @@ async def unload_plugin(ctx: lb.Context, extension: str) -> None:
 
     ctx.bot.unload_extensions(f"extensions.{extension}")
     await ctx.respond("Extension unloaded successfully.")
-
-
-@reload_plugin.set_error_handler
-async def compile_error(event: lb.CommandErrorEvent) -> bool:
-    """Error handling"""
-    exception = event.exception.__cause__ or event.exception
-
-    if isinstance(exception, lb.MissingRequiredPermission):
-        await event.context.respond("You're missing some perms there, bub.")
-        return True
-
-    if isinstance(exception, lb.CommandIsOnCooldown):
-        await event.context.respond(
-            f"The command is on cooldown, you can use it after {int(exception.retry_after)}s",
-            delete_after=int(exception.retry_after),
-        )
-        return True
-
-    if isinstance(exception, lb.errors.NotEnoughArguments):
-        await event.context.respond("Please specify the extension name.")
-        return True
-
-    return False
 
 
 def load(bot: lb.BotApp) -> None:

@@ -1,9 +1,9 @@
 """The main file of the bot, basically sets up and starts the bot """
 import asyncio
-import datetime
 import logging
 import os
 import sqlite3
+from datetime import datetime
 
 import aiohttp_client_cache
 import dotenv
@@ -12,11 +12,10 @@ import lightbulb as lb
 import miru
 from lightbulb.ext import tasks
 
+from functions.help import BotHelpCommand
 from functions.utils import verbose_timedelta
 
 dotenv.load_dotenv()
-
-from functions.help import BotHelpCommand
 
 
 # Setting the prefix as , for windows (where i run the test bot)
@@ -25,6 +24,16 @@ def return_prefix() -> list:
     if os.name == "nt":
         return [","]
     else:
+        return ["-"]
+
+
+guild_prefix_map = {980479965726404670: [","]}
+
+
+def make_prefix(app, message: hk.Message) -> list:
+    try:
+        return guild_prefix_map[message.guild_id]
+    except:
         return ["-"]
 
 
@@ -61,12 +70,13 @@ def setup_logging() -> None:
 bot = lb.BotApp(
     token=os.getenv("BOT_TOKEN"),
     intents=hk.Intents.ALL_UNPRIVILEGED
-    | hk.Intents.MESSAGE_CONTENT
-    | hk.Intents.GUILD_MEMBERS,
-    prefix=lb.when_mentioned_or(return_prefix()),
+    # | hk.Intents.ALL_PRIVILEGED,
+    | hk.Intents.MESSAGE_CONTENT | hk.Intents.GUILD_MEMBERS,
+    prefix=lb.when_mentioned_or(make_prefix),
     help_class=BotHelpCommand,
     logs="INFO",
-    owner_ids=[1002964172360929343, 701090852243505212],
+    owner_ids=[701090852243505212],
+    help_slash_command=True,
 )
 
 miru.install(bot)
@@ -90,7 +100,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
         ],  # Keep using the cached response even if this param changes
         timeout=3,
     )
-    bot.d.timeup = datetime.datetime.now().astimezone()
+    bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.update_channels = ["1127609035374461070"]
     bot.d.con = sqlite3.connect("akane_db.db")
@@ -108,7 +118,7 @@ async def on_stopping(event: hk.StoppingEvent) -> None:
 
     await bot.rest.create_message(
         1129030476695343174,
-        f"Bot closed with {verbose_timedelta(datetime.datetime.now().astimezone()-bot.d.timeup)} uptime",
+        f"Bot closed with {verbose_timedelta(datetime.now().astimezone()-bot.d.timeup)} uptime",
     )
 
 
@@ -122,7 +132,6 @@ async def ping(ctx: lb.Context) -> None:
         ctx (lb.Context): The event context (irrelevant to the user)
     """
     await ctx.respond(f"Pong! Latency: {bot.heartbeat_latency*1000:.2f}ms")
-    bot.d.ncom += 1
 
 
 @bot.listen(lb.CommandErrorEvent)
@@ -151,7 +160,7 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
     elif isinstance(exception, lb.CommandIsOnCooldown):
         await event.context.respond(
             f"The command is on cooldown, you can use it after {int(exception.retry_after)}s",
-            delete_after=int(exception.retry_after),
+            delete_after=min(15, int(exception.retry_after)),
         )
 
     elif isinstance(exception, lb.MissingRequiredPermission):
@@ -164,57 +173,32 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
         await event.context.respond("I don't have the permissions to do this 😔")
 
     elif isinstance(exception, lb.NotEnoughArguments):
-        # await event.context.respond(
-        #     (
-        #         f"Missing arguments, use `-help {event.context.command.name}`"
-        #         f"for the correct invocation"
-        #     )
-        # )\
         try:
             ctx = event.context
+            command = ctx.command
+
+            if command.hidden:
+                return
 
             await ctx.respond("Missing arguments, initializing command help...")
             await asyncio.sleep(0.3)
 
-            command = ctx.command
+            helper = BotHelpCommand(ctx.bot)
 
-            long_help = command.get_help(ctx)
-
-            if len(command.aliases) > 0:
-                aliases = f"Aliases: {', '.join(command.aliases)}\n\n"
-            else:
-                aliases = ""
-
-            # embed = (
-
-            # )
-            # lines = [
-            #     ">>> ```adoc",
-            #     "==== Command Help ====",
-            #     f"{command.name} - {command.description}",
-            #     "",
-            #     f"Usage: {prefix}{command.signature}",
-            #     "",
-            #     long_help if long_help else "No additional details provided.",
-            #     "```",
-            # ]
-            await ctx.edit_last_response(
-                content=None,
-                embed=hk.Embed(
-                    color=0x000000,
-                    title="Command Help",
-                    description=(
-                        f"**{command.name}** \n"
-                        f"{command.description} \n\n"
-                        f"Usage: `{ctx.prefix}{command.signature}` \n\n"
-                        f"{aliases}"
-                        f"{long_help or ''}"
-                    ),
-                ),
-            )
+            await helper.send_command_help(ctx=ctx, command=command)
 
         except Exception as e:
             await event.context.respond(f"Stop, {e}")
+
+    elif isinstance(exception, lb.OnlyInGuild):
+        await event.context.respond("This command can't be invoked in DMs")
+
+    elif isinstance(exception, lb.ConverterFailure):
+        await event.context.respond(f"The argument `{exception.raw_value}` is invalid")
+
+    elif isinstance(exception, lb.CommandNotFound):
+        pass
+        # To move the fuzzy matching here
 
 
 if __name__ == "__main__":
