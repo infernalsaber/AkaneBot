@@ -2,7 +2,7 @@
 import asyncio
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import hikari as hk
 import lightbulb as lb
@@ -48,7 +48,7 @@ async def _get_anime_updates() -> list:
         if (
             int(
                 (
-                    datetime.now(datetime.timezone.utc) - parser.parse(i["published"])
+                    datetime.now(timezone.utc) - parser.parse(i["published"])
                 ).total_seconds()
             )
             > 720
