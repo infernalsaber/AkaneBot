@@ -1,15 +1,11 @@
 """The extension which fetches the AL data for the plot function"""
-import datetime
+from datetime import datetime, timedelta
 from operator import itemgetter
-
-import requests
-import requests_cache
-
-requests_cache.install_cache("my_cache", expire_after=3600)
 
 
 async def search_it(search_query: str, session) -> dict | int:
     """Search for the anime"""
+
     # Here we define our query as a multi-line string
     query = """
 query ($id: Int, $search: String) { 
@@ -52,7 +48,7 @@ query ($id: Int, $search: String) {
         data = (await response.json())["data"]["Media"]
         al_id = data["id"]
         name = data["title"]["english"] or data["title"]["romaji"]
-        lower_limit = datetime.datetime(
+        lower_limit = datetime(
             data["startDate"]["year"],
             data["startDate"]["month"],
             data["startDate"]["day"],
@@ -60,32 +56,26 @@ query ($id: Int, $search: String) {
             0,
         )
 
-        if datetime.datetime.now() < lower_limit:
+        if datetime.now() < lower_limit:
             print("Unaired stuff sir")
-        lower_limit = lower_limit - datetime.timedelta(days=7)
+        lower_limit = lower_limit - timedelta(days=7)
         if data["endDate"]["year"]:
-            upper_limit = datetime.datetime(
+            upper_limit = datetime(
                 data["endDate"]["year"],
                 data["endDate"]["month"],
                 data["endDate"]["day"],
                 0,
                 0,
-            ) + datetime.timedelta(days=7)
+            ) + timedelta(days=7)
         else:
-            upper_limit = datetime.datetime.now()
+            upper_limit = datetime.now()
 
     else:
         print((await response.json())["errors"])
         return response.status
-    # except Exception as e:
-    #     print("\n\n\n\n\n\n")
-    #     print(e)
-    # print(name, "\n\n\n\n")
-    # return name
 
-    """Fetching the trend values """
-    # req = requests.Session()
-    # id = input("Enter id. ")
+    # Fetching the trend values
+
     trend_score = []
     flag = True
     counter = 1
@@ -118,11 +108,12 @@ query ($id: Int, $search: String) {
         }
 
         response = await session.post(
-            "https://graphql.anilist.co", json={"query": query, "variables": variables}, timeout=2
+            "https://graphql.anilist.co",
+            json={"query": query, "variables": variables},
+            timeout=2,
         )
 
         if response.ok:
-            # print(response.json())
             if not (await response.json())["data"]["Page"]["pageInfo"]["hasNextPage"]:
                 flag = False
             else:
@@ -131,7 +122,6 @@ query ($id: Int, $search: String) {
             for item in (await response.json())["data"]["Page"]["mediaTrends"]:
                 trend_score.append(item)
         else:
-            # print("ERROR")
             print((await response.json())["errors"])
             return response.status
 
@@ -151,10 +141,10 @@ query ($id: Int, $search: String) {
 
     for value in sorted(episode_entries, key=itemgetter("date")):
         trends2.append(value["trending"])
-        dates2.append(datetime.datetime.fromtimestamp(value["date"]))
+        dates2.append(datetime.fromtimestamp(value["date"]))
 
     for value in sorted(trend_score, key=itemgetter("date")):
-        dates.append(datetime.datetime.fromtimestamp(value["date"]))
+        dates.append(datetime.fromtimestamp(value["date"]))
         trends.append(value["trending"])
         if value["averageScore"]:
             scores.append(value["averageScore"])
@@ -164,18 +154,9 @@ query ($id: Int, $search: String) {
     return {
         "name": name,
         "data": {
-            "activity": {
-                "dates": dates,
-                "values": trends
-            },
-            "episodes": {
-                "dates": dates2,
-                "values": trends2
-            },
-            "scores": {
-                "dates": dates[-len(scores) :],
-                "values": scores
-            }
+            "activity": {"dates": dates, "values": trends},
+            "episodes": {"dates": dates2, "values": trends2},
+            "scores": {"dates": dates[-len(scores) :], "values": scores},
         },
         # [dates, trends, dates2, trends2, dates[-len(scores) :], scores],
     }

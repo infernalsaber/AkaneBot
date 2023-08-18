@@ -1,7 +1,6 @@
 hikari[speedups]>=2.0.0.dev120
 hikari-lightbulb>=2.3.3
 hikari-miru>=3.1.2
-uvloop
 
 python-dotenv>=0.21.0
 
@@ -9,11 +8,14 @@ aiohttp==3.8.3
 plotly
 isodate==0.6.1
 psutil
-# pillow-simd
-tabulate
+Pillow
+# tabulate
 feedparser
 kaleido==0.2.1
-requests-cache
 aiohttp-client-cache==0.8.1
 beautifulsoup4
 lxml
+fuzzywuzzy[speedup]
+
+# Putting this at the end coz W*ndows doesn't need it
+uvloop

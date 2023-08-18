@@ -1,15 +1,14 @@
 """Make cool plot charts"""
 
+import io
+
 import hikari as hk
 import lightbulb as lb
 import plotly.graph_objects as go
-import plotly.io as pio
 from plotly.subplots import make_subplots
 
-
-from functions.models import ColorPalette as colors 
 from functions.fetch_trends import search_it
-
+from functions.models import ColorPalette as colors
 
 plot_plugin = lb.Plugin(
     "Plots",
@@ -26,15 +25,15 @@ plot_plugin.d.help_emoji = "📈"
     # Replace minus with context prefix 😾
     (
         "Plot the activity of a series at airtime or compare multiple. \n"
-        f"-> For example, doing `-plot bocchi the rock` will return the activity "
+        f"- For example, doing `-plot bocchi the rock` will return the activity "
         "of Bocchi the Rock series during its airtime. \n"
-        "-> To compare two series, you should seperate them with a 'vs' like so: \n"
+        "- To compare two series, you should seperate them with a 'vs' like so: \n"
         f"`-plot helck vs horimiya piece`\n"
-        "-> To compare series across seasons, add a --autoscale flag at the end for eg."
+        "- To compare series across seasons, add a --autoscale flag at the end for eg."
         f"`-plot bocchi vs kaguya --autoscale` \n\n"
         "Note: You should type out the full name of the series to avoid false matches"
     )
-)      
+)
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
 @lb.add_cooldown(3, 1, lb.GuildBucket)
 @lb.option(
@@ -55,16 +54,12 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
 
     try:
         query = query.split()
-        if query[-1] == "--autoscale": #Auto scale
+        if query[-1] == "--autoscale":  # Auto scale
             autoscale = True
             query = " ".join(query[:-1])
         else:
             autoscale = False
             query = " ".join(query)
-
-
-    # except Exception as e:
-    #     await ctx.respond(e)
 
         series = query.split("vs")
         if not len(series) in [1, 2]:
@@ -78,7 +73,6 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 if isinstance(data, int):
                     await ctx.respond(f"An error occurred, `code: {data}` ")
                     return
-                print(type(data))
 
                 # pio.renderers.default = "notebook"
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -122,17 +116,35 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                 data2 = await search_it(series[1], ctx.bot.d.aio_session)
 
                 if autoscale:
-                    gap = data["data"]["activity"]["dates"][0] - data2["data"]["activity"]["dates"][0]
-                    if data["data"]["activity"]["dates"][0] > data2["data"]["activity"]["dates"][0]:
-                        data["data"]["activity"]["dates"] = [item - gap for item in data["data"]["activity"]["dates"]]
-                        data["data"]["episodes"]["dates"] = [item - gap for item in data["data"]["episodes"]["dates"]]
-                        data["data"]["scores"]["dates"] = [item - gap for item in data["data"]["scores"]["dates"]]
-                            
+                    gap = (
+                        data["data"]["activity"]["dates"][0]
+                        - data2["data"]["activity"]["dates"][0]
+                    )
+                    if (
+                        data["data"]["activity"]["dates"][0]
+                        > data2["data"]["activity"]["dates"][0]
+                    ):
+                        data["data"]["activity"]["dates"] = [
+                            item - gap for item in data["data"]["activity"]["dates"]
+                        ]
+                        data["data"]["episodes"]["dates"] = [
+                            item - gap for item in data["data"]["episodes"]["dates"]
+                        ]
+                        data["data"]["scores"]["dates"] = [
+                            item - gap for item in data["data"]["scores"]["dates"]
+                        ]
+
                     else:
-                        data2["data"]["activity"]["dates"] = [item + gap for item in data2["data"]["activity"]["dates"]]
-                        data2["data"]["episodes"]["dates"] = [item + gap for item in data2["data"]["episodes"]["dates"]]
-                        data2["data"]["scores"]["dates"] = [item + gap for item in data2["data"]["scores"]["dates"]]
-                       
+                        data2["data"]["activity"]["dates"] = [
+                            item + gap for item in data2["data"]["activity"]["dates"]
+                        ]
+                        data2["data"]["episodes"]["dates"] = [
+                            item + gap for item in data2["data"]["episodes"]["dates"]
+                        ]
+                        data2["data"]["scores"]["dates"] = [
+                            item + gap for item in data2["data"]["scores"]["dates"]
+                        ]
+
                 # pio.renderers.default = "notebook"
                 fig = make_subplots(specs=[[{"secondary_y": True}]])
                 fig.add_trace(
@@ -200,7 +212,9 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
                     yaxis_title="Trend Value",
                     template="plotly_dark",
                 )
-                embed_title = f'Popularity Comparision: {data["name"]} vs {data2["name"]}'
+                embed_title = (
+                    f'Popularity Comparision: {data["name"]} vs {data2["name"]}'
+                )
 
     except Exception as e:
         await ctx.respond(e)
@@ -208,21 +222,12 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
     try:
         fig.update_yaxes(title_text="Score", secondary_y=True)
 
-        # await ctx.respond(hk.Embed(color=colors.ELECTRIC_BLUE).set_image("https://i.imgur.com/GinlBL8.gif"))
-        
-        fig.write_image(f"pictures/{query}.png")
-        msg = await ctx.respond(attachment=f"pictures/{query}.png")
-        await ctx.delete_last_response()
-
         await ctx.respond(
-            # content=f"## {embed_title}",
-            # attachment=f"pictures/{query}.png"
-            embed=hk.Embed(
-                title=embed_title, color=colors.ELECTRIC_BLUE
-            )
-            .set_image((await msg.message()).attachments[0]),
-            attachments=[],
+            embed=hk.Embed(title=embed_title, color=colors.ELECTRIC_BLUE).set_image(
+                hk.Bytes(io.BytesIO(fig.to_image(format="png")), f"{query}.png")
+            ),
         )
+
     except Exception as e:
         await ctx.respond(e)
 

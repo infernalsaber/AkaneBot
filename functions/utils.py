@@ -1,15 +1,15 @@
-import datetime
 import json
 import random
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 import feedparser
+import hikari as hk
 import requests
-from bs4 import BeautifulSoup
 
-import typing as t
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
+from bs4 import BeautifulSoup
 
 
 def check_if_url(link: str) -> bool:
@@ -19,22 +19,6 @@ def check_if_url(link: str) -> bool:
         return True
     return False
 
-
-# def is_image(link: str) -> int:
-#     """Tells if a function is an image or not
-
-#     Args:
-#         link (str): The link to check
-
-#     Returns:
-#         int: 0 if not, 1 if yes, 2 if yes but not PIL compatible (gif/webp)
-#     """
-#     r = requests.head(link)
-#     if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
-#         return 1
-#     if r.headers["content-type"] in ["image/webp", "image/gif"]:
-#         return 2
-#     return 0
 
 async def is_image(link: str, session: CachedSession) -> int:
     """Using headers check if a link is of an image or not
@@ -46,11 +30,14 @@ async def is_image(link: str, session: CachedSession) -> int:
     Returns:
         int: 0 if not image, 1/2 if yes
     """
-    async with session.head(link, timeout=2) as r:
-        if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
-            return 1
-        if r.headers["content-type"] in ["image/webp", "image/gif"]:
-            return 2
+    try:
+        async with session.head(link, timeout=2) as r:
+            if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
+                return 1
+            if r.headers["content-type"] in ["image/webp", "image/gif"]:
+                return 2
+            return 0
+    except:
         return 0
 
 
@@ -109,7 +96,7 @@ def rss2json(url):
     return json.dumps(feedsdict)
 
 
-def verbose_timedelta(delta):
+def verbose_timedelta(delta: timedelta):
     d = delta.days
     h, s = divmod(delta.seconds, 3600)
     m, s = divmod(s, 60)
@@ -127,13 +114,35 @@ def verbose_timedelta(delta):
     return ", ".join(dhms[start : end + 1])
 
 
+def verbose_date(*args):
+    month_num_map = {
+        1: "January",
+        2: "February",
+        3: "March",
+        4: "April",
+        5: "May",
+        6: "June",
+        7: "July",
+        8: "August",
+        9: "September",
+        10: "October",
+        11: "November",
+        12: "December",
+    }
+
+    day, month, year = args
+
+    verbose_date = " ".join([day, month_num_map[int(month)]])
+    verbose_date += f", {year}" if year else ""
+
+    return verbose_date
+
+
 def iso_to_timestamp(iso_date):
     """Convert ISO datetime to timestamp"""
     try:
         return int(
-            datetime.datetime.fromisoformat(iso_date[:-1] + "+00:00")
-            .astimezone()
-            .timestamp()
+            datetime.fromisoformat(iso_date[:-1] + "+00:00").astimezone().timestamp()
         )
 
     except ValueError:  # Incase the datetime is not in the iso format, return it as is
@@ -157,6 +166,51 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
         return link
 
 
+def get_image_dominant_colour(link: str) -> hk.Color:
+    """Get the dominant colour of an image from a link to it
+
+    Args:
+        link (str): Link to the image
+
+    Returns:
+        hk.Color: Dominant Colour
+    """
+
+    return hk.Color.of(
+        get_dominant_colour(Image.open(requests.get(link, stream=True, timeout=10).raw))
+    )
+
+
+def humanized_list_join(lst) -> str:
+    if not isinstance(lst, list) or isinstance(lst, tuple):
+        return lst
+
+    if len(lst) == 0:
+        return " "
+
+    if len(lst) == 1:
+        return lst[0]
+
+    return f"{','.join(lst[:-1])}" f"or {lst[-1]}"
+
+
+async def get_anitrendz_latest(session: CachedSession):
+    try:
+        link = "https://anitrendz.tumblr.com/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
+        }
+
+        async with session.get(link, headers=headers, timeout=3) as response:
+            soup = BeautifulSoup(await response.read(), "lxml")
+
+        return soup.find("a", {"class": "post_media_photo_anchor"})["data-big-photo"]
+
+    except Exception as e:
+        print(e)
+        return link
+
+
 def get_random_quote():
     return random.choice(
         [
@@ -165,6 +219,6 @@ def get_random_quote():
             "Whenever you need me, I'll be there.",
             "I Hear The Voice Of Fate, Speaking My Name In Humble Supplication…",
             "There's Something In The Air… Something Tells Me A New Case Is Brewing.",
-            "Now this is what I call 'a moment of solitude.'"
+            "Now this is what I call 'a moment of solitude.'",
         ]
     )

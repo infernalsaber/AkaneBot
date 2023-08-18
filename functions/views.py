@@ -11,6 +11,8 @@ from functions.buttons import *
 
 
 class SelectView(miru.View):
+    """A subclassed view designed for Text Select"""
+
     def __init__(self, user_id: hk.Snowflake, pages: t.Collection[hk.Embed]) -> None:
         self.user_id = user_id
         self.pages = pages
@@ -30,11 +32,15 @@ class SelectView(miru.View):
 
 
 class PeristentViewTest(miru.View):
+    """A subclassed view designed to make persistent views(wip)"""
+
     def __init__(self) -> None:
         super().__init__(autodefer=True, timeout=None)
 
 
-class CustomNavi(nav.NavigatorView):
+class AuthorNavi(nav.NavigatorView):
+    """A subclassed navigator view with author checks for the view"""
+
     def __init__(
         self,
         *,
@@ -73,15 +79,19 @@ class CustomNavi(nav.NavigatorView):
         # self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
 
 
-class CustomView(miru.View):
+class AuthorView(miru.View):
+    """A subclassed view with author checks for the view"""
+
     def __init__(
         self,
         *,
         autodefer: bool = True,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
+        session: t.Optional[aiohttp_client_cache.CachedSession] = None,
         user_id: hk.Snowflake = None,
     ) -> None:
         self.user_id = user_id
+        self.session = session
         super().__init__(autodefer=autodefer, timeout=timeout)
 
     async def on_timeout(self) -> None:
@@ -101,6 +111,8 @@ class CustomView(miru.View):
 
 
 class PreView(nav.NavigatorView):
+    """A view designed for the preview feature of the manga command"""
+
     def __init__(
         self,
         *,
@@ -135,7 +147,7 @@ class PreView(nav.NavigatorView):
         return False
 
 
-# class AutoPaginator(CustomNavi):
+# class AutoPaginator(AuthorNavi):
 #     def __init__(
 #         self,
 #         *,
@@ -175,3 +187,14 @@ class PreView(nav.NavigatorView):
 
 #     async def on_timeout(self) -> None:
 #         await self.message.edit(components=[])
+
+
+class TabbedSwitcher(miru.View):
+    """A new view which will specialize in switching embeds via buttons"""
+
+    def __init__(
+        self,
+        *,
+        pages,
+    ):
+        ...

@@ -11,82 +11,8 @@ from lightbulb import context as context_
 from lightbulb import errors, plugins
 from lightbulb.help_command import BaseHelpCommand
 
-from functions.components import HelpTextSelect
+from functions.components import SimpleTextSelect
 from functions.views import SelectView
-
-# except Exception as e:
-# await ctx.respond(e)
-# await ctx.respond("Test")
-
-
-# async def get_text(self, select: miru.TextSelect, ctx: miru.Context) -> None:
-#     """Create the selection menu"""
-#     print(select)
-#     await ctx.respond("I exist")
-#     self.answer = select.values[0]
-
-# async def callback(self, ctx: miru.ViewContext):
-#     await ctx.respond("this that badabing badabong")
-
-
-# class AnimalView(miru.View):
-#     """The view class for the animals command"""
-
-#     def __init__(self, author: hk.User) -> None:
-#         self.author = author
-#         super().__init__(timeout=60*5)
-
-#     @miru.text_select(
-#         # custom_id="animal_select",
-#         placeholder="Choose The Plugin",
-#         options=[
-#             miru.SelectOption("Dog", value="dog", emoji="🐶"),
-#             miru.SelectOption("Bird", value="bird", emoji="🐦"),
-#             miru.SelectOption("Koala", value="koala", emoji="🐨"),
-#             miru.SelectOption("Panda", value="panda", emoji="🐼"),
-#             miru.SelectOption("Cat", value="cat", emoji="🐱"),
-#             miru.SelectOption("Racoon", value="racoon", emoji="🦝"),
-#             miru.SelectOption(
-#                 "Red Panda",
-#                 value="red_panda",
-#                 emoji=hk.Emoji.parse("<:RedPanda:1060649685934674001>"),
-#             ),
-#         ],
-#     )
-#     async def select_menu(self, select: miru.TextSelect, ctx: miru.Context) -> None:
-#         """Create the selection menu"""
-#         print(select)
-#         animal = select.values[0]
-#         async with ctx.bot.d.aio_session.get(
-#             f"https://some-random-api.ml/animal/{animal}"
-#         ) as res:
-#             if res.ok:
-#                 res = await res.json()
-
-#                 await ctx.edit_response(
-#                     f"Here's a {animal.replace('_', ' ')} for you!!",
-#                     components=[],
-#                     embed=hk.Embed(
-#                         title="",
-#                         description=res["fact"],
-#                         color=0xF4EAE9,
-#                         timestamp=datetime.now().astimezone(),
-#                     )
-#                     .set_image(res["image"])
-#                     .set_footer(
-#                         f"Requested by: {ctx.author}", icon=ctx.author.avatar_url
-#                     ),
-#                 )
-#             else:
-#                 await ctx.edit_response(
-#                     f"API error, `code:{res.status}`", components=[]
-#                 )
-
-#     async def on_timeout(self) -> None:
-#         await self.message.edit("Timed out", components=[])
-
-#     async def view_check(self, ctx: miru.Context) -> bool:
-#         return ctx.user.id == self.author.id
 
 
 async def filter_commands(
@@ -144,14 +70,7 @@ class BotHelpCommand(BaseHelpCommand):
 
     async def send_bot_help(self, ctx: context_.base.Context) -> None:
         pages = {}
-        # lines = [
-        #     ">>> ```adoc",
-        #     "Akane Bot Help Menu",
-        #     "",
-        #     f"For more information: {context.prefix}help [command|category]",
-        #     "",
-        #     "==== Categories ====",
-        # ]
+
         try:
             main_embed = (
                 hk.Embed(
@@ -168,7 +87,6 @@ class BotHelpCommand(BaseHelpCommand):
                 )
                 .set_image("https://i.imgur.com/LJ1t4wD.png")
             )
-            # import os
 
             p_commands = await self._get_command_plugin_map(
                 self.app._prefix_commands, ctx
@@ -176,25 +94,21 @@ class BotHelpCommand(BaseHelpCommand):
             s_commands = await self._get_command_plugin_map(
                 self.app._slash_commands, ctx
             )
-            # m_commands = await self._get_command_plugin_map(self.app._message_commands, context)
-            # u_commands = await self._get_command_plugin_map(self.app._user_commands, context)
 
             plugin_pages: t.MutableMapping[
                 t.Optional[plugins.Plugin], t.List[str]
             ] = collections.defaultdict(list)
             self._add_cmds_to_plugin_pages(plugin_pages, p_commands, "Prefix")
             self._add_cmds_to_plugin_pages(plugin_pages, s_commands, "Slash")
-            # self._add_cmds_to_plugin_pages(plugin_pages, m_commands, "Message")
-            # self._add_cmds_to_plugin_pages(plugin_pages, u_commands, "User")
 
             for plugin, page in plugin_pages.items():
                 if not plugin:
                     continue
                 if not plugin.d.help == True:
                     continue
-                # if plugin:
+
                 main_embed.add_field(plugin.name, plugin.description)
-                # """Start of tragedy"""
+
                 p_cmds, s_cmds = [], []
                 all_commands = await filter_commands(plugin._all_commands, ctx)
                 for cmd in all_commands:
@@ -202,17 +116,12 @@ class BotHelpCommand(BaseHelpCommand):
                         p_cmds.append(cmd)
                     elif isinstance(cmd, commands.slash.SlashCommand):
                         s_cmds.append(cmd)
-                # elif isinstance(cmd, commands.message.MessageCommand):
-                #     m_cmds.append(cmd)
-                # elif isinstance(cmd, commands.user.UserCommand):
-                #     u_cmds.append(cmd)
 
                 cmds: t.List[t.Tuple[t.Sequence[commands.base.Command], str]] = [
                     (p_cmds, "Prefix"),
                     (s_cmds, "Slash"),
-                    # (m_cmds, "Message"),
-                    # (u_cmds, "User"),
                 ]
+
                 embed = hk.Embed(
                     color=0x000000,
                     title=f"{plugin.name} Help",
@@ -220,49 +129,17 @@ class BotHelpCommand(BaseHelpCommand):
                     timestamp=datetime.now().astimezone(),
                 )
 
-                # embed.add_field("")
                 for cmd_list, header in cmds:
-                    # field1 = ""
-                    # field2 = ""
-                    # field3 = ""
                     desc = ""
                     if cmd_list:
-                        # embed.add_field(f"{header} Commands", "\u200B")
                         for cmd in set(cmd_list):
-                            desc += f"`{cmd.name}"
-                            # print(" "*14-len(cmd.name))
-                            desc += " " * (14 - len(cmd.name))
-                            desc += f"` {cmd.description} \n"
-                            # lines.append(f"- {cmd.name} - {cmd.description}, {cmd.aliases}")
-                            # field1 += f"```{cmd.name}```"
-                            # field2 += f"```{cmd.description}```"
-                            # field3 += f"```{', '.join(cmd.aliases) or ' '}```"
+                            desc += f"`{cmd.name: <14}` {cmd.description} \n"
+
                         embed.add_field(f"{header} Commands", desc)
-                        # embed.add_field("\u200B", field2, inline=True)
-                    # if isinstance(cmd_list[0], commands.prefix.PrefixCommand):
-                    #     embed.add_field("\u200B", field3, inline=True)
-                    # else:
-                    #     embed.add_field("\u200B", "\u200B", inline=True)
 
                 embed.set_image(plugin.d.help_image)
                 pages[plugin.name.replace(" ", "_")] = embed
-                # )
 
-                # "\n".join(
-                #     [
-                #         ">>> ```adoc",
-                #         f"==== {plugin.name if plugin is not None else 'Uncategorised'} ====",
-                #         (f"{plugin.description}\n" if plugin.description else "No description provided\n")
-                #         if plugin is not None
-                #         else "",
-                #         *page,
-                #         "```",
-                #     ]
-                # )
-
-            # lines.append("```")
-            # pages.insert(0, "\n".join(lines))
-            # try:
             view = SelectView(user_id=ctx.author.id, pages=pages)
             options = []
             for plugin, _ in plugin_pages.items():
@@ -275,30 +152,16 @@ class BotHelpCommand(BaseHelpCommand):
                         label=plugin.name, value=plugin.name, emoji=plugin.d.help_emoji
                     )
                 )
-            # selector =
-            view.add_item(HelpTextSelect(options=options, placeholder="Select Plugin"))
-            resp = await ctx.respond(embed=main_embed, components=view)
 
-            # print("\n\n", pages, "\n\n")
+            view.add_item(
+                SimpleTextSelect(options=options, placeholder="Select Plugin")
+            )
+            resp = await ctx.respond(content=None, embed=main_embed, components=view)
             await view.start(resp)
             await view.wait()
 
-            # print("Selector")
-            # print(dir(selector))
-            # print("\n\n\n\n\n")
-            # print(dir(view))
-            # # await ctx.respond(dir(resp))
-            # # await context.respond(pages)
-            # print(dir(resp), "\n\n\n\n\n\n\n")
-
-            # if hasattr(view, "answer"):  # Check if there is an answer
-            #     print(f"Received an answer! It is: {view.answer}")
-            #     await context.edit_last_response(embeds=[pages[view.answer]], components=view)
-
-        except Exception as e:
-            await ctx.respond(e)
-        # navigator = nav.ButtonNavigator(pages)
-        # await navigator.run(context)
+        except Exception as exp:
+            await ctx.respond(f"Initializing help command failed: `{exp}`")
 
     async def send_command_help(
         self, ctx: context_.base.Context, command: commands.base.Command
@@ -312,32 +175,40 @@ class BotHelpCommand(BaseHelpCommand):
             else "🖱️"
         )
 
-        # embed = (
+        if len(command.aliases) > 0:
+            aliases = f"Aliases: {', '.join(command.aliases)}\n\n"
+        else:
+            aliases = ""
 
-        # )
-        # lines = [
-        #     ">>> ```adoc",
-        #     "==== Command Help ====",
-        #     f"{command.name} - {command.description}",
-        #     "",
-        #     f"Usage: {prefix}{command.signature}",
-        #     "",
-        #     long_help if long_help else "No additional details provided.",
-        #     "```",
-        # ]
-        await ctx.respond(
-            embed=hk.Embed(
-                color=0x000000,
-                title="Command Help",
-                description=(
-                    f"**{command.name}** \n"
-                    f"{command.description} \n\n"
-                    f"Usage: `{prefix}{command.signature}` \n\n"
-                    f"Aliases: {', '.join(command.aliases)}\n\n"
-                    f"{long_help or ''}"
+        if len(ctx.responses) == 0:
+            await ctx.respond(
+                embed=hk.Embed(
+                    color=0x000000,
+                    title="Command Help",
+                    description=(
+                        f"**{command.name}** \n"
+                        f"{command.description} \n\n"
+                        f"Usage: `{prefix}{command.signature}` \n\n"
+                        f"{aliases}"
+                        f"{long_help or ''}"
+                    ),
+                )
+            )
+        else:
+            await ctx.edit_last_response(
+                content=None,
+                embed=hk.Embed(
+                    color=0x000000,
+                    title="Command Help",
+                    description=(
+                        f"**{command.name}** \n"
+                        f"{command.description} \n\n"
+                        f"Usage: `{prefix}{command.signature}` \n\n"
+                        f"{aliases}"
+                        f"{long_help or ''}"
+                    ),
                 ),
             )
-        )
 
     async def send_group_help(
         self,
@@ -394,64 +265,34 @@ class BotHelpCommand(BaseHelpCommand):
     async def send_plugin_help(
         self, ctx: context_.base.Context, plugin: plugins.Plugin
     ) -> None:
-        # lines = [
-        #     ">>> ```adoc",
-        #     "==== Category Help ====",
-        #     f"{plugin.name} - {plugin.description or 'No description provided'}",
-        #     "",
-        # ]
-        try:
-            p_cmds, s_cmds, m_cmds, u_cmds = [], [], [], []
-            all_commands = await filter_commands(plugin._all_commands, ctx)
-            for cmd in all_commands:
-                if isinstance(cmd, commands.prefix.PrefixCommand):
-                    p_cmds.append(cmd)
-                elif isinstance(cmd, commands.slash.SlashCommand):
-                    s_cmds.append(cmd)
-                # elif isinstance(cmd, commands.message.MessageCommand):
-                #     m_cmds.append(cmd)
-                # elif isinstance(cmd, commands.user.UserCommand):
-                #     u_cmds.append(cmd)
+        p_cmds, s_cmds = [], []
+        all_commands = await filter_commands(plugin._all_commands, ctx)
+        for cmd in all_commands:
+            if isinstance(cmd, commands.prefix.PrefixCommand):
+                p_cmds.append(cmd)
+            elif isinstance(cmd, commands.slash.SlashCommand):
+                s_cmds.append(cmd)
 
-            cmds: t.List[t.Tuple[t.Sequence[commands.base.Command], str]] = [
-                (p_cmds, "Prefix"),
-                (s_cmds, "Slash"),
-                # (m_cmds, "Message"),
-                # (u_cmds, "User"),
-            ]
-            embed = hk.Embed(
-                color=0x000000,
-                title=f"{plugin.name} Help",
-                description=f"{plugin.description or 'No additional details provided.'}\n",
-                timestamp=datetime.now().astimezone(),
-            )
+        # Message and User commands are not included in the Plugin Help
+        cmds: t.List[t.Tuple[t.Sequence[commands.base.Command], str]] = [
+            (p_cmds, "Prefix"),
+            (s_cmds, "Slash"),
+        ]
 
-            # embed.add_field("")
-            for cmd_list, header in cmds:
-                # field1 = ""
-                # field2 = ""
-                # field3 = ""
-                desc = ""
-                if cmd_list:
-                    # embed.add_field(f"{header} Commands", "\u200B")
-                    for cmd in set(cmd_list):
-                        desc += f"`{cmd.name}"
-                        # print(" "*14-len(cmd.name))
-                        desc += " " * (14 - len(cmd.name))
-                        desc += f"` {cmd.description} \n"
-                        # lines.append(f"- {cmd.name} - {cmd.description}, {cmd.aliases}")
-                        # field1 += f"```{cmd.name}```"
-                        # field2 += f"```{cmd.description}```"
-                        # field3 += f"```{', '.join(cmd.aliases) or ' '}```"
-                    embed.add_field(f"{header} Commands", desc)
-                    # embed.add_field("\u200B", field2, inline=True)
-                    # if isinstance(cmd_list[0], commands.prefix.PrefixCommand):
-                    #     embed.add_field("\u200B", field3, inline=True)
-                    # else:
-                    #     embed.add_field("\u200B", "\u200B", inline=True)
+        embed = hk.Embed(
+            color=0x000000,
+            title=f"{plugin.name} Help",
+            description=f"{plugin.description or 'No additional details provided.'}\n",
+            timestamp=datetime.now().astimezone(),
+        )
 
-            embed.set_image(plugin.d.help_image)
-            # lines.append("```")
-            await ctx.respond(embed)
-        except Exception as e:
-            await ctx.respond(e)
+        for cmd_list, header in cmds:
+            desc = ""
+            if cmd_list:
+                for cmd in set(cmd_list):
+                    desc += f"`{cmd.name: <14}` {cmd.description} \n"
+
+                embed.add_field(f"{header} Commands", desc)
+
+        embed.set_image(plugin.d.help_image)
+        await ctx.respond(embed)
