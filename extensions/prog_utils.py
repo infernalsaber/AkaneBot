@@ -61,7 +61,10 @@ async def compiler(ctx: lb.Context, code: str) -> None:
 
         if error:
             await ctx.respond(
-                f"Process returned with error: ```{(str(error, 'UTF-8')).split('ntfc.py')[1][3:]}```"
+                (
+                    f"Process returned with error: "
+                    f"```{(str(error, 'UTF-8')).split('ntfc.py')[1][3:]}```"
+                )
             )
         else:
             if not output:

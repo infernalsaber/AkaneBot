@@ -30,8 +30,6 @@ async def _get_magnet_for(query: str):
 
 
 async def _get_anime_updates() -> list:
-    link = "https://www.toptal.com/developers/feed2json/convert"
-
     # magnet_feed = "https://subsplease.org/rss/?r=1080"
     link_feed = "https://subsplease.org/rss/?t&r=1080"
 
@@ -114,7 +112,10 @@ async def on_starting(event: hk.StartedEvent) -> None:
                         color=colors.ELECTRIC_BLUE,
                         description=update["file"][13:],
                         timestamp=update["timestamp"],
-                        title=f"Episode {get_episode_number(update['file'])}: {update['data']['title']['romaji']} out",
+                        title=(
+                            f"Episode {get_episode_number(update['file'])}: "
+                            f"{update['data']['title']['romaji']} out"
+                        ),
                     )
                     .add_field(
                         "Rating", update["data"]["meanScore"] or "NA", inline=True

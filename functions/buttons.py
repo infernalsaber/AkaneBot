@@ -1,6 +1,7 @@
 """Custom Button classes"""
 import io
 import typing as t
+from typing import Optional
 
 import hikari as hk
 import miru
@@ -232,7 +233,7 @@ class PreviewButton(nav.NavButton):
             # await self.view.swap_pages(
             #     ctx, )
             # )
-        except Exception as e:
+        except Exception:
             await ctx.respond(
                 (
                     f"Looks like MangaDex doesn't have this series "
@@ -283,8 +284,8 @@ class TrailerButton(miru.Button):
             "<a:youtube:1074307805235920896>"
         ),
         row: t.Optional[int] = None,
-        trailer: str = None,
-        other_page: t.Union[hk.Embed, str] = None,
+        trailer: t.Optional[str] = None,
+        other_page: Optional[t.Union[hk.Embed, str]] = None,
     ):
         self.trailer = trailer
         self.other_page = other_page
@@ -354,8 +355,8 @@ class NewButton(miru.Button):
         self,
         style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
         label: t.Optional[str] = None,
-        link: str = None,
-        emoji: hk.Emoji = None,
+        link: Optional[str] = None,
+        emoji: Optional[hk.Emoji] = None,
         custom_id: t.Optional[str] = None,
     ) -> None:
         self.link = link
@@ -363,7 +364,7 @@ class NewButton(miru.Button):
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         try:
-            await ctx.respond(f"{self.link}", flags=hk.MessageFlag.EPHEMERAL)
+            await ctx.respond(f"```{self.link}```", flags=hk.MessageFlag.EPHEMERAL)
         except Exception as e:
             print(e)
 
@@ -381,8 +382,8 @@ class SwapButton(miru.Button):
         label2: t.Optional[str] = None,
         emoji2: t.Optional[str] = None,
         row: t.Optional[int] = None,
-        original_page: t.Union[hk.Embed, str] = None,
-        swap_page: t.Union[hk.Embed, str] = None,
+        original_page: Optional[t.Union[hk.Embed, str]] = None,
+        swap_page: Optional[t.Union[hk.Embed, str]] = None,
     ):
         self.swap_page = swap_page
         self.original_page = original_page
@@ -397,8 +398,6 @@ class SwapButton(miru.Button):
         )
 
     async def callback(self, ctx: miru.ViewContext):
-
-
         if self.emoji == self.emoji1:
             if self.label2 or self.emoji2:
                 self.label = self.label2
@@ -414,7 +413,6 @@ class SwapButton(miru.Button):
                 await ctx.edit_response(
                     content=None, embeds=[self.swap_page], components=self.view
                 )
-
 
             return
 

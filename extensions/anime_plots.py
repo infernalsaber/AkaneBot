@@ -25,12 +25,12 @@ plot_plugin.d.help_emoji = "📈"
     # Replace minus with context prefix 😾
     (
         "Plot the activity of a series at airtime or compare multiple. \n"
-        f"- For example, doing `-plot bocchi the rock` will return the activity "
+        "- For example, doing `[p]plot bocchi the rock` will return the activity "
         "of Bocchi the Rock series during its airtime. \n"
         "- To compare two series, you should seperate them with a 'vs' like so: \n"
-        f"`-plot helck vs horimiya piece`\n"
+        "`[p]plot helck vs horimiya piece`\n"
         "- To compare series across seasons, add a --autoscale flag at the end for eg."
-        f"`-plot bocchi vs kaguya --autoscale` \n\n"
+        "`[p]plot bocchi vs kaguya --autoscale` \n\n"
         "Note: You should type out the full name of the series to avoid false matches"
     )
 )
@@ -62,7 +62,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
             query = " ".join(query)
 
         series = query.split("vs")
-        if not len(series) in [1, 2]:
+        if len(series) not in [1, 2]:
             await ctx.respond("The command only works for one or two series.")
             return
 
@@ -224,7 +224,7 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
 
         await ctx.respond(
             embed=hk.Embed(title=embed_title, color=colors.ELECTRIC_BLUE).set_image(
-                hk.Bytes(io.BytesIO(fig.to_image(format="png")),"plot.png")
+                hk.Bytes(io.BytesIO(fig.to_image(format="png")), "plot.png")
             ),
         )
 

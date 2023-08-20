@@ -21,6 +21,7 @@ yt_plugin.d.help_emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
 
 
 @yt_plugin.command
+@lb.add_checks(lb.guild_only)
 @lb.set_help(
     "**Enter a topic and get videos relating to it, pick the one you find the most suitable**"
 )
@@ -39,9 +40,6 @@ async def youtube_search(ctx: lb.Context, query: str) -> None:
         query (str): The query to search for
     """
 
-    if not (guild := ctx.get_guild()):
-        await ctx.respond("This command may only be used in servers.")
-        return
     try:
         response_params = {
             "part": "snippet",

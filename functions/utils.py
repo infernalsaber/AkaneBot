@@ -10,6 +10,7 @@ import requests
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
+from PIL import Image
 
 
 def check_if_url(link: str) -> bool:
@@ -217,8 +218,10 @@ def get_random_quote():
             "Don't we have a job to do?",
             "One, two, three, four. Two, two, three, four...",
             "Whenever you need me, I'll be there.",
-            "I Hear The Voice Of Fate, Speaking My Name In Humble Supplication…",
-            "There's Something In The Air… Something Tells Me A New Case Is Brewing.",
-            "Now this is what I call 'a moment of solitude.'",
+            "I hear the voice of fate, speaking my name in humble supplication…",
+            "There's something in the Air… Something tells me a new case is brewing.",
+            "Now this is what I call 'a moment of solitude'.",
+            "Come on, let's get moving. We're not frozen in place, after all.",
+            "The case before us... is a strange and unprecedented one indeed.",
         ]
     )

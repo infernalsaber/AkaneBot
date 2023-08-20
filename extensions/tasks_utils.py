@@ -60,8 +60,8 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
 
     try:
         commandish = event.content[len(ctx_prefix) :].split()[0]
+
     except IndexError:  # Executed if the message is only the prefix
-        
         # The idea being that any prefix must be under 5 characters (this will be enforced)
         prefixes_string = "\n".join(filter(lambda x: len(x) < 5, prefixes))
 
@@ -71,7 +71,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
                 color=colors.ELECTRIC_BLUE, timestamp=datetime.now().astimezone()
             )
             .add_field("Global Prefixes", f"```{prefixes_string}```")
-            .add_field("Server Prefixes", f"```ansi\n\u001b[0;30mComing Soon...```")
+            .add_field("Server Prefixes", "```ansi\n\u001b[0;30mComing Soon...```")
             .add_field("Additional", "- Pinging the bot always works :)")
             .set_author(
                 name="Akane Bot Prefix Configuration", icon=app.get_me().avatar_url
@@ -88,7 +88,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
             pass
         else:
             close_matches: t.Optional[t.Tuple[str, int]] = process.extractBests(
-                commandish, prefix_commands_and_aliases, score_cutoff=60, limit=3
+                commandish, prefix_commands_and_aliases, score_cutoff=99, limit=3
             )
 
             possible_commands: t.Sequence = []
@@ -96,7 +96,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
             if close_matches:
                 possible_commands = [i for i, _ in close_matches]
             else:
-                possible_commands = [" "]
+                return
 
             await app.rest.create_message(
                 event.channel_id,
@@ -112,7 +112,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
 @lb.add_checks(lb.owner_only)
 @lb.command("restart", "Update the bot's source and restart")
 @lb.implements(lb.PrefixCommand)
-async def update_code(ctx: lb.Context) -> None:
+async def update_and_restart(ctx: lb.Context) -> None:
     with subprocess.Popen(
         ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as result:
@@ -257,7 +257,7 @@ async def prefix_invocation(event: hk.StartedEvent) -> None:
 
 
 @task_plugin.listener(lb.CommandInvocationEvent)
-async def prefix_invocation(event: lb.CommandInvocationEvent) -> None:
+async def command_invocation(event: lb.CommandInvocationEvent) -> None:
     conn = task_plugin.bot.d.con
     cursor = conn.cursor()
     command = event.command.name
