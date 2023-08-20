@@ -19,9 +19,10 @@ async def filter_commands(
     cmds: t.Sequence[commands.base.Command], ctx: context_.base.Context
 ) -> t.Sequence[commands.base.Command]:
     """
-    Evaluates the checks for each command provided, removing any that the checks fail for. This effectively
-    removes any commands from the given collection that could not be invoked under the given context. This will
-    also remove any commands with the ``hidden`` attribute set to ``True``.
+    Evaluates the checks for each command provided, removing any that the checks fail for.
+    This effectively removes any commands from the given collection that could not be
+    invoked under the given context. This will also remove any commands with
+    the ``hidden`` attribute set to ``True``.
 
     Args:
         cmds (Sequence[:obj:`~.commands.base.Command`]): Commands to filter.
@@ -104,7 +105,7 @@ class BotHelpCommand(BaseHelpCommand):
             for plugin, page in plugin_pages.items():
                 if not plugin:
                     continue
-                if not plugin.d.help == True:
+                if plugin.d.help is not True:
                     continue
 
                 main_embed.add_field(plugin.name, plugin.description)
@@ -145,7 +146,7 @@ class BotHelpCommand(BaseHelpCommand):
             for plugin, _ in plugin_pages.items():
                 if not plugin:
                     continue
-                if not plugin.d.help == True:
+                if plugin.d.help is not True:
                     continue
                 options.append(
                     miru.SelectOption(
@@ -166,7 +167,7 @@ class BotHelpCommand(BaseHelpCommand):
     async def send_command_help(
         self, ctx: context_.base.Context, command: commands.base.Command
     ) -> None:
-        long_help = command.get_help(ctx)
+        long_help = command.get_help(ctx).replace("[p]", ctx.prefix)
         prefix = (
             ctx.prefix
             if isinstance(command, commands.prefix.PrefixCommand)

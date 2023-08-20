@@ -3,6 +3,7 @@
 
 import os
 import re
+from typing import Optional
 
 import dotenv
 import hikari as hk
@@ -146,7 +147,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 )
 @lb.command("sauce", "Show ya sauce for the image", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashCommand)
-async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
+async def find_sauce(ctx: lb.Context, link: str, service: Optional[str] = None) -> None:
     """Find the sauce of an image
 
     Args:
@@ -196,7 +197,7 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
                 )
                 await view.start(choice)
                 await view.wait()
-            except Exception as e:
+            except Exception:
                 embed, view = await _simple_parsing(ctx, data)
                 choice = view.add_item(
                     KillButton(style=hk.ButtonStyle.SECONDARY, label="❌")
@@ -230,7 +231,10 @@ async def find_sauce(ctx: lb.Context, link: str, service: str = None) -> None:
                         .add_field("Episode", res[0]["episode"] or "1", inline=True)
                         .add_field(
                             "Timestamp",
-                            f"{int(res[0]['from']//60)}m{int(res[0]['from']%60)}s - {int(res[0]['to']//60)}m{int(res[0]['to']%60)}s",
+                            (
+                                f"{int(res[0]['from']//60)}m{int(res[0]['from']%60)}s -"
+                                f" {int(res[0]['to']//60)}m{int(res[0]['to']%60)}s"
+                            ),
                             inline=True,
                         )
                         .set_thumbnail(res[0]["image"])
@@ -313,7 +317,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                     "include": "anilist",
                 }
                 res = await ctx.bot.d.aio_session.get(
-                    f"https://arm.haglund.dev/api/v2/ids", params=params, timeout=2
+                    "https://arm.haglund.dev/api/v2/ids", params=params, timeout=2
                 )
 
                 if res.ok:
@@ -329,7 +333,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                 else:
                     await ctx.respond("not ok ")
 
-            except Exception as e:
+            except Exception:
                 pass
 
         return (
@@ -470,7 +474,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
         )
 
         for i, item in enumerate(data["data"].keys()):
-            if item not in ["source", "ext_urls"] and not "id" in item:
+            if item not in ["source", "ext_urls"] and "id" not in item:
                 if item == "created_at":
                     data["data"][item] = f"<t:{iso_to_timestamp(data['data'][item])}:D>"
 
@@ -516,7 +520,9 @@ def sanitize_field(name: str) -> str:
     return name.replace("_", " ").capitalize()
 
 
-async def al_from_mal(mal_id: int = None, type: str = None, name: str = None) -> str:
+async def al_from_mal(
+    mal_id: Optional[int] = None, type: Optional[str] = None, name: Optional[str] = None
+) -> str:
     """Anilist URL from MAL id"""
     query = """
   query ($mal_id: Int, $search: String) { # Define which variables will be used (id)
@@ -595,7 +601,9 @@ async def _find_the_url(ctx) -> dict:
         if not check_if_url(url):
             return {
                 "url": None,
-                "errorMessage": "There's no valid url in this message <:AkaneSip:1095068327786852453>",
+                "errorMessage": (
+                    "There's no valid url in this message <:AkaneSip:1095068327786852453>",
+                ),
             }
         try:
             if _is_tenor_link(url):
@@ -608,7 +616,9 @@ async def _find_the_url(ctx) -> dict:
             if not await is_image(url, ctx.bot.d.aio_session):
                 return {
                     "url": url,
-                    "errorMessage": "Please enter a valid image link <:AkaneSmile:872675969041846272>",
+                    "errorMessage": (
+                        "Please enter a valid image link <:AkaneSmile:872675969041846272>",
+                    ),
                 }
 
             return {"url": url, "errorMessage": None}
@@ -640,7 +650,9 @@ async def _find_the_url(ctx) -> dict:
         if len(ctx.options["target"].attachments) == 0:
             return {
                 "url": None,
-                "errorMessage": "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>",
+                "errorMessage": (
+                    "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>",
+                ),
             }
 
         if await is_image(

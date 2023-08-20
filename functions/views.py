@@ -1,6 +1,7 @@
 """Custom view classes"""
 import typing as t
 from datetime import timedelta
+from typing import Optional
 
 import aiohttp_client_cache
 import hikari as hk
@@ -47,7 +48,7 @@ class AuthorNavi(nav.NavigatorView):
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
-        user_id: hk.Snowflake = None,
+        user_id: Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
         if not buttons:
@@ -88,7 +89,7 @@ class AuthorView(miru.View):
         autodefer: bool = True,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
         session: t.Optional[aiohttp_client_cache.CachedSession] = None,
-        user_id: hk.Snowflake = None,
+        user_id: Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
         self.session = session
@@ -120,7 +121,7 @@ class PreView(nav.NavigatorView):
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
-        user_id: hk.Snowflake = None,
+        user_id: Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
         self.session = session
@@ -145,48 +146,6 @@ class PreView(nav.NavigatorView):
             flags=hk.MessageFlag.EPHEMERAL,
         )
         return False
-
-
-# class AutoPaginator(AuthorNavi):
-#     def __init__(
-#         self,
-#         *,
-#         content: t.Sequence[t.Sequence[str]],
-#         pages,
-#         # base_embed: t.Optional[hk.Embed] = None,
-#         # buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
-#         timeout: t.Optional[t.Union[float, int, timedelta]] = 5*60,
-#         user_id: hk.Snowflake = None,
-#     ) -> None:
-
-#         self.user_id = user_id
-#         if not buttons:
-#             buttons = [CustomPrevButton(), nav.NavButton(), CustomNextButton(), KillNavButton()]
-#         # pages = self._make_pages_from_data(content, base_embed=base_embed)
-#         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
-
-
-#     def _make_pages_from_data(content: t.Sequence[t.Sequence[str]], *, base_embed: t.Optional[hk.Embed] = None) -> t.Sequence[hk.Embed]:
-#         if not base_embed:
-#             base_embed = hk.Embed(
-#                 color=0x43408A,
-#                 timestamp=datetime.now().astimezone()
-#             )
-#         pages: t.Sequence[hk.Embed] = []
-#         col1: str = ""
-#         col2: str = ""
-
-#         for i, item in enumerate(content):
-#             col1 += item[0]
-#             col2 += item[1]
-#             if i % 19 or len(content-1):
-#                 pages.append(
-#                     base_embed.add_field("check", col1).add_field("ok", col2)
-#                 )
-#         return pages
-
-#     async def on_timeout(self) -> None:
-#         await self.message.edit(components=[])
 
 
 class TabbedSwitcher(miru.View):

@@ -33,7 +33,7 @@ guild_prefix_map = {980479965726404670: [","]}
 def make_prefix(app, message: hk.Message) -> list:
     try:
         return guild_prefix_map[message.guild_id]
-    except:
+    except KeyError:
         return ["-"]
 
 

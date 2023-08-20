@@ -4,11 +4,10 @@ import subprocess
 import typing as t
 from datetime import datetime
 from math import floor
-import pandas as pd
-
 
 import hikari as hk
 import lightbulb as lb
+import pandas as pd
 import psutil
 from fuzzywuzzy import process
 from PIL import Image, ImageOps
@@ -56,9 +55,14 @@ async def inrole_cmd(
                     role = role_
                     break
         else:
-            guild_roles = {}
-            for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
-                guild_roles[role_.name] = role_
+            guild_roles = {
+                role_.name: role_
+                for role_ in ctx.bot.cache.get_roles_view_for_guild(
+                    ctx.guild_id
+                ).values()
+            }
+            # for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
+            # guild_roles[role_.name] = role_
 
             ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=91)
 
@@ -79,12 +83,13 @@ async def inrole_cmd(
 
             pages = []
 
-            for member in ctx.bot.cache.get_members_view_for_guild(ctx.guild_id).values():
+            for member in ctx.bot.cache.get_members_view_for_guild(
+                ctx.guild_id
+            ).values():
                 if role.id in member.role_ids:
                     d1 += f"{member.id: <20}\n"
                     d2 += f"{member.username}\n"
                     counter += 1
-
 
             if counter == 0:
                 await ctx.respond(
@@ -155,7 +160,6 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
         export = False
         event = " ".join(event)
 
-
     probable_event = event
 
     try:
@@ -171,11 +175,12 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
                 event_ = event
                 break
     else:
-
-
-        guild_events = {}
-        for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id):
-            guild_events[event.name] = event
+        guild_events = {
+            event.name: event
+            for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
+        }
+        # for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id):
+        # guild_events[event.name] = event
 
         ans = process.extractOne(
             probable_event, list(guild_events.keys()), score_cutoff=80
@@ -187,16 +192,13 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
 
             event_ = guild_events[closest_role_match]
 
-
     if not event_:
         await ctx.respond("No matching events found")
         return
 
     event_members = []
     members = list(await ctx.bot.rest.fetch_scheduled_event_users(ctx.guild_id, event_))
-    
-    
-    
+
     if not export:
         for member in members:
             if member.member:
@@ -210,7 +212,6 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
         pages = []
 
         if len(event_members) == 0:
-            # await ctx.respond(event)
             await ctx.respond(
                 hk.Embed(
                     title=f"List of users interested in {event.name} ({len(event_members)})",
@@ -229,11 +230,10 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
                     color=colors.DEFAULT,
                 )
                 .set_image(event.image_url.url)
-                .add_field("​", "\n".join(item))
+                .add_field("\u200B", "\n".join(item))
             )
 
         if len(pages) == 1:
-
             await ctx.respond(pages[0])
             return
 
@@ -250,23 +250,17 @@ async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
                 if member.member:
                     mem_ids.append(member.member.id)
                     mem_names.append(member.member.username)
-            
+
             test_bytes = io.BytesIO()
 
-            pd.DataFrame(
-                {"User IDs": mem_ids, "User Names": mem_names}
-                ).to_csv(test_bytes, index=False)
+            pd.DataFrame({"User IDs": mem_ids, "User Names": mem_names}).to_csv(
+                test_bytes, index=False
+            )
 
             await ctx.respond(hk.Bytes(test_bytes.getvalue(), "event.csv"))
 
         except Exception as e:
-            await ctx.respond(f'Erra: {e}')
-    # test_bytes = io.BytesIO()
-    # pd.DataFrame([ 10, 15, 20], dtype='u1', columns=['a']).to_csv(test_bytes, index=False)
-    # await ctx.respond(hk.Bytes(test_bytes.getvalue(), "lol.csv"))
-        
-
-
+            await ctx.respond(f"Erra: {e}")
 
 
 @info_plugin.command
@@ -312,8 +306,6 @@ async def add_emote(
                 await ctx.respond(f"Error: {e}")
 
             return
-
-        await ctx.respond(ctx.raw_options)
 
         image_type = await is_image(
             emote, ctx.bot.d.aio_session
@@ -383,17 +375,6 @@ async def add_emote(
     except Exception as e:
         await ctx.respond(f"Error: {e}")
 
-
-@info_plugin.command
-@lb.add_checks(lb.owner_only)
-@lb.command("text", "uoogh")
-@lb.implements(lb.PrefixCommand)
-async def guilds(ctx: lb.Context) -> None:
-
-    import pandas as pd
-    test_bytes = io.BytesIO()
-    pd.DataFrame([ 10, 15, 20], dtype='u1', columns=['a']).to_csv(test_bytes, index=False)
-    await ctx.respond(hk.Bytes(test_bytes.getvalue(), "lol.csv"))
 
 @info_plugin.command
 @lb.add_checks(lb.owner_only)
@@ -487,7 +468,7 @@ async def user_info(ctx: lb.Context, user: hk.Member) -> None:
         )
 
         await ctx.respond(activity)
-        # await ctx.respond(f"{activity.type} {activity.name}")
+
     except Exception as e:
         await ctx.respond(e)
 
@@ -700,12 +681,10 @@ async def emote_info(
 @lb.command("removesticker", "Remove a sticker", aliases=["rst"])
 @lb.implements(lb.PrefixCommand)
 async def sticker_removal(ctx: lb.MessageContext):
-    # ctx.event.message
     if not ctx.event.message.stickers:
         await ctx.respond("No sticker in your message, I'm afraid")
         return
 
-    stickers = []
     sticker_partial = ctx.event.message.stickers[0]
 
     if isinstance(sticker_partial, hk.GuildSticker):
@@ -713,17 +692,10 @@ async def sticker_removal(ctx: lb.MessageContext):
 
     try:
         sticker = await ctx.bot.rest.fetch_sticker(sticker_partial.id)
-        # await ctx.respond(dir(sticker))
-
-        # io.BytesIO(await ctx.bot.d.aio_session.get(sticker.image_url).read())
-
-        # await ctx.respond(sticker.image_url.url)
 
         sticker_image = await ctx.bot.d.aio_session.get(
             sticker.image_url.url, timeout=2
         )
-
-        # await ctx.respond("can fetch sticker")
 
         await ctx.author.send(
             hk.Embed(
@@ -768,7 +740,8 @@ async def emote_removal(
     """Remove multiple emotes from a guild
 
     Args:
-        ctx (lb.Context): The context in which the command is invoked (should have the emotes in the message)
+        ctx (:obj:`lb.Context`): The context in which the command is invoked
+        (should have the emotes in the message)
     """
 
     words = ctx.event.message.content.split(" ")

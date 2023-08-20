@@ -1,14 +1,13 @@
 """The animanga related plugin"""
 import collections
 import re
-import typing as t
 from datetime import datetime, timedelta
+from typing import Optional
 
 import hikari as hk
 import lightbulb as lb
 import miru
 from fuzzywuzzy import process
-from miru.ext import nav
 
 import functions.buttons as btns
 import functions.views as views
@@ -243,9 +242,9 @@ async def ln_search(ctx: lb.PrefixContext, query: str):
     (
         "A simple character search from AL but with additional features.\n"
         "To filter a character by series, simply addd a comma and the series name."
-        "\nEg. `-c Ryou, Bocchi the Rock` will almost certainly give you Ryou Yamada from the BTR "
-        "series. \nIf you just enter `-c ,Bocchi the Rock` you'll get a dropdown of all characters "
-        "from the series"
+        "\nEg. `[p]c Ryou, Bocchi the Rock` will give you Ryou Yamada from the BTR"
+        " series. \nIf you just enter `[p]c ,Bocchi the Rock` you'll get a dropdown of all "
+        "characters from the series"
     )
 )
 @lb.option(
@@ -275,7 +274,7 @@ async def chara_search(ctx: lb.PrefixContext, query: str):
 )
 @lb.command("top", "Find top anime on MAL", pass_options=True, auto_defer=True)
 @lb.implements(lb.PrefixCommand, lb.SlashCommand)
-async def topanime(ctx: lb.PrefixContext, filter: str = None):
+async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
     """Find the top anime on AL
 
     Args:
@@ -358,7 +357,10 @@ async def topanime(ctx: lb.PrefixContext, filter: str = None):
             for i, item in enumerate(res["data"]):
                 embed.add_field(
                     f"{i+1}.",
-                    f"```ansi\n\u001b[0;32m{item['rank'] or ''}. \u001b[0;36m{item['title']} \u001b[0;33m({item['score'] or item['members']})```",
+                    (
+                        f"```ansi\n\u001b[0;32m{item['rank'] or ''}. \u001b[0;36m{item['title']}"
+                        f" \u001b[0;33m({item['score'] or item['members']})```",
+                    ),
                 )
 
             await ctx.respond(embed=embed)
@@ -389,7 +391,7 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 )
 @lb.command("vntrait", "Search a vn", pass_options=True, aliases=["trait"])
 @lb.implements(lb.PrefixCommand)
-async def vn_search(ctx: lb.PrefixContext, query: str):
+async def vn_trait_search(ctx: lb.PrefixContext, query: str):
     """Search for a visual novel character trait via VNDB
 
     Args:
@@ -406,7 +408,7 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 )
 @lb.command("vntag", "Search a vntag", pass_options=True, aliases=["tag"])
 @lb.implements(lb.PrefixCommand)
-async def vn_search(ctx: lb.PrefixContext, query: str):
+async def vn_tag_search(ctx: lb.PrefixContext, query: str):
     """Search for a visual novel tag via VNDB
 
     Args:
@@ -423,7 +425,7 @@ async def vn_search(ctx: lb.PrefixContext, query: str):
 )
 @lb.command("vnc", "Search a vn character", pass_options=True)
 @lb.implements(lb.PrefixCommand)
-async def vn_search(ctx: lb.PrefixContext, query: str):
+async def vn_chara_search(ctx: lb.PrefixContext, query: str):
     """Search for a visual novel character via VNDB
 
     Args:
@@ -447,13 +449,6 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
     )
     if res.ok:
         res = await res.json()
-
-        buttons = [
-            btns.CustomPrevButton(),
-            nav.IndicatorButton(),
-            btns.CustomNextButton(),
-            btns.KillNavButton(),
-        ]
 
         pages = []
         for i in res["chapters"]["1"]["groups"]["1"]:
@@ -522,158 +517,11 @@ async def _fetch_trait_map(user: str) -> str:
     return cursor.fetchone()
 
 
-async def _search_character(
-    ctx: lb.Context, *, character: t.Optional[str] = None, id_: t.Optional[int] = None
-):
-    """Search a character on AL"""
-    query = """
-query ($id: Int, $search: String) { # Define which variables will be used in the query
-  Character (id: $id, search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-    id
-    name {
-      full
-    }
-    image {
-      large
-    }
-    gender
-    dateOfBirth {
-        year
-        month
-        day
-    }
-    description (asHtml: false)
-    media (sort: TRENDING_DESC, perPage: 3) {
-        nodes {
-            title {
-                romaji
-            }
-            season
-            seasonYear
-            meanScore
-            seasonInt
-            episodes
-            chapters
-            source
-            popularity
-            tags {
-              name
-            }
-        }
-    }
-    favourites #♥
-    siteUrl
-  }
-}
-"""
-
-    try:
-        variables = {}
-
-        if id_:
-            variables["id"] = id_
-
-        elif character:
-            variables["search"] = character
-
-        else:
-            raise lb.NotEnoughArguments
-
-        response = await ctx.bot.d.aio_session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-            timeout=3,
-        )
-        if not response.ok:
-            await ctx.respond(
-                f"Failed to fetch data 😵. \nTry typing the full name of the character."
-            )
-            return
-        response = await response.json()
-
-        response = response["data"]["Character"]
-
-        title = response["name"]["full"]
-
-        if response["dateOfBirth"]["month"] and response["dateOfBirth"]["day"]:
-            dob = f"{response['dateOfBirth']['day']}/{response['dateOfBirth']['month']}"
-            if response["dateOfBirth"]["year"]:
-                dob += f"/{response['dateOfBirth']['year']}"
-        else:
-            dob = "NA"
-
-        if response["description"]:
-            response["description"] = parse_description(response["description"])
-
-        else:
-            response["description"] = "NA"
-
-        series = ""
-
-        for i, item in enumerate(response["media"]["nodes"]):
-            series += f"```ansi\n{i+1}. \u001b[0;35m{item['title']['romaji']} \u001b[0;32m({item['meanScore']})```"
-
-        pages = [
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                description="\n\n",
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
-            )
-            .add_field("Gender", response["gender"] or "Unknown")
-            .add_field("DOB", dob, inline=True)
-            .add_field("Favourites", f"{response['favourites']}❤", inline=True)
-            .add_field("Character Description", response["description"])
-            .set_thumbnail(response["image"]["large"])
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            ),
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
-            )
-            .set_thumbnail(response["image"]["large"])
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            )
-            .add_field("Appears in ", series),
-        ]
-        view = views.AuthorView(user_id=ctx.author.id)
-        view.add_item(
-            btns.SwapButton(
-                emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
-                emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
-                original_page=pages[0],
-                swap_page=pages[1],
-            )
-        )
-        view.add_item(btns.KillButton())
-
-        choice = await ctx.respond(
-            embed=pages[0],
-            components=view,
-        )
-        await view.start(choice)
-        await view.wait()
-
-        if hasattr(view, "answer"):
-            pass
-        else:
-            await ctx.edit_last_response(components=[])
-    except Exception as e:
-        await ctx.respond(f"Errer: {e}")
-
-
 async def _search_novel(ctx: lb.Context, novel: str):
     """Search a novel on AL"""
     query = """
-query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC, format_in: [NOVEL]) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+query ($id: Int, $search: String, $type: MediaType) { 
+  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC, format_in: [NOVEL]) {
     id
     idMal
     title {
@@ -766,7 +614,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 async def _search_anime(ctx, anime: str):
     """Search an anime on AL"""
     query = """
-query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used (id)
+query ($id: Int, $search: String, $type: MediaType) { 
   Page (perPage: 5) {
   media (id: $id, search: $search, type: $type) { # The sort param was POPULARITY_DESC
     id
@@ -928,31 +776,30 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         await view.wait()
     except Exception as e:
         print(e)
-    trailer = "Couldn't find anything."
+    # trailer = "Couldn't find anything."
 
-    if response["trailer"]:
-        if response["trailer"]["site"] == "youtube":
-            trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
-        else:
-            trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
+    # if response["trailer"]:
+    #     if response["trailer"]["site"] == "youtube":
+    #         trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
+    #     else:
+    #         trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
 
-        buttons = [
-            btns.TrailerButton(trailer=trailer, other_page=pages),
-            btns.KillNavButton(),
-        ]
-    else:
-        buttons = [btns.KillNavButton()]
+    #     buttons = [
+    #         btns.TrailerButton(trailer=trailer, other_page=pages),
+    #         btns.KillNavButton(),
+    #     ]
+    # else:
+    #     buttons = [btns.KillNavButton()]
 
-    navigator = views.AuthorNavi(
-        pages=pages, buttons=buttons, timeout=180, user_id=ctx.author.id
-    )
+    # views.AuthorNavi(pages=pages, buttons=buttons, timeout=180, user_id=ctx.author.id)
 
 
 async def _search_manga(ctx, manga: str):
     """Search a manga on AL and Preview on MD"""
     query = """
-query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
-    Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+query ($id: Int, $search: String, $type: MediaType) {
+    Media (id: $id, search: $search, type: $type, 
+    sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) { 
         id
         idMal
         title {
@@ -1015,10 +862,10 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
         "followedCount": "desc",
     }
 
-    final_order_query = {}
+    final_order_query = {f"order[{key}]": value for key, value in order.items()}
 
-    for key, value in order.items():
-        final_order_query[f"order[{key}]"] = value
+    # for key, value in order.items():
+    # final_order_query[f"order[{key}]"] = value
 
     req = await ctx.bot.d.aio_session.get(
         f"{base_url}/manga",
@@ -1110,6 +957,8 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
 
 
 async def _search_characters(ctx: lb.Context, query: str):
+    """Interlude function for character search"""
+
     query = query.split(",")
     if len(query) == 1 or query[1].strip() == "":
         if query[0] in ["birth", "birthday", "bday"]:
@@ -1124,7 +973,40 @@ async def _search_characters(ctx: lb.Context, query: str):
             except Exception as e:
                 await ctx.respond(e)
         else:
-            await _search_character(ctx, character=query[0])
+            # await ALCharacter.from_search(query[0], ctx.bot.d.aio_session)
+
+            pages = await (
+                await ALCharacter.from_search(query[0], ctx.bot.d.aio_session)
+            ).make_pages()
+
+            if len(pages) == 1:
+                await ctx.respond(embeds=pages)
+                return
+
+            view = views.AuthorView(user_id=ctx.author.id)
+            view.add_item(
+                btns.SwapButton(
+                    emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
+                    emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
+                    original_page=pages[0],
+                    swap_page=pages[1],
+                )
+            )
+            view.add_item(btns.KillButton())
+
+            choice = await ctx.respond(
+                embed=pages[0],
+                components=view,
+            )
+            await view.start(choice)
+            await view.wait()
+
+            if hasattr(view, "answer"):
+                pass
+            else:
+                await ctx.edit_last_response(components=[])
+
+            # await _search_character(ctx, character=query[0])
         return
 
     else:
@@ -1195,16 +1077,56 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 await view.wait()
 
             else:
-                chara_choices = {}
+                # chara_choices = {}
 
-                for chara in response["data"]["Media"]["characters"]["nodes"]:
-                    chara_choices[chara["name"]["full"]] = chara["id"]
+                chara_choices = {
+                    chara["name"]["full"]: chara["id"]
+                    for chara in response["data"]["Media"]["characters"]["nodes"]
+                }
+
+                # for chara in response["data"]["Media"]["characters"]["nodes"]:
+                # chara_choices[chara["name"]["full"]] = chara["id"]
 
                 closest_match, similarity_score = process.extractOne(
                     query[0], chara_choices.items()
                 )
 
-                await _search_character(ctx, id_=chara_choices[closest_match[0]])
+                pages = await (
+                    await ALCharacter.from_id(
+                        chara_choices[closest_match[0]], ctx.bot.d.aio_session
+                    )
+                ).make_pages()
+
+                if len(pages) == 1:
+                    await ctx.respond(embeds=pages)
+                    return
+
+                view = views.AuthorView(user_id=ctx.author.id)
+                view.add_item(
+                    btns.SwapButton(
+                        emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
+                        emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
+                        original_page=pages[0],
+                        swap_page=pages[1],
+                    )
+                )
+                view.add_item(btns.KillButton())
+
+                choice = await ctx.respond(
+                    embed=pages[0],
+                    components=view,
+                )
+                await view.start(choice)
+                await view.wait()
+
+                if hasattr(view, "answer"):
+                    pass
+                else:
+                    await ctx.edit_last_response(components=[])
+
+                # await ctx.respond(embeds=[await chara.makepages()])
+
+                # await _search_character(ctx, id_=chara_choices[closest_match[0]])
 
         except Exception as e:
             await ctx.respond(f"Error {e}")
@@ -1216,7 +1138,12 @@ async def _search_vn(ctx: lb.Context, query: str):
     headers = {"Content-Type": "application/json"}
     data = {
         "filters": ["search", "=", query],
-        "fields": "title, image.url, rating, released, length_minutes, description, tags.spoiler, tags.name",
+        "fields": (
+            "title, image.url, rating, released, length_minutes, "
+            "description, tags.spoiler, tags.name,"
+            "tags.category,"
+            "tags.rating"
+        ),
         # "sort": "title"
     }
     try:
@@ -1225,10 +1152,28 @@ async def _search_vn(ctx: lb.Context, query: str):
         )
 
         if not req.ok:
-            await ctx.respond("Couldn't find the VN you asked for.")
+            await ctx.respond(
+                hk.Embed(
+                    title="SEARCH ERROR",
+                    color=colors.WARN,
+                    description=f"Your search query raised a `code:{req.status}` error",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+            # await ctx.respond("Couldn't find the VN you asked for.")
             return
 
         req = await req.json()
+
+        if not req["results"]:
+            await ctx.respond(
+                hk.Embed(
+                    title="CAN'T FIND YOUR VN",
+                    color=colors.ERROR,
+                    description=f"Couldn't find the vn {query}",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
 
         if req["results"][0]["description"]:
             description = parse_vndb_desciption(req["results"][0]["description"])
@@ -1249,10 +1194,12 @@ async def _search_vn(ctx: lb.Context, query: str):
         if req["results"][0]["tags"]:
             tags = []
             for tag in req["results"][0]["tags"]:
-                if tag["spoiler"] == 0:
-                    tags.append(tag["name"])
+                if tag["rating"] >= 2.7 and tag["category"] == "cont":
+                    tags.append(
+                        tag["name"] if not tag["spoiler"] else f"||{tag['name']}||"
+                    )
 
-                if len(tags) == 4:
+                if len(tags) == 7:
                     break
 
             tags = ", ".join(tags)
@@ -1352,6 +1299,16 @@ async def _search_vnchara(ctx: lb.Context, query: str):
 
     req = await req.json()
 
+    if not req["results"]:
+        await ctx.respond(
+            hk.Embed(
+                title="CAN'T FIND YOUR CHARACTER",
+                color=colors.ERROR,
+                description=f"Couldn't find the character {query}",
+                timestamp=datetime.now().astimezone(),
+            )
+        )
+
     try:
         pages = collections.defaultdict(list)
         options = []
@@ -1436,6 +1393,16 @@ async def _search_vntag(ctx: lb.Context, query: str):
 
     req = await req.json()
 
+    if not req["results"]:
+        await ctx.respond(
+            hk.Embed(
+                title="CAN'T FIND YOUR TAG",
+                color=colors.ERROR,
+                description=f"Couldn't find the tag {query}",
+                timestamp=datetime.now().astimezone(),
+            )
+        )
+
     if req["results"][0]["description"]:
         description = parse_vndb_desciption(req["results"][0]["description"])
     else:
@@ -1488,10 +1455,20 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
 
     if not req.ok:
-        await ctx.respond("Couldn't find the tag you asked for.")
+        await ctx.respond("Couldn't find the trait you asked for.")
         return
 
     req = await req.json()
+
+    if not req["results"]:
+        await ctx.respond(
+            hk.Embed(
+                title="CAN'T FIND YOUR TRAIT",
+                color=colors.ERROR,
+                description=f"Couldn't find the trait {query}",
+                timestamp=datetime.now().astimezone(),
+            )
+        )
 
     if req["results"][0]["description"]:
         description = parse_vndb_desciption(req["results"][0]["description"])
@@ -1549,7 +1526,6 @@ async def al_link_finder(event: hk.GuildReactionAddEvent) -> None:
     """Check if a message contains an animanga link and display it's info"""
 
     try:
-        channel = await al_listener.bot.rest.fetch_channel(event.channel_id)
         message = await al_listener.bot.rest.fetch_message(
             event.channel_id, event.message_id
         )
@@ -1563,8 +1539,8 @@ async def al_link_finder(event: hk.GuildReactionAddEvent) -> None:
     if len(list_of_series) != 0:
         for series in list_of_series:
             query = """
-query ($id: Int, $search: String, $type: MediaType) { # Define which variables will be used in the query (id)
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { # Insert our variables into the query arguments (id) (type: ANIME is hard-coded in the query)
+query ($id: Int, $search: String, $type: MediaType) { )
+  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { 
     id
     idMal
     title {
@@ -1612,7 +1588,10 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
             no_of_items = response["chapters"] or response["episodes"] or "NA"
 
             await event.member.send(
-                content=f"Here are the details for the series requested here: {message.make_link(message.guild_id)}",
+                content=(
+                    "Here are the details for the series"
+                    f"requested here: {message.make_link(message.guild_id)}"
+                ),
                 embed=hk.Embed(
                     description="\n\n",
                     color=colors.ANILIST,
@@ -1626,10 +1605,7 @@ query ($id: Int, $search: String, $type: MediaType) { # Define which variables w
                     no_of_items,
                     inline=True,
                 )
-                .add_field(
-                    "Summary",
-                    f"{response['description'][0:250].replace('<br>', '') if len(response['description']) > 250 else response['description'].replace('<br>', '')}...",
-                )
+                .add_field("Summary", parse_description(response["description"]))
                 .set_thumbnail(response["coverImage"]["large"])
                 .set_image(response["bannerImage"])
                 .set_author(url=response["siteUrl"], name=title)
