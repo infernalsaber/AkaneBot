@@ -1,20 +1,19 @@
 """Custom view classes"""
 import typing as t
 from datetime import timedelta
-from typing import Optional
 
 import aiohttp_client_cache
 import hikari as hk
 import miru
 from miru.ext import nav
 
-from functions.buttons import *
+from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
 
 
 class SelectView(miru.View):
     """A subclassed view designed for Text Select"""
 
-    def __init__(self, user_id: hk.Snowflake, pages: t.Collection[hk.Embed]) -> None:
+    def __init__(self, user_id: hk.Snowflake, pages: dict[str, hk.Embed]) -> None:
         self.user_id = user_id
         self.pages = pages
         super().__init__(timeout=60 * 60)
@@ -48,7 +47,7 @@ class AuthorNavi(nav.NavigatorView):
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
-        user_id: Optional[hk.Snowflake] = None,
+        user_id: t.Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
         if not buttons:
@@ -73,7 +72,8 @@ class AuthorNavi(nav.NavigatorView):
         return False
 
     async def on_timeout(self) -> None:
-        await self.message.edit(components=[])
+        if self.message:
+            await self.message.edit(components=[])
 
         # Clearing the memory occupied by the preview
         # if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
@@ -89,7 +89,7 @@ class AuthorView(miru.View):
         autodefer: bool = True,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
         session: t.Optional[aiohttp_client_cache.CachedSession] = None,
-        user_id: Optional[hk.Snowflake] = None,
+        user_id: t.Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
         self.session = session
@@ -121,7 +121,7 @@ class PreView(nav.NavigatorView):
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
-        user_id: Optional[hk.Snowflake] = None,
+        user_id: t.Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
         self.session = session
@@ -129,7 +129,8 @@ class PreView(nav.NavigatorView):
         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
 
     async def on_timeout(self) -> None:
-        await self.message.edit(components=[])
+        if self.message:
+            await self.message.edit(components=[])
 
         # Clearing the memory occupied by the pages
         if self.get_context(self.message).bot.d.chapter_info[self.message_id]:

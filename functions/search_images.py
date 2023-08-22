@@ -4,7 +4,6 @@ This is the module to make 3x3s or find Google Image results
 import json
 import re
 import typing as t
-from typing import Optional
 
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
@@ -100,7 +99,7 @@ async def lookfor(
     session: CachedSession,
     *,
     num: t.Optional[int] = 9,
-    recent: Optional[str] = None,
+    recent: t.Optional[str] = None,
 ) -> list:
     """Return images and corresponding data of the search query
 

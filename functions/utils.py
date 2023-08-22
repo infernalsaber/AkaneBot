@@ -1,3 +1,4 @@
+import io
 import json
 import random
 from datetime import datetime, timedelta
@@ -5,12 +6,11 @@ from urllib.parse import urlparse
 
 import feedparser
 import hikari as hk
-import requests
 
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
-from PIL import Image
+from fast_colorthief import get_dominant_color
 
 
 def check_if_url(link: str) -> bool:
@@ -38,7 +38,7 @@ async def is_image(link: str, session: CachedSession) -> int:
             if r.headers["content-type"] in ["image/webp", "image/gif"]:
                 return 2
             return 0
-    except:
+    except Exception:
         return 0
 
 
@@ -97,7 +97,15 @@ def rss2json(url):
     return json.dumps(feedsdict)
 
 
-def verbose_timedelta(delta: timedelta):
+def verbose_timedelta(delta: timedelta) -> str:
+    """Convert a :obj:`datetime.timedelta` object into a human friendly string
+
+    Args:
+        delta (timedelta): The timedelta object
+
+    Returns:
+        str: The human readable string
+    """
     d = delta.days
     h, s = divmod(delta.seconds, 3600)
     m, s = divmod(s, 60)
@@ -115,7 +123,15 @@ def verbose_timedelta(delta: timedelta):
     return ", ".join(dhms[start : end + 1])
 
 
-def verbose_date(*args):
+def verbose_date(*args) -> str:
+    """To convert represent dates in a more verbose manner
+
+    Args:
+        In the form date, month year
+
+    Returns:
+        str: The verbose date string
+    """
     month_num_map = {
         1: "January",
         2: "February",
@@ -139,7 +155,7 @@ def verbose_date(*args):
     return verbose_date
 
 
-def iso_to_timestamp(iso_date):
+def iso_to_timestamp(iso_date) -> datetime:
     """Convert ISO datetime to timestamp"""
     try:
         return int(
@@ -167,7 +183,7 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
         return link
 
 
-def get_image_dominant_colour(link: str) -> hk.Color:
+async def get_image_dominant_colour(link: str) -> hk.Color:
     """Get the dominant colour of an image from a link to it
 
     Args:
@@ -176,9 +192,12 @@ def get_image_dominant_colour(link: str) -> hk.Color:
     Returns:
         hk.Color: Dominant Colour
     """
+    session = CachedSession()
 
     return hk.Color.of(
-        get_dominant_colour(Image.open(requests.get(link, stream=True, timeout=10).raw))
+        get_dominant_color(
+            io.BytesIO(await (await session.get(link, stream=True, timeout=10)).read())
+        )
     )
 
 
