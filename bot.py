@@ -155,7 +155,7 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
         raise event.exception
 
     if isinstance(exception, lb.NotOwner):
-        await event.context.respond("This command is only usable by bot owner")
+        return
 
     elif isinstance(exception, lb.CommandIsOnCooldown):
         await event.context.respond(

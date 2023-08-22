@@ -652,7 +652,7 @@ async def emote_info(
             if isinstance(emote, hk.CustomEmoji):
                 emotes.append(emote)
 
-        except:
+        except ValueError:
             continue
 
     emotes = list(set(emotes))
@@ -765,7 +765,10 @@ async def emote_removal(
 
             emotes.append(emote)
 
-        except:
+        except ValueError:
+            continue
+
+        except hk.NotFoundError:
             continue
 
     emotes = list(set(emotes))

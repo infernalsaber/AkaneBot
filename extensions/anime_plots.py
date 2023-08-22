@@ -22,7 +22,6 @@ plot_plugin.d.help_emoji = "📈"
 
 @plot_plugin.command
 @lb.set_help(
-    # Replace minus with context prefix 😾
     (
         "Plot the activity of a series at airtime or compare multiple. \n"
         "- For example, doing `[p]plot bocchi the rock` will return the activity "
@@ -45,7 +44,7 @@ plot_plugin.d.help_emoji = "📈"
     "plot", "Plot some trendz", pass_options=True, auto_defer=True, aliases=["p"]
 )
 @lb.implements(lb.PrefixCommand)
-async def compare_trends(ctx: lb.Context, query: str) -> None:
+async def compare_trends(ctx: lb.PrefixContext, query: str) -> None:
     """Compare the popularity and ratings of two different anime
     Args:
         ctx (lb.Context): The event context (irrelevant to the user)
@@ -53,13 +52,13 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
     """
 
     try:
-        query = query.split()
-        if query[-1] == "--autoscale":  # Auto scale
+        queries = query.split()
+        if queries[-1] == "--autoscale":  # Auto scale
             autoscale = True
-            query = " ".join(query[:-1])
+            query = " ".join(queries[:-1])
         else:
             autoscale = False
-            query = " ".join(query)
+            query = " ".join(queries)
 
         series = query.split("vs")
         if len(series) not in [1, 2]:
@@ -114,6 +113,10 @@ async def compare_trends(ctx: lb.Context, query: str) -> None:
             else:
                 data = await search_it(series[0], ctx.bot.d.aio_session)
                 data2 = await search_it(series[1], ctx.bot.d.aio_session)
+
+                if isinstance(data, int) or isinstance(data2, int):
+                    await ctx.respond("An error occurred")
+                    return
 
                 if autoscale:
                     gap = (

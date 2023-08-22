@@ -17,6 +17,9 @@ beautifulsoup4
 lxml
 fuzzywuzzy[speedup]
 pandas
+fast-colorthief
+pre-commit
+
 
 # Putting this at the end coz W*ndows doesn't need it
 uvloop

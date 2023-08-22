@@ -64,9 +64,9 @@ class BotHelpCommand(BaseHelpCommand):
         cmds: t.Mapping[t.Optional[plugins.Plugin], t.List[commands.base.Command]],
         header: str,
     ) -> None:
-        for plugin, cmds in cmds.items():
+        for plugin, cmd_list in cmds.items():
             pages[plugin].append(f"== {header} Commands")
-            for cmd in set(cmds):
+            for cmd in set(cmd_list):
                 pages[plugin].append(f"- {cmd.name} - {cmd.description}")
 
     async def send_bot_help(self, ctx: context_.base.Context) -> None:
@@ -102,11 +102,11 @@ class BotHelpCommand(BaseHelpCommand):
             self._add_cmds_to_plugin_pages(plugin_pages, p_commands, "Prefix")
             self._add_cmds_to_plugin_pages(plugin_pages, s_commands, "Slash")
 
-            for plugin, page in plugin_pages.items():
-                if not plugin:
+            for plugin, _ in plugin_pages.items():
+                if not plugin or not plugin.d.help:
                     continue
-                if plugin.d.help is not True:
-                    continue
+                # if plugin.d.help is not True:
+                # continue
 
                 main_embed.add_field(plugin.name, plugin.description)
 

@@ -12,7 +12,7 @@ from fuzzywuzzy import process
 from lightbulb.ext import tasks
 
 from functions.models import ColorPalette as colors
-from functions.utils import check_if_url
+from functions.utils import check_if_url, humanized_list_join
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
@@ -102,7 +102,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
                 event.channel_id,
                 (
                     f"No command with the name `{commandish}` could be found. "
-                    f"Did you mean: `{'` or `'.join(possible_commands)}`"
+                    f"Did you mean: {humanized_list_join(possible_commands)}"
                 ),
             )
             return

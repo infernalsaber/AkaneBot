@@ -1,7 +1,6 @@
 """Custom Button classes"""
 import io
 import typing as t
-from typing import Optional
 
 import hikari as hk
 import miru
@@ -14,13 +13,15 @@ async def poor_mans_proxy(link: str, session):
     return io.BytesIO(await resp.read())
 
 
-async def preview_maker(base_url, data_id, title, manga_id, cover, session):
+async def preview_maker(
+    base_url, data_id, title, manga_id, cover, session
+) -> t.Union[list[hk.Embed], None]:
     """A preview maker function for the manga previews"""
 
     req = await session.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
 
     if not req.ok:
-        return
+        return None
 
     r_json = await req.json()
     pages = []
@@ -54,7 +55,7 @@ async def preview_maker(base_url, data_id, title, manga_id, cover, session):
         )
     # Kill the process if there are no pages
     if len(pages) == 0:
-        return
+        return None
     pages.append(
         hk.Embed(title=title, url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1")
         .set_image(cover)
@@ -85,7 +86,7 @@ class KillNavButton(nav.NavButton):
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.DANGER,
+        style: hk.ButtonStyle = hk.ButtonStyle.DANGER,
         label: t.Optional[str] = "❌",
         custom_id: t.Optional[str] = None,
         emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
@@ -96,7 +97,8 @@ class KillNavButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-        await self.view.message.delete()
+        if self.view.message:
+            await self.view.message.delete()
 
     async def before_page_change(self) -> None:
         ...
@@ -108,15 +110,16 @@ class CustomPrevButton(nav.NavButton):
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
         label: t.Optional[str] = None,
         custom_id: t.Optional[str] = None,
-        emoji: t.Optional[t.Union[hk.Emoji, str]] = hk.Emoji.parse(
-            "<:pink_arrow_left:1059905106075725955>"
-        ),
+        emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
         row: t.Optional[int] = None,
         page_no: t.Optional[int] = None,
     ):
+        if not emoji:
+            emoji = hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>")
+
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
         )
@@ -138,14 +141,15 @@ class CustomNextButton(nav.NavButton):
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
         label: t.Optional[str] = None,
         custom_id: t.Optional[str] = None,
-        emoji: t.Optional[t.Union[hk.Emoji, str]] = hk.Emoji.parse(
-            "<:pink_arrow_right:1059900771816189953>"
-        ),
+        emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
         row: t.Optional[int] = None,
     ):
+        if not emoji:
+            emoji = hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>")
+
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
         )
@@ -167,7 +171,7 @@ class NavButton(nav.NavButton):
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.LINK,
+        style: hk.ButtonStyle = hk.ButtonStyle.LINK,
         label: t.Optional[str] = "🔗",
         custom_id: t.Optional[str] = None,
         emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
@@ -191,14 +195,14 @@ class PreviewButton(nav.NavButton):
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
         label: t.Optional[str] = "Preview",
         custom_id: t.Optional[str] = None,
-        emoji: t.Optional[t.Union[hk.Emoji, str]] = hk.Emoji.parse(
-            "<a:peek:1061709886712455308>"
-        ),
+        emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
         row: t.Optional[int] = None,
     ):
+        if not emoji:
+            emoji = hk.Emoji.parse("<a:peek:1061709886712455308>")
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
         )
@@ -215,6 +219,7 @@ class PreviewButton(nav.NavButton):
             self.view.clear_items()
             view.add_item(self)
             view.add_item(KillNavButton())
+
             await self.view.swap_pages(
                 ctx, ctx.bot.d.chapter_info[self.view.message_id][5]
             )
@@ -227,9 +232,10 @@ class PreviewButton(nav.NavButton):
                     self.view.remove_item(item)
             data = ctx.bot.d.chapter_info[self.view.message_id]
             swap_pages = None
-            swap_pages = await preview_maker(
-                data[0], data[1], data[2], data[3], data[4], self.view.session
-            )
+            if hasattr(self.view, "session"):
+                swap_pages = await preview_maker(
+                    data[0], data[1], data[2], data[3], data[4], self.view.session
+                )
             # await self.view.swap_pages(
             #     ctx, )
             # )
@@ -261,7 +267,8 @@ class PreviewButton(nav.NavButton):
         self.view.add_item(KillNavButton())
         self.label = "🔍"
         self.emoji = None
-        await self.view.swap_pages(ctx, swap_pages)
+        if swap_pages:
+            await self.view.swap_pages(ctx, swap_pages)
         # await ctx.edit_response(components=self.view)
 
     async def before_page_change(self) -> None:
@@ -271,70 +278,13 @@ class PreviewButton(nav.NavButton):
         await ctx.edit_response(components=[])
 
 
-class TrailerButton(miru.Button):
-    """A custom next button class"""
-
-    def __init__(
-        self,
-        *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
-        label: t.Optional[str] = "Trailer",
-        custom_id: t.Optional[str] = None,
-        emoji: t.Optional[t.Union[hk.Emoji, str]] = hk.Emoji.parse(
-            "<a:youtube:1074307805235920896>"
-        ),
-        row: t.Optional[int] = None,
-        trailer: t.Optional[str] = None,
-        other_page: Optional[t.Union[hk.Embed, str]] = None,
-    ):
-        self.trailer = trailer
-        self.other_page = other_page
-        super().__init__(
-            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
-        )
-
-    async def callback(self, ctx: miru.ViewContext):
-        # if not ctx.author.id == self.view.user_id:
-        #     await ctx.respond(
-        #         (
-        #             "You can't interact with this button as "
-        #             "you are not the invoker of the command."
-        #         ),
-        #         flags=hk.MessageFlag.EPHEMERAL,
-        #     )
-        #     return
-
-        if self.label == "🔍":
-            self.label = "Trailer"
-            self.emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
-
-            await ctx.edit_response(
-                content=None, embeds=[self.other_page], components=self.view
-            )
-
-            # await self.view.swap_pages(ctx, self.other_page)
-
-            return
-
-        self.label = "🔍"
-        self.emoji = None
-
-        await ctx.edit_response(content=self.trailer, embeds=[])
-        # await self.view.swap_pages(ctx, [self.trailer])
-
-        await ctx.edit_response(components=self.view)
-
-    async def before_page_change(self) -> None:
-        ...
-
-
 class KillButton(miru.Button):
     """A custom kill button class"""
 
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
         label: t.Optional[str] = "❌",
         custom_id: t.Optional[str] = None,
         emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
@@ -345,7 +295,8 @@ class KillButton(miru.Button):
         )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-        await self.view.message.delete()
+        if self.view.message:
+            await self.view.message.delete()
 
 
 class NewButton(miru.Button):
@@ -353,10 +304,10 @@ class NewButton(miru.Button):
 
     def __init__(
         self,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
         label: t.Optional[str] = None,
-        link: Optional[str] = None,
-        emoji: Optional[hk.Emoji] = None,
+        link: t.Optional[str] = None,
+        emoji: t.Optional[hk.Emoji] = None,
         custom_id: t.Optional[str] = None,
     ) -> None:
         self.link = link
@@ -375,15 +326,15 @@ class SwapButton(miru.Button):
     def __init__(
         self,
         *,
-        style: t.Union[hk.ButtonStyle, int] = hk.ButtonStyle.SECONDARY,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
         label1: t.Optional[str] = None,
         custom_id: t.Optional[str] = None,
         emoji1: t.Optional[t.Union[hk.Emoji, str]] = None,
         label2: t.Optional[str] = None,
-        emoji2: t.Optional[str] = None,
+        emoji2: t.Optional[t.Union[hk.Emoji, str]] = None,
         row: t.Optional[int] = None,
-        original_page: Optional[t.Union[hk.Embed, str]] = None,
-        swap_page: Optional[t.Union[hk.Embed, str]] = None,
+        original_page: t.Union[hk.Embed, str],
+        swap_page: t.Union[hk.Embed, str],
     ):
         self.swap_page = swap_page
         self.original_page = original_page

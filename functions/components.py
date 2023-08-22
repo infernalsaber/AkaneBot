@@ -32,9 +32,8 @@ class SimpleTextSelect(miru.TextSelect):
         )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-        # self.view.answer = self.values[0]
-        # try:
-        await ctx.edit_response(embeds=[self.view.pages[self.values[0]]])
+        if hasattr(self.view, "pages"):
+            await ctx.edit_response(embeds=[self.view.pages[self.values[0]]])
 
 
 class CharacterSelect(miru.TextSelect):
@@ -45,8 +44,11 @@ class CharacterSelect(miru.TextSelect):
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         try:
-            chara = await ALCharacter.from_id(self.values[0], self.view.session)
-            await ctx.edit_response(embeds=[await chara.make_embed()])
+            if hasattr(self.view, "session"):
+                chara = await ALCharacter.from_id(
+                    int(self.values[0]), self.view.session
+                )
+                await ctx.edit_response(embeds=[await chara.make_embed()])
 
         except Exception as e:
             await ctx.respond(content=f"Error: {e}", flags=hk.MessageFlag.EPHEMERAL)

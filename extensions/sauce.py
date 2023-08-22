@@ -3,14 +3,20 @@
 
 import os
 import re
-from typing import Optional
+import typing as t
 
 import dotenv
 import hikari as hk
 import lightbulb as lb
 
 from functions.buttons import GenericButton, KillButton
-from functions.utils import *
+from functions.utils import (
+    check_if_url,
+    get_random_quote,
+    is_image,
+    iso_to_timestamp,
+    tenor_link_from_gif,
+)
 from functions.views import AuthorView
 
 dotenv.load_dotenv()
@@ -63,7 +69,7 @@ async def pfp_sauce(ctx: lb.UserContext):
                 await ctx.respond(
                     embed=embed, components=view, flags=hk.MessageFlag.EPHEMERAL
                 )
-            except:
+            except Exception:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 await ctx.respond(
                     embed=embed, components=view, flags=hk.MessageFlag.EPHEMERAL
@@ -147,13 +153,15 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 )
 @lb.command("sauce", "Show ya sauce for the image", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashCommand)
-async def find_sauce(ctx: lb.Context, link: str, service: Optional[str] = None) -> None:
+async def find_sauce(
+    ctx: lb.Context, link: str, service: t.Optional[str] = None
+) -> None:
     """Find the sauce of an image
 
     Args:
         ctx (lb.Context): The context the command is invoked in
         link (str): The url of the image
-        service (str, optional): The service to choose. Defaults to None.
+        service (str, t.Optional): The service to choose. Defaults to None.
     """
 
     await ctx.respond(
@@ -264,7 +272,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                     GenericButton(
                         style=hk.ButtonStyle.LINK,
                         emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
-                        url=(await al_from_mal(data["data"]["mal_id"]))["siteUrl"],
+                        url=(await al_from_mal(data["data"]["mal_id"])),
                     )
                 )
             else:
@@ -272,10 +280,10 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                     GenericButton(
                         style=hk.ButtonStyle.LINK,
                         emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
-                        url=(await al_from_mal(name=data["data"]["source"]))["siteUrl"],
+                        url=(await al_from_mal(name=data["data"]["source"])),
                     )
                 )
-        except:
+        except Exception:
             pass
         view.add_item(
             GenericButton(
@@ -456,7 +464,10 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                 ):
                     sauce = f"[{data['data']['source']}]({data['data']['ext_urls'][0]})"
                 else:
-                    sauce = f"Link1: {data['data']['source']} \nLink2: {data['data']['ext_urls'][0]}"
+                    sauce = (
+                        f"Link1: {data['data']['source']} "
+                        f"\nLink2: {data['data']['ext_urls'][0]}"
+                    )
             else:
                 sauce = data["data"]["source"]
         else:
@@ -521,7 +532,9 @@ def sanitize_field(name: str) -> str:
 
 
 async def al_from_mal(
-    mal_id: Optional[int] = None, type: Optional[str] = None, name: Optional[str] = None
+    mal_id: t.Optional[int] = None,
+    type: t.Optional[str] = None,
+    name: t.Optional[str] = None,
 ) -> str:
     """Anilist URL from MAL id"""
     query = """
@@ -542,10 +555,10 @@ async def al_from_mal(
                 timeout=3,
             )
         ).json()
-    )["data"]["Media"]
+    )["data"]["Media"]["siteUrl"]
 
 
-async def vndb_url(text: str) -> str:
+async def vndb_url(text: str) -> t.Union[str, None]:
     """Gives the vndb url of a query object
 
     Args:
@@ -584,7 +597,7 @@ async def _find_the_url(ctx) -> dict:
     """A function which finds the link (if it exists) across contexts
 
     Args:
-        ctx (_type_): The context (user, message or slash)
+        ctx (:obj:`lb.Context`): The context (user, message or slash)
 
     Returns:
         dict: {
@@ -664,6 +677,11 @@ async def _find_the_url(ctx) -> dict:
             }
 
         return {"url": url, "errorMessage": errorMessage}
+
+    return {
+        "url": None,
+        "errorMessage": "You're prolly trying to use a prefix context (not implemented)",
+    }
 
 
 def _is_tenor_link(link) -> bool:
