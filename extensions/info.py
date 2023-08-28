@@ -502,7 +502,7 @@ async def botinfo(ctx: lb.Context) -> None:
         process = subprocess.Popen(
             "git rev-list --count main",
             text=True,
-            # shell=True,
+            shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
