@@ -273,7 +273,7 @@ async def inevent_cmd(ctx: lb.Context, event: str):
 
 @info_plugin.command
 @lb.add_checks(
-    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS) | lb.guild_only
+    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS), lb.guild_only
 )
 @lb.option(
     "processor",
@@ -423,7 +423,7 @@ async def guilds(ctx: lb.Context) -> None:
 
 
 @info_plugin.command
-@lb.add_checks(lb.owner_only | lb.guild_only)
+@lb.add_checks(lb.owner_only, lb.guild_only)
 @lb.option("user", "The user duh", t.Optional[hk.Member], required=False)
 @lb.command("userinfo", "Find information about a user", pass_options=True)
 @lb.implements(lb.PrefixCommand)
@@ -586,7 +586,7 @@ async def botinfo(ctx: lb.Context) -> None:
 
 @info_plugin.command
 @lb.add_checks(
-    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS) | lb.guild_only
+    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS), lb.guild_only
 )
 @lb.command("stickerinfo", "Get info about a sticker", aliases=["sticker"])
 @lb.implements(lb.PrefixCommand)
@@ -685,7 +685,7 @@ async def emote_info(
 
 
 @info_plugin.command
-@lb.add_checks(lb.has_guild_permissions(hk.Permissions.ADMINISTRATOR) | lb.guild_only)
+@lb.add_checks(lb.has_guild_permissions(hk.Permissions.ADMINISTRATOR), lb.guild_only)
 @lb.command("removesticker", "Remove a sticker", aliases=["rst"])
 @lb.implements(lb.PrefixCommand)
 async def sticker_removal(ctx: lb.MessageContext):
