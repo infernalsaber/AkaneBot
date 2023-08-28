@@ -949,8 +949,6 @@ query ($id: Int, $search: String, $type: MediaType) {
         pages,
     ]
 
-    await ctx.respond("this ")
-
 
 async def _search_characters(ctx: lb.Context, query: str):
     """Interlude function for character search"""
