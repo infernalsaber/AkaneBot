@@ -45,59 +45,59 @@ async def youtube_search(ctx: lb.Context, query: str) -> None:
         query (str): The query to search for
     """
 
-    try:
-        response_params = {
-            "part": "snippet",
-            "maxResults": "6",
-            "q": query,
-            "regionCode": "US",
-            "key": YT_KEY,
-        }
+    # try:
+    response_params = {
+        "part": "snippet",
+        "maxResults": "6",
+        "q": query,
+        "regionCode": "US",
+        "key": YT_KEY,
+    }
 
-        response = await ctx.bot.d.aio_session.get(
-            "https://youtube.googleapis.com/youtube/v3/search",
-            params=response_params,
-            timeout=2,
+    response = await ctx.bot.d.aio_session.get(
+        "https://youtube.googleapis.com/youtube/v3/search",
+        params=response_params,
+        timeout=2,
+    )
+
+    if not response.ok:
+        await ctx.respond(f"Error occurred 😵, code `{response.status_code}`")
+        return
+
+    embed = hk.Embed()
+    lst_vids = []
+    embed.set_footer(f"Requested by: {ctx.author}", icon=ctx.author.avatar_url)
+    view = AuthorView(user_id=ctx.author.id)
+    for i in range(5):
+        qvideo = YTVideo(await response.json(), i)
+        await qvideo.set_duration(ctx.bot.d.aio_session)
+        embed.add_field(
+            f"`{i+1}.`",
+            (
+                f"```ansi\n\u001b[0;35m{qvideo.vid_name} \u001b[0;36m"
+                f"[{fuck_pep8(qvideo.vid_duration)}] ```"
+            ),
         )
+        lst_vids.append(qvideo)
 
-        if not response.ok:
-            await ctx.respond(f"Error occurred 😵, code `{response.status_code}`")
-            return
+        view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=f"{i+1}"))
+    view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
 
-        embed = hk.Embed()
-        lst_vids = []
-        embed.set_footer(f"Requested by: {ctx.author}", icon=ctx.author.avatar_url)
-        view = AuthorView(user_id=ctx.author.id)
-        for i in range(5):
-            qvideo = YTVideo(await response.json(), i)
-            await qvideo.set_duration(ctx.bot.d.aio_session)
-            embed.add_field(
-                f"`{i+1}.`",
-                (
-                    f"```ansi\n\u001b[0;35m{qvideo.vid_name} \u001b[0;36m"
-                    f"[{fuck_pep8(qvideo.vid_duration)}] ```"
-                ),
-            )
-            lst_vids.append(qvideo)
+    choice = await ctx.respond(embed=embed, components=view)
+    await view.start(choice)
+    await view.wait()
 
-            view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label=f"{i+1}"))
-        view.add_item(KillButton(style=hk.ButtonStyle.DANGER, label="❌"))
-
-        choice = await ctx.respond(embed=embed, components=view)
-        await view.start(choice)
-        await view.wait()
-
-        if hasattr(view, "answer"):  # Check if there is an answer
-            await ctx.edit_last_response(
-                f"Video link: {lst_vids[int(view.answer)-1].link}",
-                embeds=[],
-                components=[],
-            )
-        else:
+    if hasattr(view, "answer"):  # Check if there is an answer
+        await ctx.edit_last_response(
+            f"Video link: {lst_vids[int(view.answer)-1].link}",
+            embeds=[],
+            components=[],
+        )
+    else:
+        # Checking if message isn't deleted by now
+        if ctx.responses:
             await ctx.edit_last_response("Process timed out.", embeds=[], components=[])
-            return
-    except Exception as e:
-        await ctx.respond(e)
+        return
 
 
 def load(bot: lb.BotApp) -> None:
