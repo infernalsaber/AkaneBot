@@ -17,10 +17,8 @@ DSC_SYNTAX_GIST = (
 
 @compiler_plugin.command
 @lb.set_help(
-    (
-        "A function to return the output of your code. "
-        "\nUse print() to print whatever output you desire"
-    )
+    "A function to return the output of your code. "
+    "\nUse print() to print whatever output you desire"
 )
 @lb.option(
     "code", "The code to test", str, modifier=lb.commands.OptionModifier.CONSUME_REST
@@ -44,10 +42,8 @@ async def compiler(ctx: lb.Context, code: str) -> None:
 
     if not (code.startswith("```py") and code.endswith("```")):
         await ctx.respond(
-            (
-                f"The entered code is not formatted correctly according to python."
-                f" Consider referring : {hk.URL(DSC_SYNTAX_GIST)}."
-            )
+            f"The entered code is not formatted correctly according to python."
+            f" Consider referring : {hk.URL(DSC_SYNTAX_GIST)}."
         )
         return
 
@@ -61,10 +57,8 @@ async def compiler(ctx: lb.Context, code: str) -> None:
 
         if error:
             await ctx.respond(
-                (
-                    f"Process returned with error: "
-                    f"```{(str(error, 'UTF-8')).split('ntfc.py')[1][3:]}```"
-                )
+                f"Process returned with error: "
+                f"```{(str(error, 'UTF-8')).split('ntfc.py')[1][3:]}```"
             )
         else:
             if not output:
@@ -73,6 +67,33 @@ async def compiler(ctx: lb.Context, code: str) -> None:
                 await ctx.respond(
                     f"This is the output ```ansi\n{str(output, 'UTF-8')}```"
                 )
+
+
+@compiler_plugin.command
+@lb.set_help("A function to make a file")
+@lb.add_checks(lb.owner_only)
+@lb.option(
+    "file_data",
+    "The data to write in the file",
+    modifier=lb.OptionModifier.CONSUME_REST,
+)
+@lb.option("directory", "The dir to write to wrt root")
+@lb.command(
+    "mkfile",
+    "Make a file, not recommended :)",
+    pass_options=True,
+    aliases=["cf"],
+)
+@lb.implements(lb.PrefixCommand)
+async def file_writer(ctx: lb.Context, directory: str, file_data: str) -> None:
+    file_data = file_data.split("```")
+    if len(file_data) != 3:
+        await ctx.respond("Invalid form of data")
+
+    with open(directory, "w+", encoding="utf-8") as writer:
+        writer.write(file_data[1])
+
+    await ctx.respond("Done")
 
 
 def load(bot: lb.BotApp) -> None:

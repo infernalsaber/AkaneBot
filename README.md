@@ -76,6 +76,8 @@ pip install -r requirements.txt
 ```
 To install the dependencies
 
+If you plan to modify the source code, do the same for `requirements_dev.txt`
+
 If you're an active python developer, might want to create a [virtual environment first](https://www.freecodecamp.org/news/how-to-setup-virtual-environments-in-python/)
 
 

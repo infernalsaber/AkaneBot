@@ -72,9 +72,11 @@ class AuthorNavi(nav.NavigatorView):
         return False
 
     async def on_timeout(self) -> None:
+        # if self.message.app.d.chapter_info[self.message_id]:
+        #     self.message.app.d.chapter_info[self.message_id] = None
+
         if self.message:
             await self.message.edit(components=[])
-
         # Clearing the memory occupied by the preview
         # if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
         # self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
@@ -87,7 +89,7 @@ class AuthorView(miru.View):
         self,
         *,
         autodefer: bool = True,
-        timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
+        timeout: t.Optional[t.Union[float, int, timedelta]] = 5 * 60,
         session: t.Optional[aiohttp_client_cache.CachedSession] = None,
         user_id: t.Optional[hk.Snowflake] = None,
     ) -> None:
@@ -96,7 +98,35 @@ class AuthorView(miru.View):
         super().__init__(autodefer=autodefer, timeout=timeout)
 
     async def on_timeout(self) -> None:
-        ...
+        # try:
+        if self.message:
+            # await self.message.edit(content=self.children)
+            new_view = None
+            for item in self.children:
+                if not item.url:
+                    new_view = self.remove_item(item)
+                # else:
+
+                # else:
+
+            # for row in self.message.components:
+            # for component in row:
+            # if component.url is None:
+            # hk.ActionRowComponent.components
+            # print("Trying to remove component")
+            # self.remove_item(component)
+            # print("Removed component")
+            # awit self.message.edit
+            # print("hackywacky")
+            # else:
+            # print(f"This has a link broski")
+            # hk.MessageFlag.
+            # print("trying to edit message now")
+            await self.message.edit(components=new_view)
+            # print("edited message")
+
+        # except Exception as e:
+        # await self.message.edit(content=e)
 
     async def view_check(self, ctx: miru.Context) -> bool:
         if ctx.user.id == self.user_id:
@@ -129,12 +159,15 @@ class PreView(nav.NavigatorView):
         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
 
     async def on_timeout(self) -> None:
+        # Clearing the memory occupied by the pages
+        if self.message.app.d.chapter_info[self.message_id]:
+            self.message.app.d.chapter_info[self.message_id] = None
+
         if self.message:
             await self.message.edit(components=[])
 
-        # Clearing the memory occupied by the pages
-        if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
-            self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
+        # if self.get_context(self.message).bot.d.chapter_info[self.message_id]:
+        # self.get_context(self.message).bot.d.chapter_info[self.message_id] = None
 
     async def view_check(self, ctx: miru.Context) -> bool:
         if ctx.user.id == self.user_id:
@@ -155,6 +188,9 @@ class TabbedSwitcher(miru.View):
     def __init__(
         self,
         *,
-        pages,
+        pages: t.Sequence[hk.Embed],
+        buttons: t.Sequence[t.Tuple[t.Optional[str], t.Optional[hk.Emoji]]],
+        active_style: hk.ButtonStyle,
+        normal_style: hk.ButtonStyle,
     ):
         ...

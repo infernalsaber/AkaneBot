@@ -66,8 +66,19 @@ async def pfp_sauce(ctx: lb.UserContext):
 
             try:
                 embed, view = await _complex_parsing(ctx, res["results"][0])
+                if float(res["results"][0]["header"]["similarity"]) < 60.0:
+                    url["url"] = url["url"].split("?")[0]
+                    view.add_item(
+                        GenericButton(
+                            url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
+                            label="Search Yandex",
+                        )
+                    )
                 await ctx.respond(
-                    embed=embed, components=view, flags=hk.MessageFlag.EPHEMERAL
+                    content=f"User: {ctx.options.target.mention}",
+                    embed=embed,
+                    components=view,
+                    flags=hk.MessageFlag.EPHEMERAL,
                 )
             except Exception:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
@@ -116,7 +127,8 @@ async def find_sauce_menu(ctx: lb.MessageContext):
             try:
                 embed, view = await _complex_parsing(ctx, res["results"][0])
 
-                if float(res["results"][0]["header"]["similarity"]) < 55.0:
+                if float(res["results"][0]["header"]["similarity"]) < 60.0:
+                    url["url"] = url["url"].split("?")[0]
                     view.add_item(
                         GenericButton(
                             url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
@@ -125,7 +137,11 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                     )
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
-                choice = await ctx.respond(embed=embed, components=view)
+                choice = await ctx.respond(
+                    content=ctx.options.target.make_link(ctx.guild_id),
+                    embed=embed,
+                    components=view,
+                )
                 await view.start(choice)
                 await view.wait()
             except Exception as e:
@@ -207,12 +223,12 @@ async def find_sauce(
                 await view.wait()
             except Exception:
                 embed, view = await _simple_parsing(ctx, data)
-                choice = view.add_item(
-                    KillButton(style=hk.ButtonStyle.SECONDARY, label="❌")
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                choice = await ctx.edit_last_response(
+                    content=None, embed=embed, components=view
                 )
                 await view.start(choice)
                 await view.wait()
-                await ctx.edit_last_response(content=None, embed=embed, components=view)
         else:
             await ctx.edit_last_response(f"Ran into en error, `code : {res.status}`")
 
@@ -612,11 +628,10 @@ async def _find_the_url(ctx) -> dict:
         url = ctx.raw_options["link"]
 
         if not check_if_url(url):
+            msg = "There's no valid url in this message <:AkaneSip:1095068327786852453>"
             return {
                 "url": None,
-                "errorMessage": (
-                    "There's no valid url in this message <:AkaneSip:1095068327786852453>",
-                ),
+                "errorMessage": msg,
             }
         try:
             if _is_tenor_link(url):
@@ -627,11 +642,10 @@ async def _find_the_url(ctx) -> dict:
                 return {"url": link, "errorMessage": None}
 
             if not await is_image(url, ctx.bot.d.aio_session):
+                msg = "Please enter a valid image link <:AkaneSmile:872675969041846272>"
                 return {
                     "url": url,
-                    "errorMessage": (
-                        "Please enter a valid image link <:AkaneSmile:872675969041846272>",
-                    ),
+                    "errorMessage": msg,
                 }
 
             return {"url": url, "errorMessage": None}
@@ -660,12 +674,11 @@ async def _find_the_url(ctx) -> dict:
         url = None
         errorMessage = "No valid url found"
 
-        if len(ctx.options["target"].attachments) == 0:
+        if not ctx.options["target"].attachments:
+            msg = "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>"
             return {
                 "url": None,
-                "errorMessage": (
-                    "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>",
-                ),
+                "errorMessage": msg,
             }
 
         if await is_image(

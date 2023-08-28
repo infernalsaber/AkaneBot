@@ -14,23 +14,23 @@ reloader_plugin.d.help = False
 @lb.option(
     "extension",
     "The extension to reload",
-    choices=[i[13:-3].replace("/", ".") for i in glob.glob("./extensions/*.py")],
+    choices=[i[13:-3].replace("/", ".") for i in glob.glob("./extensions/*.py")]
+    + ["all"],
 )
 @lb.command("reload", "Reload an extension", pass_options=True, aliases=["rl"])
 @lb.implements(lb.PrefixCommand, lb.SlashCommand)
 async def reload_plugin(ctx: lb.Context, extension: str) -> None:
     """Reload an extension"""
 
-    try:
-        if extension == "all":
-            for i in glob.glob("./extensions/*.py"):
-                ctx.bot.reload_extensions(f"{i[2:-3].replace('/', '.')}")
-            await ctx.respond("Reloaded all extensions")
-            return
-    except Exception as e:
-        await ctx.respond(f"Error: `{e}`")
+    if extension == "all":
+        for i in glob.glob("./extensions/*.py"):
+            i = i.replace("/", ".").replace("\\", ".")
+            ctx.bot.reload_extensions(f"{i[2:-3]}")
+        await ctx.respond("Reloaded all extensions")
+        return
 
     ctx.bot.reload_extensions(f"extensions.{extension}")
+    await ctx.bot.sync_application_commands()
     await ctx.respond("Extension reloaded successfully.")
 
 

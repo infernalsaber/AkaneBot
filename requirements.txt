@@ -1,11 +1,11 @@
-hikari[speedups]>=2.0.0.dev120
-hikari-lightbulb>=2.3.3
-hikari-miru>=3.1.2
+hikari[speedups]==2.0.0.dev120
+hikari-lightbulb==2.3.3
+hikari-miru==3.1.2
 
 python-dotenv>=0.21.0
 
 aiohttp==3.8.3
-plotly
+plotly==5.15.0
 isodate==0.6.1
 psutil
 Pillow
@@ -15,11 +15,9 @@ kaleido==0.2.1
 aiohttp-client-cache==0.8.1
 beautifulsoup4
 lxml
-fuzzywuzzy[speedup]
+rapidfuzz
 pandas
 fast-colorthief
-pre-commit
-
 
 # Putting this at the end coz W*ndows doesn't need it
 uvloop

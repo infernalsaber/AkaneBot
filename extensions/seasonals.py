@@ -1,12 +1,12 @@
 """Seasonal anime releases feed"""
 import asyncio
-import json
 import re
 from datetime import datetime, timezone
 
 import hikari as hk
 import lightbulb as lb
 from dateutil import parser
+from orjson import loads
 
 from functions.buttons import GenericButton, NewButton
 from functions.models import ColorPalette as colors
@@ -22,7 +22,7 @@ aniupdates.d.help = False
 async def _get_magnet_for(query: str):
     magnet_feed = "https://subsplease.org/rss/?r=1080"
     items = rss2json(magnet_feed)
-    items = json.loads(items)
+    items = loads(items)
 
     for i in items["feeds"]:
         if i["title"] == query:
@@ -34,7 +34,7 @@ async def _get_anime_updates() -> list:
     link_feed = "https://subsplease.org/rss/?t&r=1080"
 
     items = rss2json(link_feed)
-    items = json.loads(items)
+    items = loads(items)
     if not items["data"]["status"] == "ok":
         return []
 
@@ -167,7 +167,7 @@ async def return_anime_info(anime):
 
 def get_episode_number(name):
     name = name[13:-23].split("-")[-1].strip()
-    regex = "(\d+)(v\d)?"
+    regex = r"(\d+)(v\d)?"
 
     ep = re.search(regex, name).group(1)
 

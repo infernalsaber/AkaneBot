@@ -1,18 +1,24 @@
+"""Utility functions for the bot"""
 import io
-import json
 import random
-from datetime import datetime, timedelta
+import typing as t
+from datetime import timedelta
+from functools import lru_cache
 from urllib.parse import urlparse
 
 import feedparser
 import hikari as hk
+import isodate
 
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
+from ciso8601 import parse_datetime
 from fast_colorthief import get_dominant_color
+from orjson import dumps
 
 
+@lru_cache(maxsize=3, typed=False)
 def check_if_url(link: str) -> bool:
     """Simple code to see if the given string is a url or not"""
     parsed = urlparse(link)
@@ -94,7 +100,7 @@ def rss2json(url):
 
     feedsdict["feeds"] = feedslist
 
-    return json.dumps(feedsdict)
+    return dumps(feedsdict)
 
 
 def verbose_timedelta(delta: timedelta) -> str:
@@ -111,7 +117,7 @@ def verbose_timedelta(delta: timedelta) -> str:
     m, s = divmod(s, 60)
     labels = ["day", "hour", "minute", "second"]
     dhms = [
-        "%s %s%s" % (i, lbl, "s" if i != 1 else "")
+        "{} {}{}".format(i, lbl, "s" if i != 1 else "")
         for i, lbl in zip([d, h, m, s], labels)
     ]
     for start in range(len(dhms)):
@@ -155,12 +161,13 @@ def verbose_date(*args) -> str:
     return verbose_date
 
 
-def iso_to_timestamp(iso_date) -> datetime:
+def iso_to_timestamp(iso_date: isodate.Duration) -> int:
     """Convert ISO datetime to timestamp"""
     try:
-        return int(
-            datetime.fromisoformat(iso_date[:-1] + "+00:00").astimezone().timestamp()
-        )
+        return int(parse_datetime(iso_date).astimezone().timestamp())
+        # return int(
+        # datetime.fromisoformat(iso_date[:-1] + "+00:00").astimezone().timestamp()
+        # )
 
     except ValueError:  # Incase the datetime is not in the iso format, return it as is
         return iso_date
@@ -183,6 +190,7 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
         return link
 
 
+@lru_cache(maxsize=3)
 async def get_image_dominant_colour(link: str) -> hk.Color:
     """Get the dominant colour of an image from a link to it
 
@@ -194,27 +202,30 @@ async def get_image_dominant_colour(link: str) -> hk.Color:
     """
     session = CachedSession()
 
-    return hk.Color.of(
-        get_dominant_color(
-            io.BytesIO(await (await session.get(link, stream=True, timeout=10)).read())
-        )
-    )
+    async with session.get(link, stream=True, timeout=10) as res:
+        input_bytes = await res.read()
+
+    session.close()
+
+    return hk.Color.of(get_dominant_color(io.BytesIO(input_bytes)))
 
 
-def humanized_list_join(lst) -> str:
-    if not isinstance(lst, list) or isinstance(lst, tuple):
+def humanized_list_join(lst: list, *, conj: t.Optional[str] = "or") -> str:
+    """As the name suggests, convert a list into a
+    nice string"""
+    if not isinstance(lst, list):
         return lst
 
-    if len(lst) == 0:
+    if not len(lst):
         return " "
 
     if len(lst) == 1:
         return lst[0]
 
-    return f"{','.join(lst[:-1])}" f"or {lst[-1]}"
+    return f"{','.join(lst[:-1])}" f"{conj} {lst[-1]}"
 
 
-async def get_anitrendz_latest(session: CachedSession):
+async def get_anitrendz_latest(session: CachedSession) -> str:
     try:
         link = "https://anitrendz.tumblr.com/"
         headers = {
@@ -231,7 +242,8 @@ async def get_anitrendz_latest(session: CachedSession):
         return link
 
 
-def get_random_quote():
+def get_random_quote() -> str:
+    """Funny loading messages"""
     return random.choice(
         [
             "Don't we have a job to do?",

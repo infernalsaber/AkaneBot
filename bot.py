@@ -73,10 +73,10 @@ bot = lb.BotApp(
     # | hk.Intents.ALL_PRIVILEGED,
     | hk.Intents.MESSAGE_CONTENT | hk.Intents.GUILD_MEMBERS,
     prefix=lb.when_mentioned_or(make_prefix),
-    help_class=BotHelpCommand,
+    # help_class=BotHelpCommand,
     logs="INFO",
     owner_ids=[701090852243505212],
-    help_slash_command=True,
+    # help_slash_command=True,
 )
 
 miru.install(bot)

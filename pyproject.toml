@@ -14,7 +14,8 @@ line-length = 100
 
 
 [tool.isort]
-known_third_party = ["PIL", "aiohttp_client_cache", "bs4", "dateutil", "dotenv", "fast_colorthief", "feedparser", "fuzzywuzzy", "hikari", "isodate", "lightbulb", "miru", "pandas", "plotly", "psutil"]
+known_third_party = ["PIL", "aiohttp_client_cache", "bs4", "ciso8601", "dateutil", "dotenv", "fast_colorthief", "feedparser", "hikari", "isodate", "lightbulb", "miru", "orjson", "pandas", "plotly", "psutil", "rapidfuzz"]
+profile= "black"
 
 [tool.black]
-target-versions = ["py311", "py38", "py39", "py310"]
+target-versions = ["py38", "py39", "py310", "py311"]

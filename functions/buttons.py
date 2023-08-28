@@ -54,7 +54,7 @@ async def preview_maker(
             )
         )
     # Kill the process if there are no pages
-    if len(pages) == 0:
+    if not pages:
         return None
     pages.append(
         hk.Embed(title=title, url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1")
@@ -274,8 +274,8 @@ class PreviewButton(nav.NavButton):
     async def before_page_change(self) -> None:
         ...
 
-    async def on_timeout(self, ctx: miru.ViewContext) -> None:
-        await ctx.edit_response(components=[])
+    # async def on_timeout(self, ctx: miru.ViewContext) -> None:
+    # await ctx.edit_response(components=[])
 
 
 class KillButton(miru.Button):

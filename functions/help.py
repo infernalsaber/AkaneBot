@@ -10,8 +10,10 @@ from lightbulb import commands
 from lightbulb import context as context_
 from lightbulb import errors, plugins
 from lightbulb.help_command import BaseHelpCommand
+from rapidfuzz import process
 
 from functions.components import SimpleTextSelect
+from functions.utils import humanized_list_join
 from functions.views import SelectView
 
 
@@ -81,10 +83,8 @@ class BotHelpCommand(BaseHelpCommand):
                     timestamp=datetime.now().astimezone(),
                 )
                 .set_thumbnail(
-                    (
-                        "https://media.discordapp.net/attachments/980479966389096460"
-                        "/1125810202277597266/rubyhelp.png?width=663&height=662"
-                    )
+                    "https://media.discordapp.net/attachments/980479966389096460"
+                    "/1125810202277597266/rubyhelp.png?width=663&height=662"
                 )
                 .set_image("https://i.imgur.com/LJ1t4wD.png")
             )
@@ -181,7 +181,7 @@ class BotHelpCommand(BaseHelpCommand):
         else:
             aliases = ""
 
-        if len(ctx.responses) == 0:
+        if not ctx.responses:
             await ctx.respond(
                 embed=hk.Embed(
                     color=0x000000,
@@ -297,3 +297,41 @@ class BotHelpCommand(BaseHelpCommand):
 
         embed.set_image(plugin.d.help_image)
         await ctx.respond(embed)
+
+    async def object_not_found(self, ctx, obj):
+        commands_and_plugins = []
+
+        all_cmds = [
+            *self.app.prefix_commands.items(),
+            *self.app.slash_commands.items(),
+            *self.app.message_commands.items(),
+            *self.app.user_commands.items(),
+        ]
+        # self.app.plugins
+
+        for cmd_name, cmd in all_cmds:
+            if not cmd.hidden:
+                commands_and_plugins.append(cmd_name)
+
+        close_matches: t.Optional[t.Tuple[str, int]] = process.extract(
+            obj, commands_and_plugins, score_cutoff=85, limit=None
+        )
+
+        possible_commands: t.Sequence = []
+
+        if close_matches:
+            possible_commands = [f"`{i}`" for i, _, _ in close_matches]
+
+        await ctx.respond(
+            f"Command `{obj}` not found. Did you mean: {humanized_list_join(possible_commands)}?"
+        )
+
+        # for cmd_name, cmd in self.app.prefix_commands.items():
+        # if not cmd.hidden:
+        # commands_and_plugins.append(cmd_name)
+        # for cmd_name, cmd in self.app.prefix_commands.items():
+        # if not cmd.hidden:
+        # commands_and_plugins.append(cmd_name)
+        # for cmd_name, cmd in self.app.prefix_commands.items():
+        # if not cmd.hidden:
+        # commands_and_plugins.append(cmd_name)

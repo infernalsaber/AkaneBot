@@ -1,4 +1,12 @@
 repos:
+# Can make do without this one tbh
+- repo: https://github.com/asottile/pyupgrade
+  rev: v3.10.1
+  hooks:
+    - id: pyupgrade
+      args: [ --py39-plus]
+
+
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.0.285
   hooks:
@@ -10,15 +18,15 @@ repos:
   hooks:
     - id: seed-isort-config
 
-# - repo: https://github.com/pycqa/isort
-#   rev: 5.12.0
-#   hooks:
-#     - id: isort
-#       args: [ -m, "3"] 
+- repo: https://github.com/pycqa/isort
+  rev: 5.12.0
+  hooks:
+    - id: isort
+      args: [ -m, "3"] 
 
 
-# - repo: https://github.com/psf/black
-#   rev: 23.7.0
-#   hooks:
-#   - id: black
+- repo: https://github.com/psf/black
+  rev: 23.7.0
+  hooks:
+  - id: black
 
