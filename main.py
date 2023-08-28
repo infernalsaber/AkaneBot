@@ -13,7 +13,7 @@ async def main_bot_loop():
                 break
 
             process = subprocess.Popen(
-                check, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                check, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
             )
             stdout, stderr = process.communicate()
             if not int.from_bytes(stdout, byteorder="big"):
