@@ -20,6 +20,11 @@ yt_plugin.d.help = True
 yt_plugin.d.help_emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
 
 
+def fuck_pep8(duration: str) -> str:
+    """Coz yeah"""
+    return duration[2:] if duration.startswith("0:") else duration
+
+
 @yt_plugin.command
 @lb.add_checks(lb.guild_only)
 @lb.set_help(
@@ -70,7 +75,7 @@ async def youtube_search(ctx: lb.Context, query: str) -> None:
                 f"`{i+1}.`",
                 (
                     f"```ansi\n\u001b[0;35m{qvideo.vid_name} \u001b[0;36m"
-                    f"[{qvideo.vid_duration[2:] if qvideo.vid_duration.startswith('0:') else qvideo.vid_duration}] ```"
+                    f"[{fuck_pep8(qvideo.vid_duration)}] ```"
                 ),
             )
             lst_vids.append(qvideo)
@@ -84,12 +89,12 @@ async def youtube_search(ctx: lb.Context, query: str) -> None:
 
         if hasattr(view, "answer"):  # Check if there is an answer
             await ctx.edit_last_response(
-                f"Video link: {lst_vids[int(view.answer)-1].get_link()}",
+                f"Video link: {lst_vids[int(view.answer)-1].link}",
                 embeds=[],
                 components=[],
             )
         else:
-            await ctx.edit_last_response("Process timed out.", embeds=[], views=[])
+            await ctx.edit_last_response("Process timed out.", embeds=[], components=[])
             return
     except Exception as e:
         await ctx.respond(e)

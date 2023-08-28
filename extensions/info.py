@@ -9,8 +9,8 @@ import hikari as hk
 import lightbulb as lb
 import pandas as pd
 import psutil
-from fuzzywuzzy import process
 from PIL import Image, ImageOps
+from rapidfuzz import process
 
 from functions.buttons import SwapButton
 from functions.models import ColorPalette as colors
@@ -24,17 +24,16 @@ info_plugin.d.help_image = "https://i.imgur.com/nsg3lZJ.png"
 
 
 @info_plugin.command
+@lb.add_checks(lb.guild_only)
 @lb.option("role", "The role", modifier=lb.OptionModifier.CONSUME_REST)
 @lb.command("inrole", "List of users in role", pass_options=True)
 @lb.implements(lb.PrefixCommand)
-async def inrole_cmd(
-    ctx: lb.Context, role: t.Union[hk.Role, hk.ScheduledEvent]
-) -> None:
+async def inrole_cmd(ctx: lb.Context, role: str) -> None:
     """List of members in a role or interested in an event
 
     Args:
         ctx (lb.Context): Context for the command
-        role (t.Union[hk.Role, hk.ScheduledEvent]): The role/event
+        role (str): The role/event
     """
 
     # Trying to convert it into an int (hk.SnowFlake) basically, if possible
@@ -45,15 +44,22 @@ async def inrole_cmd(
 
     if not isinstance(role, hk.Role):
         if isinstance(role, int):
-            for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id):
-                if role == role_[0]:
-                    role = role_[1]
+            for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
+                if role == role_.id:
+                    role = role_
                     break
+            else:
+                await ctx.respond("No matching roles found")
+                return
+
         elif role[0] == "<":
             for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
                 if role == role_.mention:
                     role = role_
                     break
+            else:
+                await ctx.respond("No matching roles found")
+                return
         else:
             guild_roles = {
                 role_.name: role_
@@ -68,199 +74,201 @@ async def inrole_cmd(
 
             # Unpacking the closest value, if it exists
             if ans:
-                closest_role_match, _ = ans
+                closest_role_match, _, _ = ans
 
                 role = guild_roles[closest_role_match]
             else:
                 await ctx.respond("No matching roles found")
                 return
 
-    if isinstance(role, hk.Role):
-        try:
-            d1, d2 = "", ""
-
-            counter: int = 0
-
-            pages = []
-
-            for member in ctx.bot.cache.get_members_view_for_guild(
-                ctx.guild_id
-            ).values():
-                if role.id in member.role_ids:
-                    d1 += f"{member.id: <20}\n"
-                    d2 += f"{member.username}\n"
-                    counter += 1
-
-            if counter == 0:
-                await ctx.respond(
-                    hk.Embed(
-                        title=f"List of users in {role.name} role ({counter})",
-                        timestamp=datetime.now().astimezone(),
-                        color=role.color or 0xFFFFFF,
-                    ).set_thumbnail(role.icon_url)
-                )
-
-                return
-
-            mem_ids = [
-                d1.split("\n")[i : i + 20] for i in range(0, len(d1.split("\n")), 20)
-            ]
-            mem_names = [
-                d2.split("\n")[i : i + 20] for i in range(0, len(d2.split("\n")), 20)
-            ]
-
-            for i, item in enumerate(mem_ids):
-                pages.append(
-                    hk.Embed(
-                        title=f"List of users in {role.name} role ({counter})",
-                        timestamp=datetime.now().astimezone(),
-                        color=role.color or 0xFFFFFF,
-                    )
-                    .set_thumbnail(role.icon_url)
-                    .add_field("UID", "\n".join(item), inline=True)
-                    .add_field("Name", "\n".join(mem_names[i]), inline=True)
-                )
-
-            if len(pages) == 1:
-                await ctx.respond(pages[0])
-                return
-
-            for page in pages:
-                ctx.author.send(page)
-
-            view = AuthorNavi(
-                pages=pages,
-                user_id=ctx.author.id,
-            )
-
-            await view.send(ctx.channel_id)
-            return
-        except Exception as e:
-            await ctx.respond(e)
-            return
-    else:
-        await ctx.respond("No matching roles found")
-
-
-@info_plugin.command
-@lb.add_checks(lb.has_guild_permissions(hk.Permissions.MANAGE_EVENTS) | lb.owner_only)
-@lb.option("event", "The event", modifier=lb.OptionModifier.CONSUME_REST)
-@lb.command(
-    "inevent", "Fetch the list of members interested in an event", pass_options=True
-)
-@lb.implements(lb.PrefixCommand)
-async def inevent_cmd(ctx: lb.Context, event: t.Union[hk.ScheduledEvent, str]):
-    # try:
-
-    event = event.split()
-    if event[-1] == "--export":  # Whether to export the data as a csv
-        export = True
-        event = " ".join(event[:-1])
-    else:
-        export = False
-        event = " ".join(event)
-
-    probable_event = event
-
+    # if isinstance(role, hk.Role):
     try:
-        probable_event = int(probable_event)
-    except ValueError:
-        pass
+        d1, d2 = "", ""
 
-    event_: t.Optional[hk.ScheduledEvent] = None
-    events = await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
-    if isinstance(probable_event, int):
-        for event in events:
-            if probable_event == event.id:
-                event_ = event
-                break
-    else:
-        guild_events = {
-            event.name: event
-            for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
-        }
-        # for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id):
-        # guild_events[event.name] = event
+        counter: int = 0
 
-        ans = process.extractOne(
-            probable_event, list(guild_events.keys()), score_cutoff=80
-        )
-
-        # Unpacking the closest value, if it exists
-        if ans:
-            closest_role_match, _ = ans
-
-            event_ = guild_events[closest_role_match]
-
-    if not event_:
-        await ctx.respond("No matching events found")
-        return
-
-    event_members = []
-    members = list(await ctx.bot.rest.fetch_scheduled_event_users(ctx.guild_id, event_))
-
-    if not export:
-        for member in members:
-            if member.member:
-                event_members.append(
-                    f"`{member.member.id: <19}`  {member.member.username}"
-                )
-
-        paginated_members = [
-            event_members[i : i + 20] for i in range(0, len(event_members), 20)
-        ]
         pages = []
 
-        if len(event_members) == 0:
+        for member in ctx.bot.cache.get_members_view_for_guild(ctx.guild_id).values():
+            if role.id in member.role_ids:
+                d1 += f"{member.id: <20}\n"
+                d2 += f"{member.username}\n"
+                counter += 1
+
+        if not counter:
             await ctx.respond(
                 hk.Embed(
-                    title=f"List of users interested in {event.name} ({len(event_members)})",
+                    title=f"List of users in {role.name} role ({counter})",
                     timestamp=datetime.now().astimezone(),
-                    color=colors.DEFAULT,
-                ).set_image(event.image_url.url)
+                    color=role.color or 0xFFFFFF,
+                ).set_thumbnail(role.icon_url)
             )
 
             return
 
-        for item in paginated_members:
+        mem_ids = [
+            d1.split("\n")[i : i + 20] for i in range(0, len(d1.split("\n")), 20)
+        ]
+        mem_names = [
+            d2.split("\n")[i : i + 20] for i in range(0, len(d2.split("\n")), 20)
+        ]
+
+        for i, item in enumerate(mem_ids):
             pages.append(
                 hk.Embed(
-                    title=f"List of users interested in {event.name} ({len(event_members)})",
+                    title=f"List of users in {role.name} role ({counter})",
                     timestamp=datetime.now().astimezone(),
-                    color=colors.DEFAULT,
+                    color=role.color or 0xFFFFFF,
                 )
-                .set_image(event.image_url.url)
-                .add_field("\u200B", "\n".join(item))
+                .set_thumbnail(role.icon_url)
+                .add_field("UID", "\n".join(item), inline=True)
+                .add_field("Name", "\n".join(mem_names[i]), inline=True)
             )
 
         if len(pages) == 1:
             await ctx.respond(pages[0])
             return
 
+        for page in pages:
+            await ctx.author.send(page)
+
         view = AuthorNavi(
             pages=pages,
             user_id=ctx.author.id,
         )
+
         await view.send(ctx.channel_id)
+        return
+    except Exception as e:
+        await ctx.respond(e)
+        return
+    # else:
+    #     await ctx.respond("No matching roles found")
 
-    else:
+
+@info_plugin.command
+@lb.add_checks(lb.guild_only)
+@lb.add_checks(lb.has_guild_permissions(hk.Permissions.MANAGE_EVENTS) | lb.owner_only)
+@lb.option("event", "The event", modifier=lb.OptionModifier.CONSUME_REST)
+@lb.command(
+    "inevent", "Fetch the list of members interested in an event", pass_options=True
+)
+@lb.implements(lb.PrefixCommand)
+async def inevent_cmd(ctx: lb.Context, event: str):
+    try:
+        events = event.split()
+        if events[-1] == "--export":  # Whether to export the data as a csv
+            export = True
+            event = " ".join(events[:-1])
+        else:
+            export = False
+            event = " ".join(events)
+
+        probable_event = event
+
         try:
-            mem_ids, mem_names = [], []
-            for member in members:
-                if member.member:
-                    mem_ids.append(member.member.id)
-                    mem_names.append(member.member.username)
+            probable_event = int(probable_event)
+        except ValueError:
+            pass
 
-            test_bytes = io.BytesIO()
+        event_: t.Optional[hk.ScheduledEvent] = None
+        events = await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
+        if isinstance(probable_event, int):
+            for event in events:
+                if probable_event == event.id:
+                    event_ = event
+                    break
+        else:
+            guild_events = {
+                event.name: event
+                for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
+            }
+            # for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id):
+            # guild_events[event.name] = event
 
-            pd.DataFrame({"User IDs": mem_ids, "User Names": mem_names}).to_csv(
-                test_bytes, index=False
+            ans = process.extractOne(
+                probable_event, list(guild_events.keys()), score_cutoff=80
             )
 
-            await ctx.respond(hk.Bytes(test_bytes.getvalue(), "event.csv"))
+            # Unpacking the closest value, if it exists
+            if ans:
+                closest_role_match, _, _ = ans
 
-        except Exception as e:
-            await ctx.respond(f"Erra: {e}")
+                event_ = guild_events[closest_role_match]
+
+        if not event_:
+            await ctx.respond("No matching events found")
+            return
+
+        event_members = []
+        members = list(
+            await ctx.bot.rest.fetch_scheduled_event_users(ctx.guild_id, event_)
+        )
+
+        if not export:
+            for member in members:
+                if member.member:
+                    event_members.append(
+                        f"`{member.member.id: <19}`  {member.member.username}"
+                    )
+
+            paginated_members = [
+                event_members[i : i + 20] for i in range(0, len(event_members), 20)
+            ]
+            pages = []
+
+            if not event_members:
+                await ctx.respond(
+                    hk.Embed(
+                        title=f"List of users interested in {event_.name} ({len(event_members)})",
+                        timestamp=datetime.now().astimezone(),
+                        color=colors.DEFAULT,
+                    ).set_image(event_.image_url)
+                )
+
+                return
+
+            for item in paginated_members:
+                pages.append(
+                    hk.Embed(
+                        title=f"List of users interested in {event_.name} ({len(event_members)})",
+                        timestamp=datetime.now().astimezone(),
+                        color=colors.DEFAULT,
+                    ).set_image(event_.image_url)
+                    # hk.files.resou
+                    .add_field("\u200B", "\n".join(item))
+                )
+
+            if len(pages) == 1:
+                await ctx.respond(pages[0])
+                return
+
+            view = AuthorNavi(
+                pages=pages,
+                user_id=ctx.author.id,
+            )
+            await view.send(ctx.channel_id)
+
+        else:
+            try:
+                mem_ids, mem_names = [], []
+                for member in members:
+                    if member.member:
+                        mem_ids.append(member.member.id)
+                        mem_names.append(member.member.username)
+
+                test_bytes = io.BytesIO()
+
+                pd.DataFrame({"User IDs": mem_ids, "User Names": mem_names}).to_csv(
+                    test_bytes, index=False
+                )
+
+                await ctx.respond(hk.Bytes(test_bytes.getvalue(), "event.csv"))
+
+            except Exception as e:
+                await ctx.respond(f"Erra: {e}")
+    except Exception as e:
+        await ctx.respond(f"Error: {e}")
 
 
 @info_plugin.command
@@ -494,7 +502,7 @@ async def botinfo(ctx: lb.Context) -> None:
         process = subprocess.Popen(
             "git rev-list --count main",
             text=True,
-            shell=True,
+            # shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -568,10 +576,10 @@ async def botinfo(ctx: lb.Context) -> None:
         await view.start(choice)
         await view.wait()
 
-        if hasattr(view, "answer"):
-            pass
-        else:
-            await ctx.edit_last_response(components=[])
+        # if hasattr(view, "answer"):
+        #     pass
+        # else:
+        #     await ctx.edit_last_response(components=[])
     except Exception as e:
         await ctx.respond(e)
 
@@ -657,7 +665,7 @@ async def emote_info(
 
     emotes = list(set(emotes))
 
-    if len(emotes) == 0:
+    if not emotes:
         await ctx.respond("No emotes found")
         return
     elif len(emotes) > 5:
@@ -744,41 +752,44 @@ async def emote_removal(
         (should have the emotes in the message)
     """
 
-    words = ctx.event.message.content.split(" ")
-    if len(words) == 1:
-        await ctx.respond(
-            hk.Embed(
-                title="Remove emote help",
-                description=(
-                    "Remove an emote or multiple, simple as that (upto 5)"
-                    "\n\n"
-                    "Usage: `-re <emote1> <emote2>....`"
-                ),
+    try:
+        words = ctx.event.message.content.split(" ")
+        if len(words) == 1:
+            await ctx.respond(
+                hk.Embed(
+                    title="Remove emote help",
+                    description=(
+                        "Remove an emote or multiple, simple as that (upto 5)"
+                        "\n\n"
+                        "Usage: `-re <emote1> <emote2>....`"
+                    ),
+                )
             )
-        )
-        return
-    emotes = []
-    for word in words:
-        try:
-            emote = hk.Emoji.parse(word)
-            emote = await ctx.bot.rest.fetch_emoji(ctx.guild_id, emoji=emote)
+            return
+        emotes = []
+        for word in words[1:]:
+            try:
+                emote = hk.Emoji.parse(word)
+                emote = await ctx.bot.rest.fetch_emoji(ctx.guild_id, emoji=emote)
 
-            emotes.append(emote)
+                emotes.append(emote)
 
-        except ValueError:
-            continue
+            except ValueError:
+                continue
 
-        except hk.NotFoundError:
-            continue
+            except hk.NotFoundError:
+                continue
 
-    emotes = list(set(emotes))
+        emotes = list(set(emotes))
 
-    if len(emotes) == 0:
-        await ctx.respond("No emotes found")
-        return
+        if not emotes:
+            await ctx.respond("No emotes found")
+            return
 
-    if len(emotes) > 5:
-        await ctx.respond("Too many emotes, removing the first five at once")
+        if len(emotes) > 5:
+            await ctx.respond("Too many emotes, removing the first five at once")
+    except Exception as e:
+        await ctx.respond(f"Early {e}")
 
     for emote in emotes[:5]:
         try:

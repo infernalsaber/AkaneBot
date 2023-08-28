@@ -8,8 +8,8 @@ from datetime import datetime
 
 import hikari as hk
 import lightbulb as lb
-from fuzzywuzzy import process
 from lightbulb.ext import tasks
+from rapidfuzz import process
 
 from functions.models import ColorPalette as colors
 from functions.utils import check_if_url, humanized_list_join
@@ -87,14 +87,14 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
         if commandish in prefix_commands_and_aliases:
             pass
         else:
-            close_matches: t.Optional[t.Tuple[str, int]] = process.extractBests(
+            close_matches: t.Optional[t.Tuple[str, int]] = process.extract(
                 commandish, prefix_commands_and_aliases, score_cutoff=99, limit=3
             )
 
             possible_commands: t.Sequence = []
 
             if close_matches:
-                possible_commands = [i for i, _ in close_matches]
+                possible_commands = [i for i, _, _ in close_matches]
             else:
                 return
 

@@ -1,6 +1,8 @@
+"""Utility classes for everything"""
 import collections
 import os
 from datetime import datetime, timedelta
+from enum import Enum, IntEnum
 
 import aiohttp_client_cache
 import dotenv
@@ -29,7 +31,8 @@ class YTVideo:
         self.vid_channel: str = search_results["items"][i]["snippet"]["channelTitle"]
         self.vid_duration: str = ""
 
-    def get_link(self) -> str:
+    @property
+    def link(self) -> str:
         """Getting a link to the vid"""
         return f"https://www.youtube.com/watch?v={self.vid_id}"
 
@@ -47,14 +50,32 @@ class YTVideo:
             isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
         )
         if self.vid_duration.startswith("0:"):
-            self.vid_duration = str(
-                isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
-            )[2:]
+            # self.vid_duration = str(
+            #     isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
+            # )[2:]
             return self.vid_duration[2:]
         return self.vid_duration
 
 
-class ColorPalette:
+class EmoteCollection(Enum):
+    """Custom Emotes used by the bot"""
+
+    SIP = "<:AkaneSip:1095068327786852453>"
+    SMILE = "<:AkaneSmile:872675969041846272>"
+
+    PIXIV = "<:pixiv:1130216490021425352>"
+    VNDB = "<:vndb_circle:1130453890307997747>"
+    AL = "<:anilist:1127683041372942376>"
+    NYAA = "<:nyaasi:1127717935968952440>"
+    YOUTUBE = "<a:youtube:1074307805235920896>"
+
+    NEXT = "<:pink_arrow_right:1059900771816189953>"
+    PREVIOUS = "<:pink_arrow_left:1059905106075725955>"
+    GEAR = "<:MIU_changelog:1108056158377349173>"
+    LOADING = "<a:Loading_:1061933696648740945>"
+
+
+class ColorPalette(IntEnum):
     """Commonly required colours for the bot + extras"""
 
     ANILIST = 0x2B2D42
@@ -74,8 +95,8 @@ class ColorPalette:
     DAWN_PINK = 0xF4EAE9
 
 
-class ColourPalette(ColorPalette):
-    """Alias for :obj:`~ColorPalette`."""
+ColourPalette = ColorPalette
+"""Alias for :obj:`~ColorPalette`."""
 
 
 class AnilistBase:

@@ -1,6 +1,7 @@
 """Make cool plot charts"""
 
 import io
+from collections import Counter
 
 import hikari as hk
 import lightbulb as lb
@@ -22,45 +23,53 @@ plot_plugin.d.help_emoji = "📈"
 
 @plot_plugin.command
 @lb.set_help(
-    (
-        "Plot the activity of a series at airtime or compare multiple. \n"
-        "- For example, doing `[p]plot bocchi the rock` will return the activity "
-        "of Bocchi the Rock series during its airtime. \n"
-        "- To compare two series, you should seperate them with a 'vs' like so: \n"
-        "`[p]plot helck vs horimiya piece`\n"
-        "- To compare series across seasons, add a --autoscale flag at the end for eg."
-        "`[p]plot bocchi vs kaguya --autoscale` \n\n"
-        "Note: You should type out the full name of the series to avoid false matches"
-    )
+    "Plot the activity of a series at airtime or compare multiple. \n"
+    "- For example, doing `[p]plot bocchi the rock` will return the activity "
+    "of Bocchi the Rock series during its airtime. \n"
+    "- To compare two series, you should seperate them with a 'vs' like so: \n"
+    "`[p]plot helck vs horimiya piece`\n"
+    "- To compare series across seasons, add a --autoscale flag at the end for eg."
+    "`[p]plot bocchi vs kaguya --autoscale` \n\n"
+    "Note: You should type out the full name of the series to avoid false matches"
 )
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
 @lb.add_cooldown(3, 1, lb.GuildBucket)
 @lb.option(
     "query",
     "The names of the series(') to plot",
-    modifier=lb.commands.OptionModifier.CONSUME_REST,
+    modifier=lb.commands.OptionModifier.GREEDY,
 )
 @lb.command(
     "plot", "Plot some trendz", pass_options=True, auto_defer=True, aliases=["p"]
 )
 @lb.implements(lb.PrefixCommand)
-async def compare_trends(ctx: lb.PrefixContext, query: str) -> None:
+async def compare_trends(ctx: lb.PrefixContext, query: list[str]) -> None:
     """Compare the popularity and ratings of two different anime
     Args:
         ctx (lb.Context): The event context (irrelevant to the user)
-        query (str): The name of the two anime (seperated by "vs")
+        query (list[str]): The name of the two anime (seperated by "vs")
     """
-
+    # list.remove()
     try:
-        queries = query.split()
-        if queries[-1] == "--autoscale":  # Auto scale
-            autoscale = True
-            query = " ".join(queries[:-1])
-        else:
-            autoscale = False
-            query = " ".join(queries)
+        if Counter(query)["vs"] > 1:
+            await ctx.respond("The command only works for one or two series.")
+            return
+        # if "--autoscale" in query:
+        autoscale = True if "--autoscale" in query else False
+        query.remove("--autoscale") if "--autoscale" in query else ...
+        # else:
 
-        series = query.split("vs")
+        # autoscale
+        # TOO sort this mess
+        # queries = query.split()
+        # if queries[-1] == "--autoscale":  # Auto scale
+        # autoscale = True
+        # query = " ".join(queries[:-1])
+        # else:
+        # autoscale = False
+        # query = " ".join(queries)
+
+        series = ("\n".join(query)).split("vs")
         if len(series) not in [1, 2]:
             await ctx.respond("The command only works for one or two series.")
             return

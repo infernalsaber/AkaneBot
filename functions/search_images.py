@@ -1,10 +1,10 @@
 """
 This is the module to make 3x3s or find Google Image results
 """
-import json
 import re
 import typing as t
 
+import orjson
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
 
@@ -20,8 +20,8 @@ def original_images(soup):
         re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags))
     )
 
-    matched_images_data_fix = json.dumps(matched_images_data)
-    matched_images_data_json = json.loads(matched_images_data_fix)
+    matched_images_data_fix = orjson.dumps(matched_images_data)
+    matched_images_data_json = orjson.loads(matched_images_data_fix)
 
     matched_google_image_data = re.findall(
         r"\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}", matched_images_data_json

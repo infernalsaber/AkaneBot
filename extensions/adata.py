@@ -7,10 +7,10 @@ from typing import Optional
 import hikari as hk
 import lightbulb as lb
 import miru
-from fuzzywuzzy import process
+from rapidfuzz import process
 
-import functions.buttons as btns
-import functions.views as views
+from functions import buttons as btns
+from functions import views as views
 from functions.components import CharacterSelect, SimpleTextSelect
 from functions.errors import RequestsFailedError
 from functions.models import ALCharacter
@@ -86,16 +86,14 @@ async def get_imp_info(chapters):
 
 @al_listener.command
 @lb.set_help(
-    (
-        "### Search something on AL/VNDB (as applicable):"
-        "\nOptions: \n**anime**: Anime from AL"
-        "\n**manga**: Manga from AL (with preview)"
-        "\n**novel**: Novel/Light Novel from AL"
-        "\n**vn**: Visual Novel from VNDB"
-        "\n**vnc**: VN character from VNDB"
-        "\n**vntag**: VN Tag from VNDB"
-        "\n**vntrait**: VN character trait from VNDB"
-    )
+    "### Search something on AL/VNDB (as applicable):"
+    "\nOptions: \n**anime**: Anime from AL"
+    "\n**manga**: Manga from AL (with preview)"
+    "\n**novel**: Novel/Light Novel from AL"
+    "\n**vn**: Visual Novel from VNDB"
+    "\n**vnc**: VN character from VNDB"
+    "\n**vntag**: VN Tag from VNDB"
+    "\n**vntrait**: VN character trait from VNDB"
 )
 @lb.option(
     "media",
@@ -129,10 +127,9 @@ async def al_search(ctx: lb.Context, type: str, media: str) -> None:
 
     if isinstance(ctx, lb.PrefixContext):
         await ctx.respond(
-            (
-                "Please note that the lookup prefix command is depreciated and due to be removed. "
-                f"See the updated commands using `{ctx.prefix}help Lookup`."
-            )
+            "Please note that the lookup prefix command is depreciated and due to be removed. "
+            f"See the updated commands using `{ctx.prefix}help Lookup`."
+            "\n(The capitalization is important)"
         )
 
     if type.lower() in ["anime", "manga", "m", "a"]:
@@ -239,13 +236,11 @@ async def ln_search(ctx: lb.PrefixContext, query: str):
 
 @al_listener.command
 @lb.set_help(
-    (
-        "A simple character search from AL but with additional features.\n"
-        "To filter a character by series, simply addd a comma and the series name."
-        "\nEg. `[p]c Ryou, Bocchi the Rock` will give you Ryou Yamada from the BTR"
-        " series. \nIf you just enter `[p]c ,Bocchi the Rock` you'll get a dropdown of all "
-        "characters from the series"
-    )
+    "A simple character search from AL but with additional features.\n"
+    "To filter a character by series, simply addd a comma and the series name."
+    "\nEg. `[p]c Ryou, Bocchi the Rock` will give you Ryou Yamada from the BTR"
+    " series. \nIf you just enter `[p]c ,Bocchi the Rock` you'll get a dropdown of all "
+    "characters from the series"
 )
 @lb.option(
     "query", "The character query", modifier=lb.commands.OptionModifier.CONSUME_REST
@@ -293,7 +288,7 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
             pages = [
                 hk.Embed(
                     title="Top 10 Anime of the Week: AniTrendz", color=colors.LILAC
-                ).set_image((await get_anitrendz_latest(ctx.bot.d.aio_session))),
+                ).set_image(await get_anitrendz_latest(ctx.bot.d.aio_session)),
                 hk.Embed(
                     title="Top 10 Anime of the Week: AnimeCorner",
                     color=colors.LILAC,
@@ -326,10 +321,10 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
             await view.start(choice)
             await view.wait()
 
-            if hasattr(view, "answer"):
-                pass
-            else:
-                await ctx.edit_last_response(components=[])
+            # if hasattr(view, "answer"):
+            #     pass
+            # else:
+            #     await ctx.edit_last_response(components=[])
 
         except Exception as e:
             await ctx.respond(e)
@@ -604,10 +599,10 @@ query ($id: Int, $search: String, $type: MediaType) {
     await view.start(choice)
     await view.wait()
 
-    if hasattr(view, "answer"):  # Check if there is an answer
-        pass
-    else:
-        await ctx.edit_last_response(components=[])
+    # if hasattr(view, "answer"):  # Check if there is an answer
+    #     pass
+    # else:
+    #     await ctx.edit_last_response(components=[])
 
 
 async def _search_anime(ctx, anime: str):
@@ -694,12 +689,12 @@ query ($id: Int, $search: String, $type: MediaType) {
         await view.start(choice)
         await view.wait()
 
-        if hasattr(view, "answer"):  # Check if there is an answer
-            num = f"{view.answer}"
+        # if hasattr(view, "answer"):  # Check if there is an answer
+        #     num = f"{view.answer}"
 
-        else:
-            await ctx.edit_last_response(views=[])
-            return
+        # else:
+        #     await ctx.edit_last_response(components=[])
+        #     return
 
         num = int(num) - 1
 
@@ -720,7 +715,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         response["description"] = "NA"
 
     try:
-        view = views.AuthorView(user_id=ctx.author.id)
+        # view = views.AuthorView(user_id=ctx.author.id) KEY
 
         trailer = "Couldn't find anything."
 
@@ -749,6 +744,8 @@ query ($id: Int, $search: String, $type: MediaType) {
                 icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             )
         )
+
+        view.clear_items()
 
         if response["trailer"]:
             if response["trailer"]["site"] == "youtube":
@@ -895,49 +892,46 @@ query ($id: Int, $search: String, $type: MediaType) {
                 no_of_items = (
                     f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
                 )
-        # TODO Look at this
-        except lb.LightbulbError:
+
+        except IndexError:
             no_of_items = "NA"
     else:
         no_of_items = "NA"
 
-    try:
-        pages = [
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                description="\n\n",
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
-            )
-            .add_field("Rating", response["meanScore"] or "NA")
-            .add_field("Genres", ", ".join(response["genres"][:4]) or "NA")
-            .add_field("Status", response["status"] or "NA", inline=True)
-            .add_field(
-                "Chapters",
-                no_of_items or "NA",
-                inline=True,
-            )
-            .add_field("Summary", response["description"] or "NA")
-            .set_thumbnail(response["coverImage"]["large"])
-            .set_image(response["bannerImage"])
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            )
-        ]
-
-        buttons = [btns.PreviewButton(), btns.KillNavButton()]
-
-        navigator = views.PreView(
-            session=ctx.bot.d.aio_session,
-            pages=pages,
-            buttons=buttons,
-            timeout=180,
-            user_id=ctx.author.id,
+    pages = [
+        hk.Embed(
+            title=title,
+            url=response["siteUrl"],
+            description="\n\n",
+            color=colors.ANILIST,
+            timestamp=datetime.now().astimezone(),
         )
-    except Exception as e:
-        print(e)
+        .add_field("Rating", response["meanScore"] or "NA")
+        .add_field("Genres", ", ".join(response["genres"][:4]) or "NA")
+        .add_field("Status", response["status"] or "NA", inline=True)
+        .add_field(
+            "Chapters",
+            no_of_items or "NA",
+            inline=True,
+        )
+        .add_field("Summary", response["description"] or "NA")
+        .set_thumbnail(response["coverImage"]["large"])
+        .set_image(response["bannerImage"])
+        .set_footer(
+            text="Source: AniList",
+            icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+        )
+    ]
+
+    buttons = [btns.PreviewButton(), btns.KillNavButton()]
+
+    navigator = views.PreView(
+        session=ctx.bot.d.aio_session,
+        pages=pages,
+        buttons=buttons,
+        timeout=180,
+        user_id=ctx.author.id,
+    )
 
     if isinstance(ctx, lb.SlashContext):
         await navigator.send(ctx.interaction, responded=True)
@@ -954,6 +948,8 @@ query ($id: Int, $search: String, $type: MediaType) {
         response["coverImage"]["large"],
         pages,
     ]
+
+    await ctx.respond("this ")
 
 
 async def _search_characters(ctx: lb.Context, query: str):
@@ -1001,10 +997,10 @@ async def _search_characters(ctx: lb.Context, query: str):
             await view.start(choice)
             await view.wait()
 
-            if hasattr(view, "answer"):
-                pass
-            else:
-                await ctx.edit_last_response(components=[])
+            # if hasattr(view, "answer"):
+            #     pass
+            # else:
+            #     await ctx.edit_last_response(components=[])
 
             # await _search_character(ctx, character=query[0])
         return
@@ -1023,7 +1019,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 id
                 name {
                     full
-                    
+                    alternative
                 }
             }
         }        
@@ -1079,21 +1075,31 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             else:
                 # chara_choices = {}
 
-                chara_choices = {
-                    chara["name"]["full"]: chara["id"]
-                    for chara in response["data"]["Media"]["characters"]["nodes"]
-                }
+                # chara_choices = {
+                #     chara["name"]["full"]: chara["id"]
+                #     for chara in response["data"]["Media"]["characters"]["nodes"]
+                # }
+
+                chara_choices = collections.defaultdict(list)
+
+                for chara in response["data"]["Media"]["characters"]["nodes"]:
+                    chara_choices[chara["name"]["full"]] = chara["id"]
+                    for name in chara["name"]["alternative"]:
+                        chara_choices[name] = chara["id"]
+
+                # await ctx.respond(chara_choices)
+                # await ctx.respond(chara_choices.items())
 
                 # for chara in response["data"]["Media"]["characters"]["nodes"]:
                 # chara_choices[chara["name"]["full"]] = chara["id"]
 
-                closest_match, similarity_score = process.extractOne(
-                    query[0], chara_choices.items()
-                )
+                closest_match, _, _ = process.extractOne(query[0], chara_choices.keys())
+
+                # await ctx.respond(closest_match)
 
                 pages = await (
                     await ALCharacter.from_id(
-                        chara_choices[closest_match[0]], ctx.bot.d.aio_session
+                        chara_choices[closest_match], ctx.bot.d.aio_session
                     )
                 ).make_pages()
 
@@ -1119,10 +1125,10 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 await view.start(choice)
                 await view.wait()
 
-                if hasattr(view, "answer"):
-                    pass
-                else:
-                    await ctx.edit_last_response(components=[])
+                # if hasattr(view, "answer"):
+                #     pass
+                # else:
+                #     await ctx.edit_last_response(components=[])
 
                 # await ctx.respond(embeds=[await chara.makepages()])
 
@@ -1227,10 +1233,10 @@ async def _search_vn(ctx: lb.Context, query: str):
     await view.start(choice)
     await view.wait()
 
-    if hasattr(view, "answer"):  # Check if there is an answer
-        pass
-    else:
-        await ctx.edit_last_response(components=[])
+    # if hasattr(view, "answer"):  # Check if there is an answer
+    #     pass
+    # else:
+    #     await ctx.edit_last_response(components=[])
 
 
 def replace_bbcode_with_markdown(match: re.Match) -> str:
@@ -1346,7 +1352,7 @@ async def _search_vnchara(ctx: lb.Context, query: str):
                 ),
             ]
 
-            if i == 0:
+            if not i:
                 first_page = embed[0]
 
             options.append(miru.SelectOption(label=chara["name"], value=chara["name"]))
@@ -1421,10 +1427,10 @@ async def _search_vntag(ctx: lb.Context, query: str):
     await view.start(choice)
     await view.wait()
 
-    if hasattr(view, "answer"):  # Check if there is an answer
-        pass
-    else:
-        await ctx.edit_last_response(components=[])
+    # if hasattr(view, "answer"):  # Check if there is an answer
+    #     pass
+    # else:
+    #     await ctx.edit_last_response(components=[])
 
 
 async def _search_vntrait(ctx: lb.Context, query: str):
@@ -1488,10 +1494,10 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     await view.start(choice)
     await view.wait()
 
-    if hasattr(view, "answer"):  # Check if there is an answer
-        pass
-    else:
-        await ctx.edit_last_response(components=[])
+    # if hasattr(view, "answer"):  # Check if there is an answer
+    #     pass
+    # else:
+    #     await ctx.edit_last_response(components=[])
 
 
 @al_listener.listener(hk.StartedEvent)
@@ -1517,16 +1523,13 @@ async def on_starting(event: hk.StartedEvent) -> None:
 async def al_link_finder(event: hk.GuildReactionAddEvent) -> None:
     """Check if a message contains an animanga link and display it's info"""
 
-    try:
-        message = await al_listener.bot.rest.fetch_message(
-            event.channel_id, event.message_id
-        )
+    message = await al_listener.bot.rest.fetch_message(
+        event.channel_id, event.message_id
+    )
 
-        if not (event.is_for_emoji("🔍") or event.is_for_emoji("🔎")) or message.content:
-            return
-        list_of_series = pattern.findall(message.content) or []
-    except Exception as e:
-        print(e)
+    if not (event.is_for_emoji("🔍") or event.is_for_emoji("🔎")) or message.content:
+        return
+    list_of_series = pattern.findall(message.content) or []
 
     if len(list_of_series) != 0:
         for series in list_of_series:
