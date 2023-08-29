@@ -2,6 +2,7 @@
 import collections
 import re
 from datetime import datetime, timedelta
+from operator import itemgetter
 from typing import Optional
 
 import hikari as hk
@@ -28,8 +29,10 @@ al_listener.d.help = True
 al_listener.d.help_emoji = "🤔"
 
 
-pattern = re.compile(r"\b(https?:\/\/)?(www.)?anilist.co\/(anime|manga)\/(\d{1,6})")
-spoiler_str = re.compile(r"||")
+anilist_pattern = re.compile(
+    r"\b(https?:\/\/)?(www.)?anilist.co\/(anime|manga)\/(\d{1,6})"
+)
+vndb_pattern = re.compile(r"\b(https?:\/\/)?(www.)?vndb.org\/[a-z]\/(\d+)")
 
 
 def parse_description(description: str) -> str:
@@ -666,8 +669,8 @@ query ($id: Int, $search: String, $type: MediaType) {
         return
 
     num = 0
+    view = views.AuthorView(user_id=ctx.author.id)
     if not len((await response.json())["data"]["Page"]["media"]) == 1:
-        view = views.AuthorView(user_id=ctx.author.id)
         embed = hk.Embed(
             title="Choose the desired anime",
             color=0x43408A,
@@ -689,12 +692,12 @@ query ($id: Int, $search: String, $type: MediaType) {
         await view.start(choice)
         await view.wait()
 
-        # if hasattr(view, "answer"):  # Check if there is an answer
-        #     num = f"{view.answer}"
+        if hasattr(view, "answer"):  # Check if there is an answer
+            num = f"{view.answer}"
 
-        # else:
-        #     await ctx.edit_last_response(components=[])
-        #     return
+        else:
+            await ctx.edit_last_response(components=[])
+            return
 
         num = int(num) - 1
 
@@ -715,7 +718,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         response["description"] = "NA"
 
     try:
-        # view = views.AuthorView(user_id=ctx.author.id) KEY
+        # view = views.AuthorView(user_id=ctx.author.id)
 
         trailer = "Couldn't find anything."
 
@@ -1138,98 +1141,108 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
 
 async def _search_vn(ctx: lb.Context, query: str):
     """Search a vn"""
-    url = "https://api.vndb.org/kana/vn"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "filters": ["search", "=", query],
-        "fields": (
-            "title, image.url, rating, released, length_minutes, "
-            "description, tags.spoiler, tags.name,"
-            "tags.category,"
-            "tags.rating"
-        ),
-        # "sort": "title"
-    }
-    # try:
-    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
-
-    if not req.ok:
-        await ctx.respond(
-            hk.Embed(
-                title="SEARCH ERROR",
-                color=colors.WARN,
-                description=f"Your search query raised a `code:{req.status}` error",
-                timestamp=datetime.now().astimezone(),
-            )
-        )
-        # await ctx.respond("Couldn't find the VN you asked for.")
-        return
-
-    req = await req.json()
-
-    if not req["results"]:
-        await ctx.respond(
-            hk.Embed(
-                title="CAN'T FIND YOUR VN",
-                color=colors.ERROR,
-                description=f"Couldn't find the vn {query}",
-                timestamp=datetime.now().astimezone(),
-            )
-        )
-
-    if req["results"][0]["description"]:
-        description = parse_vndb_desciption(req["results"][0]["description"])
-    else:
-        description = "NA"
-
-    if req["results"][0]["released"]:
-        date = req["results"][0]["released"].split("-")
+    try:
+        url = "https://api.vndb.org/kana/vn"
+        headers = {"Content-Type": "application/json"}
+        data = {
+            "filters": ["search", "=", query],
+            "fields": (
+                "title, image.url, rating, released, length_minutes, "
+                "description, tags.spoiler, tags.name,"
+                "tags.category,"
+                "tags.rating"
+            ),
+            # "sort": "title"
+        }
         # try:
-        released = verbose_date(date[2], date[1], date[0])
-        # except Exception as e:
-        #     await ctx.respond(e)
-    else:
-        released = "Unreleased"
-
-    tags = "NA"
-
-    if req["results"][0]["tags"]:
-        tags = []
-        for tag in req["results"][0]["tags"]:
-            if tag["rating"] >= 2.7 and tag["category"] == "cont":
-                tags.append(tag["name"] if not tag["spoiler"] else f"||{tag['name']}||")
-
-            if len(tags) == 7:
-                break
-
-        tags = ", ".join(tags)
-
-    view = views.AuthorView(user_id=ctx.author.id)
-    view.add_item(btns.KillButton())
-    choice = await ctx.respond(
-        hk.Embed(
-            title=req["results"][0]["title"],
-            url=f"https://vndb.org/{req['results'][0]['id']}",
-            color=colors.VNDB,
-            timestamp=datetime.now().astimezone(),
+        req = await ctx.bot.d.aio_session.post(
+            url, headers=headers, json=data, timeout=3
         )
-        .add_field("Rating", req["results"][0]["rating"] or "NA")
-        .add_field("Tags", tags)
-        .add_field("Released", released, inline=True)
-        .add_field(
-            "Est. Time",
-            verbose_timedelta(timedelta(minutes=req["results"][0]["length_minutes"]))
-            if req["results"][0]["length_minutes"]
-            else "NA",
-            inline=True,
+
+        if not req.ok:
+            await ctx.respond(
+                hk.Embed(
+                    title="SEARCH ERROR",
+                    color=colors.WARN,
+                    description=f"Your search query raised a `code:{req.status}` error",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+            # await ctx.respond("Couldn't find the VN you asked for.")
+            return
+
+        req = await req.json()
+
+        if not req["results"]:
+            await ctx.respond(
+                hk.Embed(
+                    title="CAN'T FIND YOUR VN",
+                    color=colors.ERROR,
+                    description=f"Couldn't find the vn {query}",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+
+        if req["results"][0]["description"]:
+            description = parse_vndb_desciption(req["results"][0]["description"])
+        else:
+            description = "NA"
+
+        if req["results"][0]["released"]:
+            date = req["results"][0]["released"].split("-")
+            # try:
+            released = verbose_date(date[2], date[1], date[0])
+            # except Exception as e:
+            #     await ctx.respond(e)
+        else:
+            released = "Unreleased"
+
+        tags = "NA"
+
+        if req["results"][0]["tags"]:
+            tags = []
+            for tag in sorted(req["results"][0]["tags"], key=itemgetter("rating")):
+                if tag["category"] == "cont":
+                    tags.append(
+                        tag["name"] if not tag["spoiler"] else f"||{tag['name']}||"
+                    )
+
+                if len(tags) == 7:
+                    break
+
+            tags = ", ".join(tags if tags else ["NA"])
+
+        view = views.AuthorView(user_id=ctx.author.id)
+        view.add_item(btns.KillButton())
+        choice = await ctx.respond(
+            hk.Embed(
+                title=req["results"][0]["title"],
+                url=f"https://vndb.org/{req['results'][0]['id']}",
+                color=colors.VNDB,
+                timestamp=datetime.now().astimezone(),
+            )
+            .add_field("Rating", req["results"][0]["rating"] or "NA")
+            .add_field("Tags", tags)
+            .add_field("Released", released, inline=True)
+            .add_field(
+                "Est. Time",
+                verbose_timedelta(
+                    timedelta(minutes=req["results"][0]["length_minutes"])
+                )
+                if req["results"][0]["length_minutes"]
+                else "NA",
+                inline=True,
+            )
+            .add_field("Summary", description)
+            .set_thumbnail(req["results"][0]["image"]["url"])
+            .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg"),
+            components=view,
         )
-        .add_field("Summary", description)
-        .set_thumbnail(req["results"][0]["image"]["url"])
-        .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg"),
-        components=view,
-    )
-    await view.start(choice)
-    await view.wait()
+        await view.start(choice)
+        await view.wait()
+
+    except Exception as e:
+        await ctx.respond(e)
 
     # if hasattr(view, "answer"):  # Check if there is an answer
     #     pass
@@ -1527,7 +1540,7 @@ async def al_link_finder(event: hk.GuildReactionAddEvent) -> None:
 
     if not (event.is_for_emoji("🔍") or event.is_for_emoji("🔎")) or message.content:
         return
-    list_of_series = pattern.findall(message.content) or []
+    list_of_series = anilist_pattern.findall(message.content) or []
 
     if len(list_of_series) != 0:
         for series in list_of_series:

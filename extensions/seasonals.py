@@ -30,7 +30,7 @@ async def _get_magnet_for(query: str):
 
 
 async def _get_anime_updates() -> list:
-    # magnet_feed = "https://subsplease.org/rss/?r=1080"
+    # mag_feed = "https://subsplease.org/rss/?r=1080"
     link_feed = "https://subsplease.org/rss/?t&r=1080"
 
     items = rss2json(link_feed)
