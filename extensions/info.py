@@ -67,8 +67,6 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
                     ctx.guild_id
                 ).values()
             }
-            # for role_ in ctx.bot.cache.get_roles_view_for_guild(ctx.guild_id).values():
-            # guild_roles[role_.name] = role_
 
             ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=91)
 
@@ -142,13 +140,13 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
     except Exception as e:
         await ctx.respond(e)
         return
-    # else:
-    #     await ctx.respond("No matching roles found")
 
 
 @info_plugin.command
-@lb.add_checks(lb.guild_only)
-@lb.add_checks(lb.has_guild_permissions(hk.Permissions.MANAGE_EVENTS) | lb.owner_only)
+@lb.add_checks(
+    lb.guild_only,
+    lb.has_guild_permissions(hk.Permissions.MANAGE_EVENTS) | lb.owner_only,
+)
 @lb.option("event", "The event", modifier=lb.OptionModifier.CONSUME_REST)
 @lb.command(
     "inevent", "Fetch the list of members interested in an event", pass_options=True
@@ -183,8 +181,6 @@ async def inevent_cmd(ctx: lb.Context, event: str):
                 event.name: event
                 for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id)
             }
-            # for event in await ctx.bot.rest.fetch_scheduled_events(ctx.guild_id):
-            # guild_events[event.name] = event
 
             ans = process.extractOne(
                 probable_event, list(guild_events.keys()), score_cutoff=80
@@ -234,8 +230,8 @@ async def inevent_cmd(ctx: lb.Context, event: str):
                         title=f"List of users interested in {event_.name} ({len(event_members)})",
                         timestamp=datetime.now().astimezone(),
                         color=colors.DEFAULT,
-                    ).set_image(event_.image_url)
-                    # hk.files.resou
+                    )
+                    .set_image(event_.image_url)
                     .add_field("\u200B", "\n".join(item))
                 )
 
@@ -359,7 +355,6 @@ async def add_emote(
                         new_pixels = io.BytesIO()
                         im.save(new_pixels, format="PNG", optimize=True)
                         emote = new_pixels.getvalue()
-                        # emote = io.BytesIO(im.resize((new_w, new_h)).tobytes())
 
                     else:
                         pass
@@ -793,13 +788,6 @@ async def emote_removal(
 
     for emote in emotes[:5]:
         try:
-            # await ctx.author.send(
-            #     content=(
-            #         "## EMOTE REMOVAL NOTIFICATION\n"
-            #         f"Emote `{emote.name}` removed from `{ctx.get_guild()}`"
-            #     ),
-            #     attachment=emote,
-            # )
             await ctx.author.send(
                 hk.Embed(
                     title="EMOTE REMOVAL NOTIFICATION",

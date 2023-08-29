@@ -45,7 +45,6 @@ async def youtube_search(ctx: lb.Context, query: str) -> None:
         query (str): The query to search for
     """
 
-    # try:
     response_params = {
         "part": "snippet",
         "maxResults": "6",

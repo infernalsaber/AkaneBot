@@ -15,7 +15,6 @@ helper.d.help = False
 @lb.command("help", "See this message duh", pass_options=True)
 @lb.implements(lb.SlashCommand)
 async def help_slash_command(ctx: lb.Context, query: t.Optional[str]) -> None:
-    # Your code in here
     try:
         helper = BotHelpCommand(ctx.bot)
 
@@ -65,7 +64,3 @@ def unload(bot):
     bot.help_command = bot.d.old_help_command
     del bot.d.old_help_command
     bot.remove_plugin(helper)
-
-
-# def unload(bot: lb.BotApp) -> None:
-# """Unload the plugin"""

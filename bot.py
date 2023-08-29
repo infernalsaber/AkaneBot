@@ -63,7 +63,7 @@ def setup_logging() -> None:
     # add both handlers to the root logger
     root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
-    # set logging level to info
+    # set logging level to debug
     root_logger.setLevel(logging.DEBUG)
 
 
@@ -73,10 +73,9 @@ bot = lb.BotApp(
     # | hk.Intents.ALL_PRIVILEGED,
     | hk.Intents.MESSAGE_CONTENT | hk.Intents.GUILD_MEMBERS,
     prefix=lb.when_mentioned_or(make_prefix),
-    # help_class=BotHelpCommand,
     logs="INFO",
+    allow_color=False,
     owner_ids=[701090852243505212],
-    # help_slash_command=True,
 )
 
 miru.install(bot)
@@ -155,7 +154,8 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
         raise event.exception
 
     if isinstance(exception, lb.NotOwner):
-        return
+        await event.message.add_reaction()
+    # lb.CommandErrorEvent.
 
     elif isinstance(exception, lb.CommandIsOnCooldown):
         await event.context.respond(

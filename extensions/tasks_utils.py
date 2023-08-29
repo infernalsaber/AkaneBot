@@ -2,9 +2,9 @@
 import asyncio
 import glob
 import os
-import subprocess
 import typing as t
 from datetime import datetime
+from subprocess import PIPE, Popen
 
 import hikari as hk
 import lightbulb as lb
@@ -113,9 +113,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
 @lb.command("restart", "Update the bot's source and restart")
 @lb.implements(lb.PrefixCommand)
 async def update_and_restart(ctx: lb.Context) -> None:
-    with subprocess.Popen(
-        ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    ) as result:
+    with Popen(["git", "pull"], stdout=PIPE, stderr=PIPE) as result:
         output, error = result.communicate(timeout=12)
 
         if error:
@@ -149,6 +147,41 @@ async def embed_color(ctx: lb.Context, color: hk.Color) -> None:
             timestamp=datetime.now().astimezone(),
         )
     )
+
+
+def last_n_lines(filename, num_lines):
+    with Popen(["tail", f"-{num_lines}", filename], stderr=PIPE, stdout=PIPE) as pcs:
+        res, err = pcs.communicate()
+        if err:
+            return err.decode()
+    return res.decode()
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("filename", "The log file to read", required=False)
+@lb.option("num_lines", "The number of lines to fetch", int, required=False)
+@lb.command(
+    "latestlogs",
+    "Read from the bottom and find the latest logs",
+    aliases=["ll"],
+    pass_options=True,
+    hidden=True,
+)
+@lb.implements(lb.PrefixCommand)
+async def latest_logs(
+    ctx: lb.PrefixContext, num_lines: t.Optional[int], filename: t.Optional[str]
+) -> None:
+    await ctx.user.send(
+        hk.Bytes(
+            last_n_lines(
+                f"logs/{filename}" if filename else "logs/log.txt", num_lines or 100
+            ),
+            "log.txt",
+        )
+    )
+    await ctx.event.message.add_reaction("✅")
+    # await ctx.respond()
 
 
 @task_plugin.command
@@ -186,9 +219,7 @@ async def pingu(ctx: lb.Context, link: str) -> None:
 @lb.command("update", "Update the bot's source")
 @lb.implements(lb.PrefixCommand)
 async def update_code(ctx: lb.Context) -> None:
-    with subprocess.Popen(
-        ["git", "pull"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    ) as result:
+    with Popen(["git", "pull"], stdout=PIPE, stderr=PIPE) as result:
         output, error = result.communicate(timeout=12)
 
         if error:

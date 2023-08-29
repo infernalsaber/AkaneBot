@@ -57,17 +57,6 @@ async def compare_trends(ctx: lb.PrefixContext, query: list[str]) -> None:
         # if "--autoscale" in query:
         autoscale = True if "--autoscale" in query else False
         query.remove("--autoscale") if "--autoscale" in query else ...
-        # else:
-
-        # autoscale
-        # TOO sort this mess
-        # queries = query.split()
-        # if queries[-1] == "--autoscale":  # Auto scale
-        # autoscale = True
-        # query = " ".join(queries[:-1])
-        # else:
-        # autoscale = False
-        # query = " ".join(queries)
 
         series = ("\n".join(query)).split("vs")
         if len(series) not in [1, 2]:
