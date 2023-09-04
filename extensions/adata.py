@@ -555,11 +555,12 @@ query ($id: Int, $search: String, $type: MediaType) {
     )
 
     if not response.ok:
-        await ctx.respond(
-            f"Failed to fetch data 😵, error `code: {response.status_code}`"
-        )
+        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
         return
     response = (await response.json())["data"]["Media"]
+
+    if not response:
+        await ctx.respond("No novel found")
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
@@ -663,9 +664,7 @@ query ($id: Int, $search: String, $type: MediaType) {
     )
 
     if not response.ok or not len((await response.json())["data"]["Page"]["media"]):
-        await ctx.respond(
-            f"Failed to fetch data 😵, error `code: {response.status_code}`"
-        )
+        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
         return
 
     num = 0
@@ -775,22 +774,6 @@ query ($id: Int, $search: String, $type: MediaType) {
         await view.wait()
     except Exception as e:
         print(e)
-    # trailer = "Couldn't find anything."
-
-    # if response["trailer"]:
-    #     if response["trailer"]["site"] == "youtube":
-    #         trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
-    #     else:
-    #         trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
-
-    #     buttons = [
-    #         btns.TrailerButton(trailer=trailer, other_page=pages),
-    #         btns.KillNavButton(),
-    #     ]
-    # else:
-    #     buttons = [btns.KillNavButton()]
-
-    # views.AuthorNavi(pages=pages, buttons=buttons, timeout=180, user_id=ctx.author.id)
 
 
 async def _search_manga(ctx, manga: str):
@@ -835,12 +818,13 @@ query ($id: Int, $search: String, $type: MediaType) {
     )
 
     if not response.ok:
-        await ctx.respond(
-            f"Failed to fetch data 😵, error `code: {response.status_code}`"
-        )
+        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
         return
 
     response = (await response.json())["data"]["Media"]
+
+    if not response:
+        await ctx.respond("No manga found")
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
@@ -851,9 +835,8 @@ query ($id: Int, $search: String, $type: MediaType) {
 
     else:
         response["description"] = "NA"
-    print("response parsed ig")
 
-    print("\n\nUsing MD\n\n")
+    print("Using MD")
     base_url = "https://api.mangadex.org"
 
     order = {
@@ -1088,15 +1071,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                     for name in chara["name"]["alternative"]:
                         chara_choices[name] = chara["id"]
 
-                # await ctx.respond(chara_choices)
-                # await ctx.respond(chara_choices.items())
-
-                # for chara in response["data"]["Media"]["characters"]["nodes"]:
-                # chara_choices[chara["name"]["full"]] = chara["id"]
-
                 closest_match, _, _ = process.extractOne(query[0], chara_choices.keys())
-
-                # await ctx.respond(closest_match)
 
                 pages = await (
                     await ALCharacter.from_id(
@@ -1180,7 +1155,8 @@ async def _search_vn(ctx: lb.Context, query: str):
                     color=colors.ERROR,
                     description=f"Couldn't find the vn {query}",
                     timestamp=datetime.now().astimezone(),
-                )
+                ),
+                delete_after=15,
             )
 
         if req["results"][0]["description"]:
@@ -1190,10 +1166,11 @@ async def _search_vn(ctx: lb.Context, query: str):
 
         if req["results"][0]["released"]:
             date = req["results"][0]["released"].split("-")
-            # try:
-            released = verbose_date(date[2], date[1], date[0])
-            # except Exception as e:
-            #     await ctx.respond(e)
+            if len(date) == 3:
+                released = verbose_date(date[2], date[1], date[0])
+            else:
+                released = "-".join(date)
+
         else:
             released = "Unreleased"
 
@@ -1201,7 +1178,9 @@ async def _search_vn(ctx: lb.Context, query: str):
 
         if req["results"][0]["tags"]:
             tags = []
-            for tag in sorted(req["results"][0]["tags"], key=itemgetter("rating")):
+            for tag in sorted(
+                req["results"][0]["tags"], key=itemgetter("rating"), reverse=True
+            ):
                 if tag["category"] == "cont":
                     tags.append(
                         tag["name"] if not tag["spoiler"] else f"||{tag['name']}||"
@@ -1315,7 +1294,8 @@ async def _search_vnchara(ctx: lb.Context, query: str):
                 color=colors.ERROR,
                 description=f"Couldn't find the character {query}",
                 timestamp=datetime.now().astimezone(),
-            )
+            ),
+            delete_after=15,
         )
 
     try:
@@ -1409,7 +1389,8 @@ async def _search_vntag(ctx: lb.Context, query: str):
                 color=colors.ERROR,
                 description=f"Couldn't find the tag {query}",
                 timestamp=datetime.now().astimezone(),
-            )
+            ),
+            delete_after=15,
         )
 
     if req["results"][0]["description"]:
@@ -1476,7 +1457,8 @@ async def _search_vntrait(ctx: lb.Context, query: str):
                 color=colors.ERROR,
                 description=f"Couldn't find the trait {query}",
                 timestamp=datetime.now().astimezone(),
-            )
+            ),
+            delete_after=15,
         )
 
     if req["results"][0]["description"]:

@@ -4,12 +4,14 @@
 import os
 import re
 import typing as t
+from datetime import datetime
 
 import dotenv
 import hikari as hk
 import lightbulb as lb
 
-from functions.buttons import GenericButton, KillButton
+from functions.buttons import GenericButton, KillButton, SwapButton
+from functions.models import ColorPalette as colors
 from functions.utils import (
     check_if_url,
     get_random_quote,
@@ -32,7 +34,7 @@ sauce_plugin.d.help = True
 
 
 @sauce_plugin.command
-@lb.command("User pfp Sauce", "Sauce of user pfp", auto_defer=True)
+@lb.command("User pfp Sauce", "Sauce of user pfp", auto_defer=True, ephemeral=True)
 @lb.implements(lb.UserCommand)
 async def pfp_sauce(ctx: lb.UserContext):
     """Find the sauce of a user's pfp
@@ -78,12 +80,14 @@ async def pfp_sauce(ctx: lb.UserContext):
                     content=f"User: {ctx.options.target.mention}",
                     embed=embed,
                     components=view,
-                    flags=hk.MessageFlag.EPHEMERAL,
+                    # flags=hk.MessageFlag.EPHEMERAL,
                 )
             except Exception:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 await ctx.respond(
-                    embed=embed, components=view, flags=hk.MessageFlag.EPHEMERAL
+                    embed=embed,
+                    components=view,
+                    # flags=hk.MessageFlag.EPHEMERAL
                 )
         else:
             await ctx.respond(f"Ran into en error, `code : {res.status}`")
@@ -128,6 +132,30 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                 embed, view = await _complex_parsing(ctx, res["results"][0])
 
                 if float(res["results"][0]["header"]["similarity"]) < 60.0:
+                    disp_embed = hk.Embed(
+                        title="Possible false match",
+                        description=(
+                            "We might have encountered a false match."
+                            "\n\nFalse matches often contain NSFW matches or "
+                            "in rarer cases, what you're actually looking for."
+                            "\nPlease use the ❌ or Go Back button should that happen."
+                        ),
+                        color=colors.WARN,
+                        timestamp=datetime.now().astimezone(),
+                    )
+
+                    view.clear_items()
+                    # view = AuthorView(user_id=ctx.author.id)
+                    view.add_item(
+                        SwapButton(
+                            label1="Show anyway",
+                            label2="Go Back",
+                            emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
+                            emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
+                            original_page=disp_embed,
+                            swap_page=embed,
+                        )
+                    )
                     url["url"] = url["url"].split("?")[0]
                     view.add_item(
                         GenericButton(
@@ -135,15 +163,24 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                             label="Search Yandex",
                         )
                     )
-                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                    choice = await ctx.respond(
+                        content=ctx.options.target.make_link(ctx.guild_id),
+                        embed=disp_embed,
+                        components=view,
+                    )
+                    await view.start(choice)
+                    await view.wait()
+                else:
+                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
-                choice = await ctx.respond(
-                    content=ctx.options.target.make_link(ctx.guild_id),
-                    embed=embed,
-                    components=view,
-                )
-                await view.start(choice)
-                await view.wait()
+                    choice = await ctx.respond(
+                        content=ctx.options.target.make_link(ctx.guild_id),
+                        embed=embed,
+                        components=view,
+                    )
+                    await view.start(choice)
+                    await view.wait()
             except Exception as e:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
@@ -208,19 +245,51 @@ async def find_sauce(
             data = res["results"][0]
             try:
                 embed, view = await _complex_parsing(ctx, data)
-                if float(data["header"]["similarity"]) < 55.0:
+                if float(data["header"]["similarity"]) < 60.0:
+                    disp_embed = hk.Embed(
+                        title="Possible false match",
+                        description=(
+                            "We might have encountered a false match."
+                            "\n\nFalse matches often contain NSFW matches or "
+                            "in rarer cases, what you're actually looking for."
+                            "\nPlease use the ❌ or Go Back button should that happen."
+                        ),
+                        color=colors.WARN,
+                        timestamp=datetime.now().astimezone(),
+                    )
+                    view = AuthorView(user_id=ctx.author.id)
+                    view.add_item(
+                        SwapButton(
+                            label1="Show anyway",
+                            label2="Go Back",
+                            emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
+                            emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
+                            original_page=disp_embed,
+                            swap_page=embed,
+                        )
+                    )
+                    url["url"] = url["url"].split("?")[0]
                     view.add_item(
                         GenericButton(
                             url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
                             label="Search Yandex",
                         )
                     )
-                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                choice = await ctx.edit_last_response(
-                    content=None, embed=embed, components=view
-                )
-                await view.start(choice)
-                await view.wait()
+                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                    choice = await ctx.edit_last_response(
+                        content=None, embed=disp_embed, components=view
+                    )
+                    await view.start(choice)
+                    await view.wait()
+
+                else:
+                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                    choice = await ctx.edit_last_response(
+                        content=None, embed=embed, components=view
+                    )
+                    await view.start(choice)
+                    await view.wait()
+
             except Exception:
                 embed, view = await _simple_parsing(ctx, data)
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))

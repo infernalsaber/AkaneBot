@@ -1,16 +1,13 @@
 """Custom Button classes"""
-import io
 import typing as t
 
 import hikari as hk
 import miru
 from miru.ext import nav
 
+from functions.utils import proxy_img
 
 # from bs4 import BeautifulSoup
-async def poor_mans_proxy(link: str, session):
-    resp = await session.get(link, timeout=2)
-    return io.BytesIO(await resp.read())
 
 
 async def preview_maker(
@@ -26,16 +23,16 @@ async def preview_maker(
     r_json = await req.json()
     pages = []
 
-    try:
-        if (await session.get(r_json["chapter"]["dataSaver"][0])).ok:
-            print("OK\n\n\n")
-        else:
-            print("NOTOK\n\n\n")
-    except Exception as e:
-        print("ERra\n\n\n", e)
+    # try:
+    # if (await session.get(r_json["chapter"]["dataSaver"][0])).ok:
+    # print("OK\n\n\n")
+    # else:
+    # print("NOTOK\n\n\n")
+    # except Exception as e:
+    # print("ERra\n\n\n", e)
 
-    for page in r_json["chapter"]["data"][:5]:
-        # Proxy the first five at first
+    for page in r_json["chapter"]["data"]:
+        # Use dataSaver, figure out why it fails
         pages.append(
             hk.Embed(
                 title=title,
@@ -43,10 +40,13 @@ async def preview_maker(
                 url=f"https://mangadex.org/title/{manga_id}",
             )
             .set_image(
-                await poor_mans_proxy(
-                    f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}",
-                    session,
+                proxy_img(
+                    f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}"
                 )
+                # await poor_mans_proxy(
+                # f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}",
+                # session,
+                # )
             )
             .set_footer(
                 "Fetched via: MangaDex",
@@ -226,29 +226,15 @@ class PreviewButton(nav.NavButton):
 
             return
 
-        try:
-            for item in self.view.children:
-                if not item == self:
-                    self.view.remove_item(item)
-            data = ctx.bot.d.chapter_info[self.view.message_id]
-            swap_pages = None
-            if hasattr(self.view, "session"):
-                swap_pages = await preview_maker(
-                    data[0], data[1], data[2], data[3], data[4], self.view.session
-                )
-            # await self.view.swap_pages(
-            #     ctx, )
-            # )
-        except Exception:
-            await ctx.respond(
-                (
-                    f"Looks like MangaDex doesn't have this series "
-                    f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}"
-                    f"\nThat or some unknown error."
-                ),
-                flags=hk.MessageFlag.EPHEMERAL,
+        for item in self.view.children:
+            if not item == self:
+                self.view.remove_item(item)
+        data = ctx.bot.d.chapter_info[self.view.message_id]
+        swap_pages = None
+        if hasattr(self.view, "session"):
+            swap_pages = await preview_maker(
+                data[0], data[1], data[2], data[3], data[4], self.view.session
             )
-            return
 
         self.view.add_item(
             CustomPrevButton(
@@ -269,13 +255,19 @@ class PreviewButton(nav.NavButton):
         self.emoji = None
         if swap_pages:
             await self.view.swap_pages(ctx, swap_pages)
+        else:
+            await ctx.respond(
+                (
+                    f"Looks like MangaDex doesn't have this series "
+                    f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}"
+                    f"\nThat or some ungabunga error."
+                ),
+                flags=hk.MessageFlag.EPHEMERAL,
+            )
         # await ctx.edit_response(components=self.view)
 
     async def before_page_change(self) -> None:
         ...
-
-    # async def on_timeout(self, ctx: miru.ViewContext) -> None:
-    # await ctx.edit_response(components=[])
 
 
 class KillButton(miru.Button):
@@ -349,37 +341,42 @@ class SwapButton(miru.Button):
         )
 
     async def callback(self, ctx: miru.ViewContext):
-        if self.emoji == self.emoji1:
-            if self.label2 or self.emoji2:
-                self.label = self.label2
-                self.emoji = self.emoji2
+        try:
+            if (self.emoji and self.emoji == self.emoji1) or (
+                self.label and self.label == self.label1
+            ):
+                if self.label2 or self.emoji2:
+                    self.label = self.label2
+                    self.emoji = self.emoji2
 
-            # Page 1 -> 2
+                # Page 1 -> 2
 
-            if isinstance(self.swap_page, str):
+                if isinstance(self.swap_page, str):
+                    await ctx.edit_response(
+                        content=self.swap_page, embeds=[], components=self.view
+                    )
+                else:
+                    await ctx.edit_response(
+                        content=None, embeds=[self.swap_page], components=self.view
+                    )
+
+                return
+
+            # Page 2 -> 1
+
+            self.label = self.label1
+            self.emoji = self.emoji1
+
+            if isinstance(self.original_page, str):
                 await ctx.edit_response(
-                    content=self.swap_page, embeds=[], components=self.view
+                    content=self.original_page, embeds=[], components=self.view
                 )
             else:
                 await ctx.edit_response(
-                    content=None, embeds=[self.swap_page], components=self.view
+                    content=None, embeds=[self.original_page], components=self.view
                 )
-
-            return
-
-        # Page 2 -> 1
-
-        self.label = self.label1
-        self.emoji = self.emoji1
-
-        if isinstance(self.original_page, str):
-            await ctx.edit_response(
-                content=self.original_page, embeds=[], components=self.view
-            )
-        else:
-            await ctx.edit_response(
-                content=None, embeds=[self.original_page], components=self.view
-            )
+        except Exception as e:
+            await ctx.edit_response(content=e)
 
     async def before_page_change(self) -> None:
         ...

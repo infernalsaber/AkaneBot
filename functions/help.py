@@ -127,7 +127,8 @@ class BotHelpCommand(BaseHelpCommand):
                     color=0x000000,
                     title=f"{plugin.name} Help",
                     description=f"{plugin.description or 'No additional details provided.'}\n",
-                    timestamp=datetime.now().astimezone(),
+                ).set_footer(
+                    f"Use `{ctx.prefix}help <cmd_name>` for more details about a command"
                 )
 
                 for cmd_list, header in cmds:

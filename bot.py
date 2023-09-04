@@ -17,6 +17,10 @@ from functions.utils import verbose_timedelta
 
 dotenv.load_dotenv()
 
+# TODO
+# 1. Nox based testing
+# 2. Prefix configuration
+
 
 # Setting the prefix as , for windows (where i run the test bot)
 # and - for others (where it's deployed :) )
@@ -154,8 +158,7 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
         raise event.exception
 
     if isinstance(exception, lb.NotOwner):
-        await event.message.add_reaction()
-    # lb.CommandErrorEvent.
+        await event.context.event.message.add_reaction("❌")
 
     elif isinstance(exception, lb.CommandIsOnCooldown):
         await event.context.respond(
