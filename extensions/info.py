@@ -1,9 +1,9 @@
 """Get information about a role, server, user, bot etc."""
 import io
-import subprocess
 import typing as t
 from datetime import datetime
 from math import floor
+from subprocess import PIPE, Popen
 
 import hikari as hk
 import lightbulb as lb
@@ -494,23 +494,23 @@ async def botinfo(ctx: lb.Context) -> None:
             guild_obj = ctx.bot.cache.get_guild(guild)
             member = member + guild_obj.member_count
 
-        process = subprocess.Popen(
+        process = Popen(
             "git rev-list --count main",
             text=True,
             shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
         )
         num_commits, _ = process.communicate()
 
         num_commits = int(num_commits)
 
-        process = subprocess.Popen(
+        process = Popen(
             'git log -5 --format="<t:%at:D>: %s"',
             text=True,
             shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=PIPE,
+            stderr=PIPE,
         )
         changes, _ = process.communicate()
 

@@ -61,9 +61,12 @@ First clone the project:
 $ git clone https://github.com/infernalsaber/AkaneBot.git
 ```
 
+***Note**:
+You can also run the `SETUP.py` file (instructions in file)*
+
 Open the directory and run
 ```
-$ mv .example.env .env
+$ mv env.template .env
 ```
 
 Now put your Discord Bot Token and [SauceNAO Token](https://saucenao.com/) in the `.env` file
@@ -72,7 +75,7 @@ Now put your Discord Bot Token and [SauceNAO Token](https://saucenao.com/) in th
 
 Do
 ```
-pip install -r requirements.txt
+$ pip install -r requirements.txt
 ```
 To install the dependencies
 

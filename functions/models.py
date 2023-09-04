@@ -62,6 +62,7 @@ class EmoteCollection(Enum):
 
     SIP = "<:AkaneSip:1095068327786852453>"
     SMILE = "<:AkaneSmile:872675969041846272>"
+    THINK = "<:AkaneThink:1146885037002858618>"
 
     PIXIV = "<:pixiv:1130216490021425352>"
     VNDB = "<:vndb_circle:1130453890307997747>"

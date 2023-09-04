@@ -32,15 +32,18 @@ plot_plugin.d.help_emoji = "📈"
     "`[p]plot bocchi vs kaguya --autoscale` \n\n"
     "Note: You should type out the full name of the series to avoid false matches"
 )
-@lb.add_cooldown(15, 2, lb.ChannelBucket)
-@lb.add_cooldown(3, 1, lb.GuildBucket)
+@lb.add_cooldown(300, 1, lb.GlobalBucket)
 @lb.option(
     "query",
     "The names of the series(') to plot",
     modifier=lb.commands.OptionModifier.GREEDY,
 )
 @lb.command(
-    "plot", "Plot some trendz", pass_options=True, auto_defer=True, aliases=["p"]
+    "plot",
+    "Chart the airtime popularity of an anime or compare it for two different anime",
+    pass_options=True,
+    auto_defer=True,
+    aliases=["p"],
 )
 @lb.implements(lb.PrefixCommand)
 async def compare_trends(ctx: lb.PrefixContext, query: list[str]) -> None:

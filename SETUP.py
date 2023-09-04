@@ -1,4 +1,11 @@
 """A script intended to ease the setup process"""
+
+# TIP:
+# Pass the -d or --dev flag to install developer dependencies
+
+# So just run: "python SETUP.py -d" for with and "python SETUP.py" for without
+# developer dependencies (w/o the "s) of course
+
 import shutil
 import subprocess
 import sys

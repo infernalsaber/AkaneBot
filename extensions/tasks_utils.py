@@ -12,7 +12,12 @@ from lightbulb.ext import tasks
 from rapidfuzz import process
 
 from functions.models import ColorPalette as colors
-from functions.utils import check_if_url, humanized_list_join
+from functions.utils import (
+    check_if_url,
+    humanized_list_join,
+    poor_mans_proxy,
+    proxy_img,
+)
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
@@ -155,6 +160,22 @@ def last_n_lines(filename, num_lines):
         if err:
             return err.decode()
     return res.decode()
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("image_url", "The image to proxy")
+@lb.command("proxy", "Proxy test an image", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def proxy_img_test(ctx: lb.PrefixContext, image_url: str) -> None:
+    proxy = await ctx.bot.d.aio_session.get(proxy_img(image_url), timeout=2)
+    await ctx.respond(
+        embed=hk.Embed(title="Proxy test", description=f"Code: `{proxy.status}`")
+        .set_image(await poor_mans_proxy(image_url, ctx.bot.d.aio_session))
+        .set_footer(f"Requested by {ctx.author}", icon=ctx.author.avatar_url)
+    )
+    # except Exception as e:
+    # await ctx.respond(e)
 
 
 @task_plugin.command
