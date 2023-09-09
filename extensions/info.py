@@ -68,7 +68,7 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
                 ).values()
             }
 
-            ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=91)
+            ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=75)
 
             # Unpacking the closest value, if it exists
             if ans:
@@ -127,9 +127,6 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
             await ctx.respond(pages[0])
             return
 
-        for page in pages:
-            await ctx.author.send(page)
-
         view = AuthorNavi(
             pages=pages,
             user_id=ctx.author.id,
@@ -183,7 +180,7 @@ async def inevent_cmd(ctx: lb.Context, event: str):
             }
 
             ans = process.extractOne(
-                probable_event, list(guild_events.keys()), score_cutoff=80
+                probable_event, list(guild_events.keys()), score_cutoff=70
             )
 
             # Unpacking the closest value, if it exists
@@ -342,7 +339,6 @@ async def add_emote(
                     img_bytes = await resp.read()
 
                     ratio = len(img_bytes) / (1024 * 256)
-                    await ctx.respond(ratio)
 
                     if ratio > 1:
                         await ctx.respond(
@@ -359,7 +355,6 @@ async def add_emote(
                     else:
                         pass
 
-                await ctx.respond(hk.Embed(title="Test").set_image(emote))
                 emoji = await ctx.bot.rest.create_emoji(
                     ctx.guild_id, name=name, image=emote
                 )
