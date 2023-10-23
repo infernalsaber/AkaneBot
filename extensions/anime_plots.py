@@ -40,7 +40,7 @@ plot_plugin.d.help_emoji = "📈"
 )
 @lb.command(
     "plot",
-    "Chart the airtime popularity of an anime or compare it for two different anime",
+    "Chart the airtime popularity of upto two anime",
     pass_options=True,
     auto_defer=True,
     aliases=["p"],

@@ -9,9 +9,18 @@ from datetime import datetime
 import dotenv
 import hikari as hk
 import lightbulb as lb
+from miru.ext import nav
 
-from functions.buttons import GenericButton, KillButton, SwapButton
+from functions.buttons import (
+    GenericButton,
+    KillButton,
+    KillNavButton,
+    NavButton,
+    SwapButton,
+    SwapNaviButton,
+)
 from functions.models import ColorPalette as colors
+from functions.models import EmoteCollection as emotes
 from functions.utils import (
     check_if_url,
     get_random_quote,
@@ -19,7 +28,7 @@ from functions.utils import (
     iso_to_timestamp,
     tenor_link_from_gif,
 )
-from functions.views import AuthorView
+from functions.views import AuthorNavi, AuthorView
 
 dotenv.load_dotenv()
 
@@ -34,6 +43,8 @@ sauce_plugin.d.help = True
 
 
 @sauce_plugin.command
+@lb.add_cooldown(length=86400, uses=7, bucket=lb.UserBucket)
+@lb.add_cooldown(length=86400, uses=10, bucket=lb.GuildBucket)
 @lb.command("User pfp Sauce", "Sauce of user pfp", auto_defer=True, ephemeral=True)
 @lb.implements(lb.UserCommand)
 async def pfp_sauce(ctx: lb.UserContext):
@@ -94,6 +105,8 @@ async def pfp_sauce(ctx: lb.UserContext):
 
 
 @sauce_plugin.command
+@lb.add_cooldown(length=86400, uses=10, bucket=lb.UserBucket)
+@lb.add_cooldown(length=86400, uses=20, bucket=lb.GuildBucket)
 @lb.command("Find the Sauce", "Search the sauce of the image", auto_defer=True)
 @lb.implements(lb.MessageCommand)
 async def find_sauce_menu(ctx: lb.MessageContext):
@@ -132,45 +145,77 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                 embed, view = await _complex_parsing(ctx, res["results"][0])
 
                 if float(res["results"][0]["header"]["similarity"]) < 60.0:
-                    disp_embed = hk.Embed(
-                        title="Possible false match",
-                        description=(
-                            "We might have encountered a false match."
-                            "\n\nFalse matches often contain NSFW matches or "
-                            "in rarer cases, what you're actually looking for."
-                            "\nPlease use the ❌ or Go Back button should that happen."
-                        ),
-                        color=colors.WARN,
-                        timestamp=datetime.now().astimezone(),
-                    )
+                    # [
+                    #     nav.Page(
+                    #         content=ctx.options.target.make_link(ctx.guild_id),
+                    #         embed=embed,
+                    #     ),
+                    #     nav.Page(
+                    #         content=ctx.options.target.make_link(ctx.guild_id),
+                    #         embed=hk.Embed(
+                    #             title="Possible false match",
+                    #             description=(
+                    #                 "We might have encountered a false match."
+                    #                 "\n\nFalse matches often contain NSFW matches or "
+                    #                 "in rarer cases, what you're actually looking for."
+                    #                 "\nPlease use the ❌ or Go Back button should that happen."
+                    #             ),
+                    #             color=colors.WARN,
+                    #             timestamp=datetime.now().astimezone(),
+                    #         ),
+                    #     ),
+                    # ]
+                    # disp_embed = hk.Embed(
+                    #     title="Possible false match",
+                    #     description=(
+                    #         "We might have encountered a false match."
+                    #         "\n\nFalse matches often contain NSFW matches or "
+                    #         "in rarer cases, what you're actually looking for."
+                    #         "\nPlease use the ❌ or Go Back button should that happen."
+                    #     ),
+                    #     color=colors.WARN,
+                    #     timestamp=datetime.now().astimezone(),
+                    # )
 
-                    view.clear_items()
-                    # view = AuthorView(user_id=ctx.author.id)
-                    view.add_item(
-                        SwapButton(
-                            label1="Show anyway",
-                            label2="Go Back",
-                            emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
-                            emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
-                            original_page=disp_embed,
-                            swap_page=embed,
-                        )
+                    view = AuthorNavi(
+                        pages=[
+                            nav.Page(
+                                content=ctx.options.target.make_link(ctx.guild_id),
+                                embed=hk.Embed(
+                                    title="Possible false match",
+                                    description=(
+                                        "We might have encountered a false match."
+                                        "\n\nFalse matches often contain NSFW matches or "
+                                        "in rarer cases, what you're actually looking for."
+                                        "\nPlease use the ❌ or Go Back button should that happen."
+                                    ),
+                                    color=colors.WARN,
+                                    timestamp=datetime.now().astimezone(),
+                                ),
+                            ),
+                            nav.Page(
+                                content=ctx.options.target.make_link(ctx.guild_id),
+                                embed=embed,
+                            ),
+                        ],
+                        buttons=[
+                            SwapNaviButton(
+                                labels=["Show anyway", "Go Back"],
+                                emojis=[
+                                    None,
+                                    hk.Emoji.parse("<:previous:1136984315415236648>"),
+                                ],
+                            ),
+                            NavButton(
+                                url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
+                                label="Search Yandex",
+                            ),
+                            KillNavButton(style=hk.ButtonStyle.SECONDARY),
+                        ],
+                        user_id=ctx.author.id,
                     )
-                    url["url"] = url["url"].split("?")[0]
-                    view.add_item(
-                        GenericButton(
-                            url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
-                            label="Search Yandex",
-                        )
-                    )
-                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                    choice = await ctx.respond(
-                        content=ctx.options.target.make_link(ctx.guild_id),
-                        embed=disp_embed,
-                        components=view,
-                    )
-                    await view.start(choice)
-                    await view.wait()
+                    await view.send(ctx.interaction, responded=True)
+
                 else:
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
@@ -217,9 +262,7 @@ async def find_sauce(
         service (str, t.Optional): The service to choose. Defaults to None.
     """
 
-    await ctx.respond(
-        f"{get_random_quote()} {hk.Emoji.parse('<a:Loading_:1061933696648740945>')}"
-    )
+    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
 
     url = await _find_the_url(ctx)
 
@@ -356,7 +399,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                 view.add_item(
                     GenericButton(
                         style=hk.ButtonStyle.LINK,
-                        emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                        emoji=hk.Emoji.parse(emotes.AL.value),
                         url=(await al_from_mal(data["data"]["mal_id"])),
                     )
                 )
@@ -364,7 +407,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                 view.add_item(
                     GenericButton(
                         style=hk.ButtonStyle.LINK,
-                        emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                        emoji=hk.Emoji.parse(emotes.AL.value),
                         url=(await al_from_mal(name=data["data"]["source"])),
                     )
                 )
@@ -373,7 +416,8 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse("<:mangadex:1128015134426677318>"),
+                emoji=emotes.MANGADEX.value,
+                # emoji=hk.Emoji.parse("<:mangadex:1128015134426677318>"),
                 url=data["data"]["ext_urls"][0],
             )
         )
@@ -398,7 +442,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
             view.add_item(
                 GenericButton(
                     style=hk.ButtonStyle.LINK,
-                    emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                    emoji=hk.Emoji.parse(emotes.AL.value),
                     url=data["data"]["ext_urls"][2],
                 )
             )
@@ -419,7 +463,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                     view.add_item(
                         GenericButton(
                             style=hk.ButtonStyle.LINK,
-                            emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                            emoji=hk.Emoji.parse(emotes.AL.value),
                             url=f"https://anilist.co/anime/{res['anilist']}",
                         )
                     )
@@ -453,7 +497,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse("<:danbooru:1130206873388326952>"),
+                emoji=hk.Emoji.parse(emotes.DANBOORU.value),
                 url=data["data"]["ext_urls"][0],
             )
         )
@@ -490,7 +534,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse("<:pixiv:1130216490021425352>"),
+                emoji=hk.Emoji.parse(emotes.PIXIV.value),
                 url=data["data"]["ext_urls"][0],
             )
         )
@@ -517,7 +561,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
-                emoji=hk.Emoji.parse("<:vndb_circle:1130453890307997747>"),
+                emoji=hk.Emoji.parse(emotes.VNDB.value),
                 label="VNDB",
                 url=await vndb_url(data["data"]["source"]),
             )
@@ -571,7 +615,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
 
         for i, item in enumerate(data["data"].keys()):
             if item not in ["source", "ext_urls"] and "id" not in item:
-                if item == "created_at":
+                if item in ["created_at", "published", "published_at"]:
                     data["data"][item] = f"<t:{iso_to_timestamp(data['data'][item])}:D>"
 
                 if item == "creator":
@@ -697,7 +741,7 @@ async def _find_the_url(ctx) -> dict:
         url = ctx.raw_options["link"]
 
         if not check_if_url(url):
-            msg = "There's no valid url in this message <:AkaneSip:1095068327786852453>"
+            msg = f"There's no valid url in this message {emotes.SIP.value}"
             return {
                 "url": None,
                 "errorMessage": msg,
@@ -711,7 +755,7 @@ async def _find_the_url(ctx) -> dict:
                 return {"url": link, "errorMessage": None}
 
             if not await is_image(url, ctx.bot.d.aio_session):
-                msg = "Please enter a valid image link <:AkaneSmile:872675969041846272>"
+                msg = f"Please enter a valid image link {emotes.SMILE.value}"
                 return {
                     "url": url,
                     "errorMessage": msg,
@@ -744,7 +788,7 @@ async def _find_the_url(ctx) -> dict:
         errorMessage = "No valid url found"
 
         if not ctx.options["target"].attachments:
-            msg = "There's nothing here to find the sauce of <:AkaneSip:1095068327786852453>"
+            msg = f"There's nothing here to find the sauce of {emotes.SIP.value}"
             return {
                 "url": None,
                 "errorMessage": msg,

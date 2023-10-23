@@ -10,6 +10,7 @@ from orjson import loads
 
 from functions.buttons import GenericButton, NewButton
 from functions.models import ColorPalette as colors
+from functions.models import EmoteCollection as emotes
 from functions.utils import rss2json
 from functions.views import PeristentViewTest
 
@@ -94,14 +95,14 @@ async def on_starting(event: hk.StartedEvent) -> None:
             view.add_item(
                 GenericButton(
                     style=hk.ButtonStyle.SECONDARY,
-                    emoji=hk.Emoji.parse("<:nyaasi:1127717935968952440>"),
+                    emoji=hk.Emoji.parse(emotes.NYAA.value),
                     url=update["link"],
                 )
             )
             view.add_item(
                 GenericButton(
                     style=hk.ButtonStyle.LINK,
-                    emoji=hk.Emoji.parse("<:anilist:1127683041372942376>"),
+                    emoji=hk.Emoji.parse(emotes.AL.value),
                     url=update["data"]["siteUrl"],
                 )
             )

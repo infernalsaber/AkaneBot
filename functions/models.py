@@ -63,11 +63,14 @@ class EmoteCollection(Enum):
     SIP = "<:AkaneSip:1095068327786852453>"
     SMILE = "<:AkaneSmile:872675969041846272>"
     THINK = "<:AkaneThink:1146885037002858618>"
+    POUT = "<:AkanePoutColor:852847827826376736>"
 
     PIXIV = "<:pixiv:1130216490021425352>"
     VNDB = "<:vndb_circle:1130453890307997747>"
     AL = "<:anilist:1127683041372942376>"
     NYAA = "<:nyaasi:1127717935968952440>"
+    DANBOORU = "<:danbooru:1130206873388326952>"
+    MANGADEX = "<:mangadex:1128015134426677318>"
     YOUTUBE = "<a:youtube:1074307805235920896>"
 
     NEXT = "<:pink_arrow_right:1059900771816189953>"

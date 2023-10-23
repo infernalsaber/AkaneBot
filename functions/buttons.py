@@ -5,7 +5,10 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
+from functions.models import EmoteCollection as emotes
 from functions.utils import proxy_img
+
+# from functions.views import AuthorView
 
 # from bs4 import BeautifulSoup
 
@@ -23,16 +26,7 @@ async def preview_maker(
     r_json = await req.json()
     pages = []
 
-    # try:
-    # if (await session.get(r_json["chapter"]["dataSaver"][0])).ok:
-    # print("OK\n\n\n")
-    # else:
-    # print("NOTOK\n\n\n")
-    # except Exception as e:
-    # print("ERra\n\n\n", e)
-
-    for page in r_json["chapter"]["data"]:
-        # Use dataSaver, figure out why it fails
+    for page in r_json["chapter"]["dataSaver"]:
         pages.append(
             hk.Embed(
                 title=title,
@@ -41,12 +35,8 @@ async def preview_maker(
             )
             .set_image(
                 proxy_img(
-                    f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}"
+                    f"{r_json['baseUrl']}/data-saver/{r_json['chapter']['hash']}/{page}"
                 )
-                # await poor_mans_proxy(
-                # f"{r_json['baseUrl']}/data/{r_json['chapter']['hash']}/{page}",
-                # session,
-                # )
             )
             .set_footer(
                 "Fetched via: MangaDex",
@@ -69,15 +59,18 @@ async def preview_maker(
 
 
 class GenericButton(miru.Button):
-    """A general button class"""
+    """A general button class, value only works only with AuthorView"""
 
     # Let's leave our arguments dynamic this time, instead of hard-coding them
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-        self.view.answer = self.label
-        self.view.stop()
+        if self.label:
+            self.view.answer = self.label
+            self.view.stop()
+        # else:
+        # await ctx.respond("Nope", ephemeral=True)
 
 
 class KillNavButton(nav.NavButton):
@@ -115,10 +108,9 @@ class CustomPrevButton(nav.NavButton):
         custom_id: t.Optional[str] = None,
         emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
         row: t.Optional[int] = None,
-        page_no: t.Optional[int] = None,
     ):
         if not emoji:
-            emoji = hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>")
+            emoji = hk.Emoji.parse(emotes.PREVIOUS.value)
 
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
@@ -148,7 +140,7 @@ class CustomNextButton(nav.NavButton):
         row: t.Optional[int] = None,
     ):
         if not emoji:
-            emoji = hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>")
+            emoji = hk.Emoji.parse(emotes.NEXT.value)
 
         super().__init__(
             style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
@@ -239,14 +231,14 @@ class PreviewButton(nav.NavButton):
         self.view.add_item(
             CustomPrevButton(
                 style=hk.ButtonStyle.SECONDARY,
-                emoji=hk.Emoji.parse("<:pink_arrow_left:1059905106075725955>"),
+                emoji=hk.Emoji.parse(emotes.PREVIOUS.value),
             )
         )
         self.view.add_item(nav.IndicatorButton())
         self.view.add_item(
             CustomNextButton(
                 style=hk.ButtonStyle.SECONDARY,
-                emoji=hk.Emoji.parse("<:pink_arrow_right:1059900771816189953>"),
+                emoji=hk.Emoji.parse(emotes.NEXT.value),
             )
         )
 
@@ -380,3 +372,63 @@ class SwapButton(miru.Button):
 
     async def before_page_change(self) -> None:
         ...
+
+
+class SwapNaviButton(nav.NavButton):
+    def __init__(
+        self,
+        *,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
+        labels: t.Optional[t.Sequence[str]] = None,
+        custom_id: t.Optional[str] = None,
+        emojis: t.Optional[t.Sequence[t.Union[hk.Emoji, str]]] = None,
+        row: t.Optional[int] = None,
+        url: t.Optional[str] = None,
+    ):
+        self.labels = labels
+        self.emojis = emojis
+
+        super().__init__(
+            style=style,
+            label=labels[0] if labels else None,
+            custom_id=custom_id,
+            emoji=emojis[0] if emojis else None,
+            row=row,
+            url=url,
+        )
+
+    async def callback(self, ctx: miru.ViewContext):
+        if self.view.message:
+            if self.view.current_page == 0:
+                self.view.current_page = 1
+
+                self.label = self.labels[1] if self.labels else None
+                self.emoji = self.emojis[1] if self.emojis else None
+
+            else:
+                self.view.current_page = 0
+                self.label = self.labels[0] if self.labels else None
+                self.emoji = self.emojis[0] if self.emojis else None
+
+            await self.view.send_page(ctx)
+
+
+class TabButton(nav.NavButton):
+    def __init__(
+        self,
+        *,
+        style: hk.ButtonStyle = hk.ButtonStyle.SECONDARY,
+        active: bool = False,
+        label: t.Optional[str] = None,
+        custom_id: t.Optional[str] = None,
+        emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
+        row: t.Optional[int] = None,
+        url: t.Optional[str] = None,
+    ):
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row, url=url
+        )
+
+    async def callback(self, ctx: miru.ViewContext):
+        # self.active = True
+        self.style = self.view.active_button_style

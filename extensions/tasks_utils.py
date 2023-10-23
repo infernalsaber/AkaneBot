@@ -12,6 +12,7 @@ from lightbulb.ext import tasks
 from rapidfuzz import process
 
 from functions.models import ColorPalette as colors
+from functions.models import EmoteCollection as emotes
 from functions.utils import (
     check_if_url,
     humanized_list_join,
@@ -56,11 +57,10 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
     ctx_prefix = None
 
     for prefix in prefixes:
-        if event.content.startswith(prefix):
+        if event.content.startswith(prefix.strip()):
             ctx_prefix = prefix
             break
-
-    if not ctx_prefix:
+    else:
         return
 
     try:
@@ -79,7 +79,8 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
             .add_field("Server Prefixes", "```ansi\n\u001b[0;30mComing Soon...```")
             .add_field("Additional", "- Pinging the bot always works :)")
             .set_author(
-                name="Akane Bot Prefix Configuration", icon=app.get_me().avatar_url
+                name=f"{app.get_me().username} Prefix Configuration",
+                icon=app.get_me().avatar_url,
             ),
         )
         return
@@ -93,13 +94,16 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
             pass
         else:
             close_matches: t.Optional[t.Tuple[str, int]] = process.extract(
-                commandish, prefix_commands_and_aliases, score_cutoff=99, limit=3
+                commandish,
+                prefix_commands_and_aliases,
+                score_cutoff=99,
+                limit=3,
             )
 
             possible_commands: t.Sequence = []
 
             if close_matches:
-                possible_commands = [i for i, _, _ in close_matches]
+                possible_commands = [i for i, *_ in close_matches]
             else:
                 return
 
@@ -140,17 +144,18 @@ async def update_and_restart(ctx: lb.Context) -> None:
 
 
 @task_plugin.command
+@lb.option("image", "Image url to embed", str, required=False)
 @lb.option("color", "The colour to embed", hk.Color)
 @lb.command("embed", "Make embed of a color", pass_options=True, hidden=True)
 @lb.implements(lb.PrefixCommand)
-async def embed_color(ctx: lb.Context, color: hk.Color) -> None:
+async def embed_color(ctx: lb.Context, color: hk.Color, image: str) -> None:
     await ctx.respond(
         embed=hk.Embed(
             color=color,
             title="Test Embed",
             description="Testing the appropriate colours for embed",
             timestamp=datetime.now().astimezone(),
-        )
+        ).set_image(image)
     )
 
 
@@ -221,7 +226,7 @@ async def pingu(ctx: lb.Context, link: str) -> None:
     """
 
     if not check_if_url(link):
-        await ctx.respond("That's... not a link <:AkanePoutColor:852847827826376736>")
+        await ctx.respond(f"That's... not a link {emotes.POUT.value}")
         return
 
     try:
