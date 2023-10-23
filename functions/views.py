@@ -46,7 +46,7 @@ class AuthorNavi(nav.NavigatorView):
         *,
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
-        timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
+        timeout: t.Optional[t.Union[float, int, timedelta]] = 5 * 60,
         user_id: t.Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
@@ -73,7 +73,12 @@ class AuthorNavi(nav.NavigatorView):
 
     async def on_timeout(self) -> None:
         if self.message:
-            await self.message.edit(components=[])
+            new_view = None
+            for item in self.children:
+                if not item.url:
+                    new_view = self.remove_item(item)
+
+            await self.message.edit(components=new_view)
 
 
 class AuthorView(miru.View):
@@ -89,6 +94,7 @@ class AuthorView(miru.View):
     ) -> None:
         self.user_id = user_id
         self.session = session
+        self.answer = None
         super().__init__(autodefer=autodefer, timeout=timeout)
 
     async def on_timeout(self) -> None:
@@ -164,4 +170,12 @@ class TabbedSwitcher(miru.View):
         active_style: hk.ButtonStyle,
         normal_style: hk.ButtonStyle,
     ):
-        ...
+        for btn in buttons:
+            self.add_item(miru.Button(style=normal_style, label=btn[0], emoji=btn[1]))
+
+        # self._page_btn_map
+
+        super().__init__()
+
+
+# class TabbedSwitcherButton(nav.NavButton)

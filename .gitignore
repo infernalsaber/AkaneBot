@@ -12,3 +12,4 @@ my_cache.sqlite
 ntfc.py
 config.json
 extensions/prefix_setup.py
+extensions/x.py

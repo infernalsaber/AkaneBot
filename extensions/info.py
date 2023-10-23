@@ -11,6 +11,7 @@ import pandas as pd
 import psutil
 from PIL import Image, ImageOps
 from rapidfuzz import process
+from rapidfuzz.utils import default_process
 
 from functions.buttons import SwapButton
 from functions.models import ColorPalette as colors
@@ -68,11 +69,16 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
                 ).values()
             }
 
-            ans = process.extractOne(role, list(guild_roles.keys()), score_cutoff=75)
+            ans = process.extractOne(
+                role,
+                list(guild_roles.keys()),
+                score_cutoff=85,
+                processor=default_process,
+            )
 
             # Unpacking the closest value, if it exists
             if ans:
-                closest_role_match, _, _ = ans
+                closest_role_match, *_ = ans
 
                 role = guild_roles[closest_role_match]
             else:
@@ -180,12 +186,15 @@ async def inevent_cmd(ctx: lb.Context, event: str):
             }
 
             ans = process.extractOne(
-                probable_event, list(guild_events.keys()), score_cutoff=70
+                probable_event,
+                list(guild_events.keys()),
+                score_cutoff=70,
+                processor=default_process,
             )
 
             # Unpacking the closest value, if it exists
             if ans:
-                closest_role_match, _, _ = ans
+                closest_role_match, *_ = ans
 
                 event_ = guild_events[closest_role_match]
 
@@ -515,7 +524,7 @@ async def botinfo(ctx: lb.Context) -> None:
 
         changes = "\n".join(change_list)
 
-        version = f"{floor(num_commits/1000)}.{floor(num_commits/100)}.{floor(num_commits/10)}"
+        version = f"0.{floor(num_commits/100)}.{floor((num_commits%100)/10)}"
 
         pages = [
             hk.Embed(

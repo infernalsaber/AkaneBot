@@ -6,6 +6,7 @@ import hikari as hk
 import lightbulb as lb
 
 from functions.buttons import GenericButton, KillButton
+from functions.models import EmoteCollection as emotes
 from functions.models import YTVideo
 from functions.views import AuthorView
 
@@ -17,7 +18,7 @@ YT_KEY = os.getenv("YT_KEY")
 yt_plugin = lb.Plugin("YouTube", "Search and get songs", include_datastore=True)
 yt_plugin.d.help_image = "https://i.imgur.com/dTvGa1t.png"
 yt_plugin.d.help = True
-yt_plugin.d.help_emoji = hk.Emoji.parse("<a:youtube:1074307805235920896>")
+yt_plugin.d.help_emoji = hk.Emoji.parse(emotes.YOUTUBE.value)
 
 
 def fuck_pep8(duration: str) -> str:

@@ -1,6 +1,6 @@
 hikari[speedups]==2.0.0.dev120
 hikari-lightbulb==2.3.3
-hikari-miru==3.1.2
+hikari-miru==3.2.0
 
 python-dotenv>=0.21.0
 

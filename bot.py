@@ -95,6 +95,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
         cache_name="cache_db.db",
         expire_after=24 * 60 * 60,
+        urls_expire_after={"*.mangadex.org": 15 * 60},
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
         include_headers=True,
@@ -126,7 +127,7 @@ async def on_stopping(event: hk.StoppingEvent) -> None:
 
 
 @bot.command
-@lb.command("ping", description="The bot's ping")
+@lb.command("ping", description="The bot's ping", ephemeral=True)
 @lb.implements(lb.PrefixCommand, lb.SlashCommand)
 async def ping(ctx: lb.Context) -> None:
     """Check the latency of the bot

@@ -3,6 +3,7 @@ import typing as t
 import hikari as hk
 import lightbulb as lb
 from rapidfuzz import process
+from rapidfuzz.utils import default_process
 
 from functions.help import BotHelpCommand
 
@@ -12,7 +13,7 @@ helper.d.help = False
 
 @helper.command
 @lb.option("query", "The object to get help for", required=False, autocomplete=True)
-@lb.command("help", "See this message duh", pass_options=True)
+@lb.command("help", "The bot's help command", pass_options=True)
 @lb.implements(lb.SlashCommand)
 async def help_slash_command(ctx: lb.Context, query: t.Optional[str]) -> None:
     try:
@@ -41,14 +42,18 @@ async def help_autocomplete(
         if not cmd.hidden:
             commands_and_plugins.append(cmd_name)
 
-    close_matches: t.Optional[t.Tuple[str, int]] = process.extract(
-        option.value, commands_and_plugins, score_cutoff=85, limit=None
+    close_matches = process.extract(
+        option.value,
+        commands_and_plugins,
+        score_cutoff=85,
+        limit=None,
+        processor=default_process,
     )
 
     possible_commands: t.Sequence = []
 
     if close_matches:
-        possible_commands = [f"{i}" for i, _, _ in close_matches]
+        possible_commands = [f"{i}" for i, *_ in close_matches]
 
     return possible_commands
 

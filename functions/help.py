@@ -11,6 +11,7 @@ from lightbulb import context as context_
 from lightbulb import errors, plugins
 from lightbulb.help_command import BaseHelpCommand
 from rapidfuzz import process
+from rapidfuzz.utils import default_process
 
 from functions.components import SimpleTextSelect
 from functions.utils import humanized_list_join
@@ -77,7 +78,7 @@ class BotHelpCommand(BaseHelpCommand):
         try:
             main_embed = (
                 hk.Embed(
-                    title="Akane Bot Help Menu",
+                    title=f"{ctx.bot.get_me().username} Help Menu",
                     color=0x000000,
                     description=("An animanga search and sauce bot \n\n" "### Plugins"),
                     timestamp=datetime.now().astimezone(),
@@ -315,13 +316,17 @@ class BotHelpCommand(BaseHelpCommand):
                 commands_and_plugins.append(cmd_name)
 
         close_matches: t.Optional[t.Tuple[str, int]] = process.extract(
-            obj, commands_and_plugins, score_cutoff=85, limit=None
+            obj,
+            commands_and_plugins,
+            score_cutoff=85,
+            limit=None,
+            processor=default_process,
         )
 
         possible_commands: t.Sequence = []
 
         if close_matches:
-            possible_commands = [f"`{i}`" for i, _, _ in close_matches]
+            possible_commands = [f"`{i}`" for i, *_ in close_matches]
 
         await ctx.respond(
             f"Command `{obj}` not found. Did you mean: {humanized_list_join(possible_commands)}?"
