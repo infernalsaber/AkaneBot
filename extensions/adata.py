@@ -361,7 +361,7 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
                     f"{i+1}.",
                     (
                         f"```ansi\n\u001b[0;32m{item['rank'] or ''}. \u001b[0;36m{item['title']}"
-                        f" \u001b[0;33m({item['score'] or item['members']})```",
+                        f" \u001b[0;33m({item['score'] or item['members']})```"
                     ),
                 )
 
@@ -509,6 +509,89 @@ async def remove_trait_map(ctx: lb.PrefixContext, person: str):
         db.commit()
     except Exception as e:
         print(e)
+
+
+@al_listener.command
+@lb.option(
+    "query", "The game to search", modifier=lb.commands.OptionModifier.CONSUME_REST
+)
+@lb.command("game", "Search a game on steam", pass_options=True, aliases=["steam"])
+@lb.implements(lb.PrefixCommand)
+async def game_search(ctx: lb.PrefixContext, query: str):
+    """Search for a game on steam
+
+    Args:
+        ctx (lb.PrefixContext): The context
+        query (str): The vn trait to search for
+    """
+
+    # try:
+    # resp = (await (await ctx.bot.d.aio_session.get(
+    #     "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
+    #     ,
+    #     timeout=10,
+    # )).json())['applist']['apps']
+    # await ctx.respond('Got the list of games')
+
+    # resp = {v['name']: v['appid'] for v in resp}
+    # names = list(resp.keys())
+    # # await ctx.edit_last_response('revdict')
+
+    # threshold = 70
+    # name, confidence, _ = process.extractOne(query, names, processor=default_process, scorer=partial_ratio)
+    # if confidence < threshold:
+    #     await ctx.respond("No matches found")
+    #     return
+    # await ctx.edit_last_response("fuzz")
+
+    resp = await ctx.bot.d.aio_session.get(
+        f"https://store.steampowered.com/search/suggest?term={query}&f=games&cc=GB&realm=1&l=english&v=22790766&use_store_query=1&use_search_spellcheck=1&search_creators_and_tags=1",
+        timeout=5,
+    )
+
+    if resp.ok:
+        resp = await resp.content.read()
+    else:
+        await ctx.respond("Can't find the game requested")
+        return
+
+    # await ctx.respond("resp got")
+
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(resp, "lxml")
+    # for a in soup.find_all('a'):
+    # print(a.get('href'))
+    # await ctx.respond(resp)
+    sup = soup.find_all("a")[0].get("href")
+
+    # await ctx.edit_last_response("parseley")
+
+    import re
+
+    pattern = re.compile(r"https://store.steampowered.com/app/(\d+)")
+    match = pattern.search(str(sup))
+    if match:
+        _id = match.group(1)
+        await ctx.respond(f"https://store.steampowered.com/app/{_id}")
+    else:
+        await ctx.respond("No matches found")
+
+    # TBA
+    #     app_dets = (await (await ctx.bot.d.aio_session.get(
+    #         f"https://store.steampowered.com/api/appdetails?appids={_id}",
+    #         timeout=5
+    #     )).json())
+
+    #     if not app_dets[resp[int(_id)]]['success']:
+    #         await ctx.respond("No matches found")
+    #         return
+    #     else:
+    #         await ctx.respond(f"{app_dets[resp[int(_id)]]}")
+    # except Exception as e:
+    #     await ctx.respond(e)
+
+    # await ctx.respond(f"https://store.steampowered.com/app/{resp[name]}")
 
 
 async def _fetch_trait_map(user: str) -> str:
