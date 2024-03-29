@@ -275,7 +275,7 @@ async def inevent_cmd(ctx: lb.Context, event: str):
 
 @info_plugin.command
 @lb.add_checks(
-    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS), lb.guild_only
+    lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS), lb.guild_only
 )
 @lb.option(
     "processor",
@@ -585,7 +585,7 @@ async def botinfo(ctx: lb.Context) -> None:
 
 @info_plugin.command
 @lb.add_checks(
-    lb.has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS), lb.guild_only
+    lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS), lb.guild_only
 )
 @lb.command("stickerinfo", "Get info about a sticker", aliases=["sticker"])
 @lb.implements(lb.PrefixCommand)
@@ -730,13 +730,13 @@ async def sticker_removal(ctx: lb.MessageContext):
 
 @info_plugin.command
 @lb.add_checks(
-    lb.bot_has_guild_permissions(hk.Permissions.MANAGE_EMOJIS_AND_STICKERS),
+    lb.bot_has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS),
     lb.has_guild_permissions(hk.Permissions.ADMINISTRATOR),
 )
 @lb.command(
-    "re",
+    "removeemote",
     "Remove emote or multiple, simple as that",
-    aliases=["remote"],
+    aliases=["re", "remote"],
     pass_options=True,
     hidden=True,
 )

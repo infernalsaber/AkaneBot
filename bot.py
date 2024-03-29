@@ -95,14 +95,17 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
         cache_name="cache_db.db",
         expire_after=24 * 60 * 60,
-        urls_expire_after={"*.mangadex.org": 15 * 60},
+        urls_expire_after={
+            "*.mangadex.org": 15 * 60,
+            "*.steampowered.com": 2 * 60 * 60,
+        },
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
         include_headers=True,
         ignored_params=[
             "auth_token"
         ],  # Keep using the cached response even if this param changes
-        timeout=3,
+        timeout=10,
     )
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
