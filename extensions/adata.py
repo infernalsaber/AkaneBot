@@ -8,6 +8,7 @@ from typing import Optional
 import hikari as hk
 import lightbulb as lb
 import miru
+from bs4 import BeautifulSoup
 from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
@@ -552,22 +553,37 @@ async def game_search(ctx: lb.PrefixContext, query: str):
     if resp.ok:
         resp = await resp.content.read()
     else:
-        await ctx.respond("Can't find the game requested")
+        await ctx.respond(
+            hk.Embed(
+                title="CAN'T FIND THE REQUESTED GAME",
+                color=colors.ERROR,
+                description="Your search failed to go through",
+                timestamp=datetime.now().astimezone(),
+            ),
+            delete_after=15,
+        )
         return
 
     # await ctx.respond("resp got")
-
-    from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(resp, "lxml")
     # for a in soup.find_all('a'):
     # print(a.get('href'))
     # await ctx.respond(resp)
-    sup = soup.find_all("a")[0].get("href")
-
+    sup = soup.find_all("a")
+    if not sup or len(sup) == 0:
+        await ctx.respond(
+            hk.Embed(
+                title="CAN'T FIND THE REQUESTED GAME",
+                color=colors.ERROR,
+                description=f"Can't find the game `{query}`, maybe it's not on steam?",
+                timestamp=datetime.now().astimezone(),
+            ),
+            delete_after=15,
+        )
+        return
+    sup = sup[0].get("href")
     # await ctx.edit_last_response("parseley")
-
-    import re
 
     pattern = re.compile(r"https://store.steampowered.com/app/(\d+)")
     match = pattern.search(str(sup))
@@ -575,7 +591,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
         _id = match.group(1)
         await ctx.respond(f"https://store.steampowered.com/app/{_id}")
     else:
-        await ctx.respond("No matches found")
+        await ctx.respond("No suitable game found")
 
     # TBA
     #     app_dets = (await (await ctx.bot.d.aio_session.get(
