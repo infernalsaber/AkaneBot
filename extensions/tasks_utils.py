@@ -6,10 +6,13 @@ import typing as t
 from datetime import datetime
 from subprocess import PIPE, Popen
 
+import arrow
 import hikari as hk
 import lightbulb as lb
+import pytz
 from lightbulb.ext import tasks
 from rapidfuzz import process
+from rapidfuzz.utils import default_process
 
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
@@ -358,6 +361,133 @@ async def bot_stats(ctx: lb.Context) -> None:
         .add_field("Command", command, inline=True)
         .add_field("Usage", usage, inline=True)
     )
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("locale", "Your timezone", autocomplete=True)
+@lb.option("minute", "Your timezone", autocomplete=True)
+@lb.option("hour", "Your timezone", autocomplete=True)
+@lb.option("date", "Your timezone", autocomplete=True)
+@lb.option("month", "Your timezone", autocomplete=True)
+@lb.option("year", "Your timezone", autocomplete=True)
+@lb.command(
+    "timestamp",
+    "Generate timezone aware timestamps for planning and stuff",
+    pass_options=True,
+)
+@lb.implements(lb.SlashCommand)
+async def timestamp_generator(
+    ctx: lb.Context,
+    year: str,
+    month: str,
+    date: str,
+    hour: str,
+    minute: str,
+    locale: str,
+) -> None:
+    try:
+        await ctx.respond(
+            f'```<t:{int(arrow.get(f"{year.zfill(4)} {month} {date.zfill(2)} {hour.zfill(2)}:{minute.zfill(2)}", "YYYY MMMM DD HH:mm").to(locale).timestamp())}:R>```',
+            flags=hk.MessageFlag.EPHEMERAL,
+        )
+    except Exception as e:
+        await ctx.respond(e, flags=hk.MessageFlag.EPHEMERAL)
+
+
+@timestamp_generator.autocomplete("year")
+async def year_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+):
+    if option.value is None or option.value.strip() == "":
+        curr_year = arrow.now().year
+        return [str(i) for i in range(curr_year - 5, curr_year + 5)]
+
+    years = [str(i) for i in range(1970, 2050) if str(i).startswith(option.value)]
+
+    return years
+
+
+@timestamp_generator.autocomplete("month")
+async def month_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+):
+    months = [
+        "january",
+        "february",
+        "march",
+        "april",
+        "may",
+        "june",
+        "july",
+        "august",
+        "september",
+        "october",
+        "november",
+        "december",
+    ]
+
+    if option.value is None or option.value.strip() == "":
+        return [month.title() for month in months]
+
+    close_matches = process.extract(
+        option.value.lower(),
+        months,
+        score_cutoff=85,
+        limit=None,
+        processor=default_process,
+    )
+
+    months = [f"{i.title()}" for i, *_ in close_matches] if close_matches else []
+
+    return months
+
+
+@timestamp_generator.autocomplete("date")
+async def date_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+):
+    if option.value is None or option.value.strip() == "":
+        curr_dt = arrow.now()
+        dates = [curr_dt.shift(days=i) for i in range(-5, 6)]
+        return [str(date.day) for date in dates]
+
+    return [str(i) for i in range(1, 32) if str(i).startswith(option.value)]
+
+
+@timestamp_generator.autocomplete("hour")
+async def hour_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+):
+    return [str(i) for i in range(0, 24) if str(i).startswith(option.value)]
+
+
+@timestamp_generator.autocomplete("minute")
+async def minute_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+):
+    if option.value is None or option.value.strip() == "":
+        return ["00", "15", "30", "45"]
+
+    return [str(i) for i in range(0, 60) if str(i).startswith(option.value)]
+
+
+@timestamp_generator.autocomplete("locale")
+async def timezone_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+):
+    tzs = list(pytz.all_timezones)
+    close_matches = process.extract(
+        option.value,
+        tzs,
+        score_cutoff=75,
+        limit=24,
+        processor=default_process,
+    )
+
+    locale = [f"{i}" for i, *_ in close_matches] if close_matches else []
+
+    return locale
 
 
 def load(bot: lb.BotApp) -> None:

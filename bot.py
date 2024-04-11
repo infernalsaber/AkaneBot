@@ -24,7 +24,7 @@ dotenv.load_dotenv()
 
 # Setting the prefix as , for windows (where i run the test bot)
 # and - for others (where it's deployed :) )
-def return_prefix() -> list:
+def return_prefix() -> list[str]:
     if os.name == "nt":
         return [","]
     else:

@@ -4,6 +4,7 @@ hikari-miru==3.2.0
 
 python-dotenv>=0.21.0
 
+arrow
 aiohttp==3.8.3
 plotly==5.15.0
 isodate==0.6.1
