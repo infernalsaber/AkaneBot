@@ -5,7 +5,7 @@
 
 <div align="center"> 
 
-<img src="https://cdn.discordapp.com/attachments/980479966389096460/1130626054302744688/akanebotround.png" width="250" />
+<img src="https://files.catbox.moe/ule0bb.png" width="250" />
 
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -33,10 +33,11 @@ Please contact `fenix.er` on Discord should you want to add it to your server.
 
 ## Features
 
-* Search for animanga 
+* Search for animanga/vn/games
 * Make cool comparitive charts 
 * Find the source (sauce)
 * Anime update feeds
+* Add/remove emotes
 
 More coming soon...
 
