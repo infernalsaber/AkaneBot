@@ -75,7 +75,7 @@ class AuthorNavi(nav.NavigatorView):
         if self.message:
             new_view = None
             for item in self.children:
-                if not item.url:
+                if item.url is not None:
                     new_view = self.remove_item(item)
 
             await self.message.edit(components=new_view)
@@ -103,7 +103,7 @@ class AuthorView(miru.View):
             # await self.message.edit(content=self.children)
             new_view = None
             for item in self.children:
-                if not item.url:
+                if item.url is not None:
                     new_view = self.remove_item(item)
 
             await self.message.edit(components=new_view)

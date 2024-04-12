@@ -365,12 +365,12 @@ async def bot_stats(ctx: lb.Context) -> None:
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
-@lb.option("locale", "Your timezone", autocomplete=True)
-@lb.option("minute", "Your timezone", autocomplete=True)
-@lb.option("hour", "Your timezone", autocomplete=True)
-@lb.option("date", "Your timezone", autocomplete=True)
-@lb.option("month", "Your timezone", autocomplete=True)
-@lb.option("year", "Your timezone", autocomplete=True)
+@lb.option("locale", "Your locale", autocomplete=True)
+@lb.option("minute", "The minute to set", autocomplete=True)
+@lb.option("hour", "The hour to set timezone", autocomplete=True)
+@lb.option("date", "The date to set", autocomplete=True)
+@lb.option("month", "The month name to set", autocomplete=True)
+@lb.option("year", "The year to set", autocomplete=True)
 @lb.command(
     "timestamp",
     "Generate timezone aware timestamps for planning and stuff",

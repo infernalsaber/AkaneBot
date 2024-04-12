@@ -77,13 +77,18 @@ def parse_description(description: str) -> str:
 
 async def get_imp_info(chapters):
     """Parse the chapter info and return the required parts"""
+
     volume_last = list(chapters["volumes"].keys())[0]
     chapter_last = list(chapters["volumes"][volume_last]["chapters"].keys())[0]
     id_last = chapters["volumes"][volume_last]["chapters"][chapter_last]["id"]
 
     volume_first = list(chapters["volumes"].keys())[-1]
     chapter_first = list(chapters["volumes"][volume_first]["chapters"].keys())[-1]
-    id_first = chapters["volumes"][volume_first]["chapters"][chapter_first]["id"]
+    first_chapter_dets = chapters["volumes"][volume_first]["chapters"][chapter_first]
+    if "others" in first_chapter_dets.keys():
+        id_first = first_chapter_dets["others"][0]
+    else:
+        id_first = first_chapter_dets["id"]
 
     return {
         "latest": {"chapter": chapter_last, "id": id_last},
