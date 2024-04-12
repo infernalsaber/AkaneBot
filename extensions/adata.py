@@ -592,12 +592,29 @@ async def game_search(ctx: lb.PrefixContext, query: str):
 
     pattern = re.compile(r"https://store.steampowered.com/app/(\d+)")
     match = pattern.search(str(sup))
+
     if match:
         _id = match.group(1)
-        await ctx.respond(f"https://store.steampowered.com/app/{_id}")
+        resp = await ctx.respond(f"https://store.steampowered.com/app/{_id}")
     else:
-        await ctx.respond("No suitable game found")
+        resp = await ctx.respond("No suitable game found")
 
+    try:
+        await (await resp.message()).add_reaction("❌")
+
+        def predicate(event: hk.ReactionAddEvent) -> bool:
+            return event.user_id == ctx.author.id and event.emoji_name == "❌"
+
+        reaction = await ctx.bot.wait_for(
+            hk.ReactionAddEvent, timeout=1 * 60, predicate=predicate
+        )
+        if reaction.emoji_name == "❌":
+            await ctx.delete_last_response()
+        else:
+            pass
+
+    except Exception:
+        await (await resp.message()).remove_all_reactions()
     # TBA
     #     app_dets = (await (await ctx.bot.d.aio_session.get(
     #         f"https://store.steampowered.com/api/appdetails?appids={_id}",
