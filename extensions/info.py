@@ -530,7 +530,7 @@ async def botinfo(ctx: lb.Context) -> None:
             hk.Embed(
                 color=colors.DEFAULT,
                 description="A multi-purpose discord bot \
-                    written in hikari-py.",
+                    written in hikari-py.\n\nPrimarily made for the Oshi no Ko discord server.",
             )
             .add_field("Name", user)
             .add_field("No of Servers", len(guilds), inline=True)
