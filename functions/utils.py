@@ -40,13 +40,6 @@ def proxy_img(img_url: str) -> str:
     return f"{PROXY_URL}/proxy?url={img_url}"
 
 
-print(
-    proxy_img(
-        "https://m.media-amazon.com/images/M/MV5BZTE3M2JkZjUtODQ4My00NzBlLTllZTctNDBlODcxNDU0MWNmXkEyXkFqcGdeQXVyNjc3NTI5MDY@._V1_FMjpg_UX1000_.jpg"
-    )
-)
-
-
 @lru_cache(maxsize=3, typed=False)
 def check_if_url(link: str) -> bool:
     """Simple code to see if the given string is a url or not"""
