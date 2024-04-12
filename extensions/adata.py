@@ -606,7 +606,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
             return event.user_id == ctx.author.id and event.emoji_name == "❌"
 
         reaction = await ctx.bot.wait_for(
-            hk.ReactionAddEvent, timeout=1 * 60, predicate=predicate
+            hk.ReactionAddEvent, timeout=15 * 60, predicate=predicate
         )
         if reaction.emoji_name == "❌":
             await ctx.delete_last_response()
