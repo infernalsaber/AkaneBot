@@ -700,10 +700,9 @@ async def sticker_removal(ctx: lb.MessageContext):
     try:
         sticker = await ctx.bot.rest.fetch_sticker(sticker_partial.id)
 
-        sticker_image = await ctx.bot.d.aio_session.get(
-            sticker.image_url.url, timeout=2
-        )
+        sticker_image = await ctx.bot.d.aio_session.get(sticker.image_url, timeout=2)
 
+        ext = sticker.image_url.split(".")[-1]
         await ctx.author.send(
             hk.Embed(
                 title="STICKER REMOVAL NOTIFICATION",
@@ -713,7 +712,7 @@ async def sticker_removal(ctx: lb.MessageContext):
             ).set_image(
                 hk.Bytes(
                     io.BytesIO(await sticker_image.read()),
-                    f"{sticker.name}_archive.png",
+                    f"{sticker.name}_archive.{ext}",
                 )
             )
         )
@@ -792,6 +791,7 @@ async def emote_removal(
 
     for emote in emotes[:5]:
         try:
+            ext = emote.url.split(".")[-1]
             await ctx.author.send(
                 hk.Embed(
                     title="EMOTE REMOVAL NOTIFICATION",
@@ -800,7 +800,7 @@ async def emote_removal(
                     timestamp=datetime.now().astimezone(),
                 ).set_image(
                     hk.Bytes(
-                        io.BytesIO(await emote.read()), f"{emote.name}_archive.png"
+                        io.BytesIO(await emote.read()), f"{emote.name}_archive.{ext}"
                     )
                 )
             )
