@@ -72,7 +72,10 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
 
     except IndexError:  # Executed if the message is only the prefix
         # The idea being that any prefix must be under 5 characters (this will be enforced)
-        prefixes_string = "\n".join(filter(lambda x: len(x) < 5, prefixes))
+        prefixes_string = "\n".join(filter(lambda x: len(x) < 5 and x != "-", prefixes))
+
+        if len(prefixes_string) == 0:
+            prefixes_string = "ansi\n\u001b[0;30mNone\n"
 
         await app.rest.create_message(
             event.channel_id,

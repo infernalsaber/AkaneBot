@@ -1,0 +1,22 @@
+{
+    "DEFAULT_EMBED_COLOR": "#000000",
+    "OWNER_IDS": [],
+    "GUILD_PREFIX_MAP": {
+    },
+    "EMOTES": {
+        "SIP": "\ud83e\udd64",
+        "SMILE": "\ud83d\ude04",
+        "THINK": "\ud83e\udd14",
+        "POUT": "\ud83d\ude3e",
+        "PIXIV": "\ud83d\uddbc\ufe0f",
+        "VNDB": "\ud83c\udfae",
+        "AL": "",
+        "NYAA": "\ud83c\udff4\u200d\u2620\ufe0f",
+        "DANBOORU": "",
+        "YOUTUBE": "\u23ef\ufe0f",
+        "NEXT": "\u23ea",
+        "PREVIOUS": "\u23e9",
+        "GEAR": "\u2699\ufe0f",
+        "LOADING": "\ud83d\udd03"
+    }
+}
