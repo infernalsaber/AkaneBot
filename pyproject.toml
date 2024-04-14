@@ -9,7 +9,7 @@ exclude = [
     ".venv",
     "venv"
 ]
-select = ["E", "F", "B"]
+lint.select = ["E", "F", "B"]
 line-length = 180
 
 
