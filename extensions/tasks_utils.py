@@ -22,6 +22,7 @@ from functions.utils import (
     poor_mans_proxy,
     proxy_img,
 )
+from functions.views import AuthorNavi
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
@@ -78,8 +79,8 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
             embed=hk.Embed(
                 color=colors.ELECTRIC_BLUE, timestamp=datetime.now().astimezone()
             )
-            .add_field("Global Prefixes", f"```{prefixes_string}```")
-            .add_field("Server Prefixes", "```ansi\n\u001b[0;30mComing Soon...```")
+            .add_field("Global Prefixes", "```-```")
+            .add_field("Server Prefixes", f"```{prefixes_string}```")
             .add_field("Additional", "- Pinging the bot always works :)")
             .set_author(
                 name=f"{app.get_me().username} Prefix Configuration",
@@ -118,6 +119,21 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
                 ),
             )
             return
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("content", "The content to send", modifier=lb.OptionModifier.CONSUME_REST)
+@lb.command(
+    "slideshow",
+    "Create a gallery of images/text",
+    aliases=["ss", "pages"],
+    pass_options=True,
+)
+@lb.implements(lb.PrefixCommand)
+async def slideshow(ctx: lb.Context, content: str) -> None:
+    view = AuthorNavi(pages=content.split("\n"), user_id=ctx.author.id)
+    await view.send(ctx.channel_id)
 
 
 @task_plugin.command

@@ -10,7 +10,7 @@ plotly==5.15.0
 isodate==0.6.1
 psutil
 Pillow
-# tabulate
+requests-html
 feedparser
 kaleido==0.2.1
 aiohttp-client-cache==0.8.1

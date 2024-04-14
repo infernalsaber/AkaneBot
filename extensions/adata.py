@@ -8,10 +8,10 @@ from typing import Optional
 import hikari as hk
 import lightbulb as lb
 import miru
-from bs4 import BeautifulSoup
 from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
+from requests_html import HTMLSession
 
 from functions import buttons as btns
 from functions import views as views
@@ -550,14 +550,33 @@ async def game_search(ctx: lb.PrefixContext, query: str):
     #     return
     # await ctx.edit_last_response("fuzz")
 
-    resp = await ctx.bot.d.aio_session.get(
-        f"https://store.steampowered.com/search/suggest?term={query}&f=games&cc=GB&realm=1&l=english&v=22790766&use_store_query=1&use_search_spellcheck=1&search_creators_and_tags=1",
-        timeout=5,
-    )
+    session = HTMLSession()
 
-    if resp.ok:
-        resp = await resp.content.read()
-    else:
+    params = {
+        "term": {query},
+        "f": "games",
+        "cc": "US",
+        "realm": 1,
+        "l": "english",
+        "v": 22790766,
+        "use_store_query": 1,
+        "use_search_spellcheck": 1,
+        "search_creators_and_tags": 1,
+    }
+
+    r = session.get("https://store.steampowered.com/search/suggest", params=params)
+    # if r.ok:
+    #     await ctx.respond(r.html.find('a')[0].attrs['href'])
+    #     return
+    # else:
+    #     await ctx.respond("No matches found")
+    #     return
+    # resp = await ctx.bot.d.aio_session.get(
+    #     f"https://store.steampowered.com/search/suggest?term={query}&f=games&cc=GB&realm=1&l=english&v=22790766&use_store_query=1&use_search_spellcheck=1&search_creators_and_tags=1",
+    #     timeout=5,
+    # )
+
+    if not r.ok:
         await ctx.respond(
             hk.Embed(
                 title="CAN'T FIND THE REQUESTED GAME",
@@ -571,11 +590,15 @@ async def game_search(ctx: lb.PrefixContext, query: str):
 
     # await ctx.respond("resp got")
 
-    soup = BeautifulSoup(resp, "lxml")
+    # soup = BeautifulSoup(resp, "lxml")
     # for a in soup.find_all('a'):
     # print(a.get('href'))
     # await ctx.respond(resp)
-    sup = soup.find_all("a")
+    sup = r.html.find("a")
+
+    print("Sup is", sup)
+
+    await ctx.respond(sup)
     if not sup or len(sup) == 0:
         await ctx.respond(
             hk.Embed(
@@ -587,7 +610,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
             delete_after=15,
         )
         return
-    sup = sup[0].get("href")
+    sup = sup[0].attrs["href"]
     # await ctx.edit_last_response("parseley")
 
     pattern = re.compile(r"https://store.steampowered.com/app/(\d+)")
