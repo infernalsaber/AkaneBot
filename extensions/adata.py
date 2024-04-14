@@ -1,4 +1,5 @@
 """The animanga related plugin"""
+
 import collections
 import re
 from datetime import datetime, timedelta
@@ -596,9 +597,6 @@ async def game_search(ctx: lb.PrefixContext, query: str):
     # await ctx.respond(resp)
     sup = r.html.find("a")
 
-    print("Sup is", sup)
-
-    await ctx.respond(sup)
     if not sup or len(sup) == 0:
         await ctx.respond(
             hk.Embed(
@@ -1388,11 +1386,13 @@ async def _search_vn(ctx: lb.Context, query: str):
             .add_field("Released", released, inline=True)
             .add_field(
                 "Est. Time",
-                verbose_timedelta(
-                    timedelta(minutes=req["results"][0]["length_minutes"])
-                )
-                if req["results"][0]["length_minutes"]
-                else "NA",
+                (
+                    verbose_timedelta(
+                        timedelta(minutes=req["results"][0]["length_minutes"])
+                    )
+                    if req["results"][0]["length_minutes"]
+                    else "NA"
+                ),
                 inline=True,
             )
             .add_field("Summary", description)
@@ -1554,7 +1554,7 @@ async def _search_vntag(ctx: lb.Context, query: str):
     headers = {"Content-Type": "application/json"}
     data = {
         "filters": ["search", "=", query],
-        "fields": "name, aliases, description, category, vn_count"
+        "fields": "name, aliases, description, category, vn_count",
         # "sort": "title"
     }
     req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
@@ -1628,7 +1628,7 @@ async def _search_vntrait(ctx: lb.Context, query: str):
 
     data = {
         "filters": ["search", "=", query],
-        "fields": "name, aliases, description, group_name, char_count"
+        "fields": "name, aliases, description, group_name, char_count",
         # "sort": "title"
     }
 

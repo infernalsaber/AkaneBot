@@ -1,14 +1,14 @@
 repos:
 # Can make do without this one tbh
 - repo: https://github.com/asottile/pyupgrade
-  rev: v3.10.1
+  rev: v3.15.2
   hooks:
     - id: pyupgrade
       args: [ --py39-plus]
 
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.0.285
+  rev: v0.3.7
   hooks:
     - id: ruff
       args: [ --fix, --exit-non-zero-on-fix]
