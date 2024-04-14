@@ -1,5 +1,6 @@
 """The main file of the bot, basically sets up and starts the bot """
 import asyncio
+import json
 import logging
 import os
 import sqlite3
@@ -19,26 +20,30 @@ dotenv.load_dotenv()
 
 # TODO
 # 1. Nox based testing
-# 2. Prefix configuration
 
 
 # Setting the prefix as , for windows (where i run the test bot)
 # and - for others (where it's deployed :) )
-def return_prefix() -> list[str]:
-    if os.name == "nt":
-        return [","]
-    else:
-        return ["-"]
+# def return_prefix() -> list[str]:
+#     if os.name == "nt":
+#         return [","]
+#     else:
+#         return ["-"]
 
 
-guild_prefix_map = {980479965726404670: [","]}
+# guild_prefix_map = {980479965726404670: ["-"]}
 
 
 def make_prefix(app, message: hk.Message) -> list:
-    try:
-        return guild_prefix_map[message.guild_id]
-    except KeyError:
-        return ["-"]
+    cfg = open("config.json", encoding="utf-8")
+    cfg = json.loads(cfg.read())
+
+    guild_prefix_map = cfg["GUILD_PREFIX_MAP"]
+
+    prefixes = guild_prefix_map.get(str(message.guild_id), ["-"])
+    # print("Guild prefixes", prefixes, type(prefixes))
+
+    return prefixes
 
 
 # The following snippet is borrowed from:

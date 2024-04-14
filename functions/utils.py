@@ -244,7 +244,7 @@ def humanized_list_join(lst: list, *, conj: t.Optional[str] = "or") -> str:
     if len(lst) == 1:
         return lst[0]
 
-    return f"{','.join(lst[:-1])}" f"{conj} {lst[-1]}"
+    return f"{','.join(lst[:-1])}" f" {conj} {lst[-1]}"
 
 
 async def get_anitrendz_latest(session: CachedSession) -> str:
