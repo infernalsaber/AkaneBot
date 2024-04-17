@@ -21,8 +21,7 @@ from functions.errors import RequestsFailedError
 from functions.models import ALCharacter
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
-from functions.search_images import lookfor
-from functions.utils import get_anitrendz_latest, verbose_date, verbose_timedelta
+from functions.utils import verbose_date, verbose_timedelta
 
 al_listener = lb.Plugin(
     "Lookup",
@@ -295,28 +294,30 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
         RequestsFailedError: Raised if the API call fails
     """
 
+    filtr = filter
+
     num = 5
-    if filter and filter in ["upcoming", "bypopularity", "favorite"]:
+    if filtr and filtr in ["upcoming", "bypopularity", "favorite"]:
         params = {"limit": num, "filter": filter}
-    elif filter in ["airing", "weekly", "week"]:
+
+    elif filtr in ["airing", "weekly", "week"]:
+        url = "https://raw.githubusercontent.com/infernalsaber/Anicharts_API/main/anime_images.json"
+        try:
+            data = await (await ctx.bot.d.aio_session.get(url, timeout=3)).json()
+            anitrendz = data[max(data.keys())]["anitrendz"]
+            animecorner = data[max(data.keys())]["animecorner"]
+        except Exception as e:
+            await ctx.respond(f"parsing {e}")
+            return
         try:
             pages = [
                 hk.Embed(
                     title="Top 10 Anime of the Week: AniTrendz", color=colors.LILAC
-                ).set_image(await get_anitrendz_latest(ctx.bot.d.aio_session)),
+                ).set_image(anitrendz["image_url"]),
                 hk.Embed(
                     title="Top 10 Anime of the Week: AnimeCorner",
                     color=colors.LILAC,
-                ).set_image(
-                    (
-                        await lookfor(
-                            "anime corner top anime of the week",
-                            ctx.bot.d.aio_session,
-                            num=1,
-                            recent="w",
-                        )
-                    )[0]["original"]
-                ),
+                ).set_image(animecorner["image_url"]),
             ]
             view = views.AuthorView(user_id=ctx.author.id)
             view.add_item(
