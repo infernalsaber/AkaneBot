@@ -70,7 +70,7 @@ Open the directory and run
 $ mv env.template .env
 ```
 
-Now put your Discord Bot Token and [SauceNAO Token](https://saucenao.com/) in the `.env` file
+Now put your Discord Bot Token and [SauceNAO Token](https://saucenao.com/user.php) in the `.env` file
 
 ### Install dependencies
 
