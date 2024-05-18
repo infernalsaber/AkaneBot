@@ -11,15 +11,8 @@ from functions.utils import humanized_list_join
 
 prefix_manager = lb.Plugin("Prefix", "manager", include_datastore=True)
 prefix_manager.d.help = True
-
-# @prefix_manager.command
-# @lb.command("test", "a")
-# @lb.implements(lb.PrefixCommand)
-# async def testing(ctx: lb.PrefixContext) -> None:
-#     await ctx.respond(emotes.DANBOORU.name)
-#     await ctx.respond(emotes.DANBOORU.value)
-#     await ctx.respond(emotes)
-# TODO remove
+prefix_manager.d.help_emoji = "〰️"
+# prefix_manager.d.help_image = "https://i.imgur.com/nsg3lZJ.png"
 
 
 @prefix_manager.command
