@@ -64,7 +64,7 @@ def parse_description(description: str) -> str:
     )
 
     if len(description) > 400:
-        description = description[0:400]
+        description = description[0 : 400 + re.search(" ", description[400:]).span()[0]]
 
         # If the trimmed description has a missing spoiler tag, add one
         if description.count("||") % 2:
@@ -138,11 +138,15 @@ async def al_search(ctx: lb.Context, type: str, media: str) -> None:
     """A wrapper slash command for AL/VNDB search"""
 
     if isinstance(ctx, lb.PrefixContext):
-        await ctx.respond(
-            "Please note that the lookup prefix command is depreciated and due to be removed. "
-            f"See the updated commands using `{ctx.prefix}help Lookup`."
-            "\n(The capitalization is important)"
-        )
+        try:
+            await ctx.respond(
+                "Please note that the lookup prefix command is depreciated and due to be removed. "
+                f"See the updated commands using ```{ctx.prefix}help Lookup```"
+                "\n(The capitalization is important)"
+            )
+        except Exception as e:
+            print(e)
+            await ctx.respond(e)
 
     if type.lower() in ["anime", "manga", "m", "a"]:
         if type[0].lower() == "m":
@@ -714,7 +718,7 @@ query ($id: Int, $search: String, $type: MediaType) {
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
-    no_of_items = response["volumes"] or "NA"
+    no_of_items = response.get("volumes", "NA")
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -732,15 +736,15 @@ query ($id: Int, $search: String, $type: MediaType) {
             color=colors.ANILIST,
             timestamp=datetime.now().astimezone(),
         )
-        .add_field("Rating", response["meanScore"])
+        .add_field("Rating", response.get("meanScore", "NA"))
         .add_field("Genres", ", ".join(response["genres"][:4]))
-        .add_field("Status", response["status"], inline=True)
+        .add_field("Status", response("status", "Unknown"), inline=True)
         .add_field(
             "Volumes",
             no_of_items,
             inline=True,
         )
-        .add_field("Summary", response["description"])
+        .add_field("Summary", response.get("description", "NA"))
         .set_thumbnail(response["coverImage"]["large"])
         .set_image(response["bannerImage"])
         .set_footer(
@@ -861,7 +865,7 @@ query ($id: Int, $search: String, $type: MediaType) {
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
-    no_of_items = response["episodes"] if response["episodes"] else "NA"
+    no_of_items = response.get("episodes", "NA")
 
     if isinstance(response["episodes"], int) and no_of_items == 1:
         no_of_items = (
@@ -892,7 +896,7 @@ query ($id: Int, $search: String, $type: MediaType) {
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response["meanScore"] or "NA")
+            .add_field("Rating", response.get("meanScore", "NA"))
             .add_field("Genres", ", ".join(response["genres"][:4]))
             .add_field("Status", response["status"].replace("_", " "), inline=True)
             .add_field(
@@ -1065,15 +1069,15 @@ query ($id: Int, $search: String, $type: MediaType) {
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response["meanScore"] or "NA")
+            .add_field("Rating", response.get("meanScore", "NA"))
             .add_field("Genres", ", ".join(response["genres"][:4]) or "NA")
-            .add_field("Status", response["status"] or "NA", inline=True)
+            .add_field("Status", response.get("status", "NA"), inline=True)
             .add_field(
                 "Chapters",
                 no_of_items or "NA",
                 inline=True,
             )
-            .add_field("Summary", response["description"] or "NA")
+            .add_field("Summary", response("description", "NA"))
             .set_thumbnail(response["coverImage"]["large"])
             .set_image(response["bannerImage"])
             .set_footer(

@@ -1,6 +1,7 @@
 """Utility classes for everything"""
 import collections
 import os
+import re
 from datetime import datetime, timedelta
 from enum import Enum, IntEnum
 
@@ -132,7 +133,13 @@ class AnilistBase:
         )
 
         if len(description) > 400:
-            description = description[0:400]
+            # for line in description.split("\n"):
+            # desc = description[0:400]
+            # leftover = description[400:]
+            description = description[
+                0 : 400 + re.search(" ", description[400:]).span()[0]
+            ]
+            # description = " ".join(description[0:420].split()[:-1])
 
             # If the trimmed description has a missing spoiler tag, add one
             if description.count("||") % 2:
