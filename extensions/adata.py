@@ -307,9 +307,7 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
     elif filtr in ["airing", "weekly", "week"]:
         url = "https://raw.githubusercontent.com/infernalsaber/Anicharts_API/main/anime_images.json"
         try:
-            data = await (await ctx.bot.d.aio_session.get(url, timeout=3)).json(
-                content_type=None
-            )
+            data = await (await ctx.bot.d.aio_session.get(url, timeout=3)).json()
             anitrendz = data[max(data.keys())]["anitrendz"]
             animecorner = data[max(data.keys())]["animecorner"]
         except Exception as e:
