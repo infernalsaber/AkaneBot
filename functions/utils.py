@@ -247,23 +247,6 @@ def humanized_list_join(lst: list, *, conj: t.Optional[str] = "or") -> str:
     return f"{','.join(lst[:-1])}" f" {conj} {lst[-1]}"
 
 
-async def get_anitrendz_latest(session: CachedSession) -> str:
-    try:
-        link = "https://anitrendz.tumblr.com/"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
-        }
-
-        async with session.get(link, headers=headers, timeout=3) as response:
-            soup = BeautifulSoup(await response.read(), "lxml")
-
-        return soup.find("a", {"class": "post_media_photo_anchor"})["data-big-photo"]
-
-    except Exception as e:
-        print(e)
-        return link
-
-
 def get_random_quote() -> str:
     """Funny loading messages"""
     return random.choice(
