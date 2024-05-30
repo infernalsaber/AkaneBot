@@ -208,6 +208,11 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
     elif isinstance(exception, lb.ConverterFailure):
         await event.context.respond(f"The argument `{exception.raw_value}` is invalid")
 
+    elif isinstance(exception, lb.MaxConcurrencyLimitReached):
+        await event.context.respond(
+            "Too many people are using the command, please try again later"
+        )
+
     elif isinstance(exception, lb.CommandNotFound):
         pass
         # To move the fuzzy matching here
