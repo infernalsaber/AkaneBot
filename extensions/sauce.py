@@ -9,7 +9,6 @@ from datetime import datetime
 import dotenv
 import hikari as hk
 import lightbulb as lb
-import miru
 from miru.ext import nav
 
 from functions.buttons import (
@@ -20,7 +19,6 @@ from functions.buttons import (
     SwapButton,
     SwapNaviButton,
 )
-from functions.checks import trusted_user_check
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
 from functions.utils import (
@@ -28,7 +26,6 @@ from functions.utils import (
     get_random_quote,
     is_image,
     iso_to_timestamp,
-    poor_mans_proxy,
     tenor_link_from_gif,
 )
 from functions.views import AuthorNavi, AuthorView
@@ -108,140 +105,9 @@ async def pfp_sauce(ctx: lb.UserContext):
 
 
 @sauce_plugin.command
-@lb.set_max_concurrency(1, lb.GlobalBucket)
-@lb.add_checks(trusted_user_check)
 @lb.add_cooldown(length=86400, uses=10, bucket=lb.UserBucket)
 @lb.add_cooldown(length=86400, uses=20, bucket=lb.GuildBucket)
-@lb.command("Video Sauce", "Search the sauce of video", auto_defer=True)
-@lb.implements(lb.MessageCommand)
-async def find_video_sacue(ctx: lb.MessageContext):
-    """Find the sauce of a video
-
-    Args:
-        ctx (lb.MessageContext): The context the command is invoked in
-    """
-
-    if ctx.options["target"].attachments:
-        vid_url = ctx.options["target"].attachments[0].url
-
-    print("Video URL: ", vid_url)
-
-    vid_bytes = await poor_mans_proxy(vid_url, ctx.bot.d.aio_session)
-
-    print("Video Bytes")
-
-    # To save the bytes to memory
-    with open("temp.mp4", "wb") as f:
-        f.write(vid_bytes.read())
-
-    print("Written to filesystem")
-
-    os.system("ffmpeg -i temp.mp4 -vf fps=1 temp.jpg")
-
-    print("Converted to image")
-
-    msg = await ctx.respond(attachments=["temp.jpg"])
-    message = await msg.message()
-    link = message.attachments[0].url
-
-    # await msg.delete()
-
-    params = {
-        "api_key": SAUCENAO_KEY,
-        "output_type": 2,
-        "numres": 5,
-        "url": link,
-    }
-
-    async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params, timeout=3
-    ) as res:
-        if res.ok:
-            res = await res.json()
-
-            if res["header"]["status"] < 0:
-                await ctx.edit_last_response(f"Error: {res['header']['message']}")
-                return
-
-            try:
-                embed, view = await _complex_parsing(ctx, res["results"][0])
-
-                if float(res["results"][0]["header"]["similarity"]) < 60.0:
-                    await msg.delete()
-                    view = AuthorNavi(
-                        pages=[
-                            nav.Page(
-                                content=ctx.options.target.make_link(ctx.guild_id),
-                                embed=hk.Embed(
-                                    title="Possible false match",
-                                    description=(
-                                        "We might have encountered a false match."
-                                        "\n\nFalse matches often contain NSFW matches or "
-                                        "in rarer cases, what you're actually looking for."
-                                        "\nPlease use the ❌ or Go Back button should that happen."
-                                    ),
-                                    color=colors.WARN,
-                                    timestamp=datetime.now().astimezone(),
-                                ),
-                            ),
-                            nav.Page(
-                                content=ctx.options.target.make_link(ctx.guild_id),
-                                embed=embed,
-                            ),
-                        ],
-                        buttons=[
-                            SwapNaviButton(
-                                labels=["Show anyway", "Go Back"],
-                                emojis=[
-                                    None,
-                                    hk.Emoji.parse("<:previous:1136984315415236648>"),
-                                ],
-                            ),
-                            NavButton(
-                                url=f"https://yandex.com/images/search?url={link}&rpt=imageview",
-                                label="Search Yandex",
-                            ),
-                            KillNavButton(style=hk.ButtonStyle.SECONDARY),
-                        ],
-                        user_id=ctx.author.id,
-                    )
-                    await view.send(ctx.interaction, responded=True)
-
-                else:
-                    # view.
-                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-
-                    choice = await ctx.edit_last_response(
-                        content=ctx.options.target.make_link(ctx.guild_id),
-                        embed=embed,
-                        components=view,
-                        attachments=None,
-                    )
-
-                    await view.start(choice)
-                    await view.wait()
-            except Exception as e:
-                embed, view = await _simple_parsing(ctx, res["results"][0])
-                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                choice = await ctx.edit_last_response(
-                    embed=embed, components=view, attachments=None
-                )
-                await ctx.respond(e)
-                await view.start(choice)
-                await view.wait()
-        else:
-            await ctx.respond(f"Ran into en error, `code : {res.status}`")
-
-    os.remove("temp.mp4")
-    os.remove("temp.jpg")
-
-    # ctx.get_channel()
-
-
-@sauce_plugin.command
-@lb.add_cooldown(length=86400, uses=10, bucket=lb.UserBucket)
-@lb.add_cooldown(length=86400, uses=20, bucket=lb.GuildBucket)
-@lb.command("Find the Sauce", "Search the sauce of the image", auto_defer=False)
+@lb.command("Find the Sauce", "Search the sauce of the image", auto_defer=True)
 @lb.implements(lb.MessageCommand)
 async def find_sauce_menu(ctx: lb.MessageContext):
     """Find the image from a message and then its sauce
@@ -250,9 +116,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
         ctx (lb.MessageContext): The context the command is invoked in
     """
 
-    message_link = ctx.options["target"].make_link(ctx.guild_id)
-
-    ctx, url = await _find_the_url(ctx)
+    url = await _find_the_url(ctx)
 
     if not url["errorMessage"]:
         link = url["url"]
@@ -281,10 +145,42 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                 embed, view = await _complex_parsing(ctx, res["results"][0])
 
                 if float(res["results"][0]["header"]["similarity"]) < 60.0:
+                    # [
+                    #     nav.Page(
+                    #         content=ctx.options.target.make_link(ctx.guild_id),
+                    #         embed=embed,
+                    #     ),
+                    #     nav.Page(
+                    #         content=ctx.options.target.make_link(ctx.guild_id),
+                    #         embed=hk.Embed(
+                    #             title="Possible false match",
+                    #             description=(
+                    #                 "We might have encountered a false match."
+                    #                 "\n\nFalse matches often contain NSFW matches or "
+                    #                 "in rarer cases, what you're actually looking for."
+                    #                 "\nPlease use the ❌ or Go Back button should that happen."
+                    #             ),
+                    #             color=colors.WARN,
+                    #             timestamp=datetime.now().astimezone(),
+                    #         ),
+                    #     ),
+                    # ]
+                    # disp_embed = hk.Embed(
+                    #     title="Possible false match",
+                    #     description=(
+                    #         "We might have encountered a false match."
+                    #         "\n\nFalse matches often contain NSFW matches or "
+                    #         "in rarer cases, what you're actually looking for."
+                    #         "\nPlease use the ❌ or Go Back button should that happen."
+                    #     ),
+                    #     color=colors.WARN,
+                    #     timestamp=datetime.now().astimezone(),
+                    # )
+
                     view = AuthorNavi(
                         pages=[
                             nav.Page(
-                                content=message_link,
+                                content=ctx.options.target.make_link(ctx.guild_id),
                                 embed=hk.Embed(
                                     title="Possible false match",
                                     description=(
@@ -298,7 +194,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                                 ),
                             ),
                             nav.Page(
-                                content=message_link,
+                                content=ctx.options.target.make_link(ctx.guild_id),
                                 embed=embed,
                             ),
                         ],
@@ -324,7 +220,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
                     choice = await ctx.respond(
-                        content=message_link,
+                        content=ctx.options.target.make_link(ctx.guild_id),
                         embed=embed,
                         components=view,
                     )
@@ -826,22 +722,6 @@ pattern = r"https?://\S+|www\.\S+"
 url_regex = re.compile(pattern)
 
 
-class MyModal(miru.Modal):
-    # Define our modal items
-    # You can also use Modal.add_item() to add items to the modal after instantiation, just like with views.
-    num = miru.TextInput(
-        label="Which image to search for?",
-        placeholder="The attachment number to consider",
-        required=True,
-    )
-
-    # The callback function is called after the user hits 'Submit'
-    async def callback(self, ctx: miru.ModalContext) -> None:
-        ...
-
-    #     # You can also access the values using ctx.values, Modal.values, or use ctx.get_value_by_id()
-
-
 async def _find_the_url(ctx) -> dict:
     """A function which finds the link (if it exists) across contexts
 
@@ -889,64 +769,40 @@ async def _find_the_url(ctx) -> dict:
         url = None
         errorMessage = "No valid url found"
 
-        message = ctx.options["target"]
-
-        if message.content:
-            match = url_regex.search(message.content)
+        if ctx.options["target"].content:
+            match = url_regex.search(ctx.options["target"].content)
             if match:
                 url = match.group()
 
         if url:
             if await is_image(url, ctx.bot.d.aio_session):
-                return ctx, {"url": url, "errorMessage": None}
+                return {"url": url, "errorMessage": None}
 
             if _is_tenor_link(url):
                 link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
-                    return ctx, {"url": url, "errorMessage": "Unknown error"}
-                return ctx, {"url": link, "errorMessage": None}
+                    return {"url": url, "errorMessage": "Unknown error"}
+                return {"url": link, "errorMessage": None}
 
         url = None
         errorMessage = "No valid url found"
 
-        if not message.attachments:
+        if not ctx.options["target"].attachments:
             msg = f"There's nothing here to find the sauce of {emotes.SIP.value}"
-            return ctx, {
+            return {
                 "url": None,
                 "errorMessage": msg,
             }
 
-        if len(message.attachments) > 1:
-            test = MyModal(title="test", timeout=60)
-            await test.send(ctx.interaction)
-            await test.wait(timeout=60)
-            if test.last_context is None:
-                return
-            ctx = test.last_context
-            val = test.num.value
-        else:
-            val = 1
+        if await is_image(
+            ctx.options["target"].attachments[0].url, ctx.bot.d.aio_session
+        ):
+            return {
+                "url": ctx.options["target"].attachments[0].url,
+                "errorMessage": None,
+            }
 
-        try:
-            if not isinstance(eval(val), int):
-                return
-
-            val = int(val)
-
-            if val > len(message.attachments) + 1 or val < 1:
-                return ctx, {
-                    "url": None,
-                    "errorMessage": "Invalid attachment number",
-                }
-
-            if await is_image(message.attachments[val - 1].url, ctx.bot.d.aio_session):
-                return ctx, {
-                    "url": message.attachments[val - 1].url,
-                    "errorMessage": None,
-                }
-            return ctx, {"url": url, "errorMessage": errorMessage}
-        except Exception as e:
-            await ctx.respond(f"Error: {e}")
+        return {"url": url, "errorMessage": errorMessage}
 
     return {
         "url": None,

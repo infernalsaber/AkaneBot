@@ -19,7 +19,6 @@ lxml
 rapidfuzz
 pandas
 fast-colorthief
-seventv
 
 # Putting this at the end coz W*ndows doesn't need it
 uvloop
