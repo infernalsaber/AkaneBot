@@ -181,6 +181,46 @@ class NavButton(nav.NavButton):
         ...
 
 
+class AddEmoteButton(nav.NavButton):
+    """A custom button class for adding emotes to the server"""
+
+    def __init__(
+        self,
+        *,
+        style: hk.ButtonStyle = hk.ButtonStyle.PRIMARY,
+        label: t.Optional[str] = "Add Emote",
+        custom_id: t.Optional[str] = None,
+        emoji: t.Optional[t.Union[hk.Emoji, str]] = None,
+        row: t.Optional[int] = None,
+        selected_embed: t.Optional[int] = None,
+    ):
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
+        )
+        if selected_embed:
+            self.selected_embed = selected_embed
+        else:
+            self.selected_embed = 0
+
+    async def callback(self, ctx: miru.ViewContext):
+        try:
+            emote_name = ctx.message.embeds[self.selected_embed].title.replace(
+                "Emote: ", ""
+            )
+            image_url = ctx.message.embeds[self.selected_embed].image.url
+
+            emoji = await ctx.bot.rest.create_emoji(
+                ctx.guild_id, name=emote_name, image=image_url
+            )
+            await ctx.respond(f"Added emote: {emoji.mention}")
+
+        except Exception as e:
+            await ctx.respond(f"Failed to add emote: {e}")
+
+    async def before_page_change(self) -> None:
+        ...
+
+
 class PreviewButton(nav.NavButton):
     """A custom button for the manga preview"""
 
