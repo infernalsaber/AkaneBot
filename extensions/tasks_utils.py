@@ -4,7 +4,6 @@ import glob
 import os
 import typing as t
 from datetime import datetime
-from random import randint
 from subprocess import PIPE, Popen
 
 import arrow
@@ -15,7 +14,6 @@ from lightbulb.ext import tasks
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
-from functions.checks import trusted_user_check
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
 from functions.utils import (
@@ -44,77 +42,6 @@ async def clear_pic_files():
     for file in files:
         os.remove(file)
     print("Cleared")
-
-
-@tasks.task(d=1)
-async def update_status():
-    """Update the bot's status"""
-
-    update_dict = {
-        0: {
-            "status": hk.Status.IDLE,
-            "activity": hk.Activity(
-                name="Aqua's back | -help",
-                type=hk.ActivityType.WATCHING,
-            ),
-        },
-        1: {
-            "status": hk.Status.IDLE,
-            "activity": hk.Activity(
-                name="Bell Pepper Exercise | -help",
-                type=hk.ActivityType.PLAYING,
-            ),
-        },
-        2: {
-            "status": hk.Status.IDLE,
-            "activity": hk.Activity(
-                name="『Idol』 | -help", type=hk.ActivityType.LISTENING
-            ),
-        },
-    }
-
-    chosen_status = update_dict[randint(0, 2)]
-
-    await task_plugin.bot.update_presence(
-        status=chosen_status["status"], activity=chosen_status["activity"]
-    )
-
-
-@task_plugin.command
-@lb.add_checks(lb.owner_only)
-@lb.option("user", "The user to trust", hk.User)
-@lb.command("trust", "Trust a user to access certain test commands", pass_options=True)
-@lb.implements(lb.PrefixCommand)
-async def trust_user(ctx: lb.PrefixContext, person: hk.User):
-    """Add an alias for a vn trait (fun command)"""
-    try:
-        db = ctx.bot.d.con
-        cursor = db.cursor()
-        cursor.execute(
-            """INSERT INTO trusted_users (user, ) VALUES (?,)""",
-            (person.id,),
-        )
-        db.commit()
-        await ctx.respond(f"Added user `{person.username}` to trusted users list")
-    except Exception as e:
-        print(e)
-
-
-@task_plugin.command
-@lb.add_checks(lb.owner_only)
-@lb.option("user", "The user to remove from trusted list", hk.User)
-@lb.command("untrust", "Remove a user from the list", pass_options=True)
-@lb.implements(lb.PrefixCommand)
-async def distrust_user(ctx: lb.PrefixContext, person: hk.User):
-    """Remove an alias for a vn trait (fun command)"""
-    try:
-        db = ctx.bot.d.con
-        cursor = db.cursor()
-        cursor.execute("DELETE FROM trusted_users where user = ?", (person.id,))
-        await ctx.respond(f"Removed user `{person.username}` from trusted users list")
-        db.commit()
-    except Exception as e:
-        print(e)
 
 
 @task_plugin.listener(hk.GuildMessageCreateEvent)
@@ -263,7 +190,7 @@ def last_n_lines(filename, num_lines):
 
 
 @task_plugin.command
-@lb.add_checks(trusted_user_check)
+@lb.add_checks(lb.owner_only)
 @lb.option("image_url", "The image to proxy")
 @lb.command("proxy", "Proxy test an image", pass_options=True)
 @lb.implements(lb.PrefixCommand)
@@ -305,20 +232,7 @@ async def latest_logs(
     # await ctx.respond()
 
 
-# @task_plugin.command
-# @lb.add_checks(lb.owner_only)
-# @lb.option("link", "Link to new pfp")
-# @lb.command("newpfp", "Change the bot's pfp", pass_options=True)
-# @lb.implements(lb.PrefixCommand)
-# async def new_bot_pfp(ctx: lb.PrefixContext, link: str):
-#     try:
-#         await ctx.bot.rest.edit_my_user(avatar=base64.b64encode((await poor_mans_proxy(link, ctx.bot.d.aio_session)).read()))
-#         await ctx.respond("Changed bot pfp")
-#     except Exception as e:
-#         await ctx.respond(e)
-# task_plugin.bot.rest.edit_my_user()
 @task_plugin.command
-@lb.add_checks(trusted_user_check)
 @lb.option(
     "link",
     "The link to check",
@@ -405,16 +319,6 @@ async def prefix_invocation(event: hk.StartedEvent) -> None:
         )
     """
     )
-
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS trusted_users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER
-        )
-    """
-    )
-
     conn.commit()
 
 

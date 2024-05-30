@@ -9,19 +9,11 @@ import hikari as hk
 import lightbulb as lb
 import pandas as pd
 import psutil
-import seventv
-from miru.ext import nav
 from PIL import Image, ImageOps
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
-from functions.buttons import (
-    AddEmoteButton,
-    CustomNextButton,
-    CustomPrevButton,
-    KillNavButton,
-    SwapButton,
-)
+from functions.buttons import SwapButton
 from functions.models import ColorPalette as colors
 from functions.utils import is_image
 from functions.views import AuthorNavi, AuthorView
@@ -277,92 +269,6 @@ async def inevent_cmd(ctx: lb.Context, event: str):
 
             except Exception as e:
                 await ctx.respond(f"Erra: {e}")
-    except Exception as e:
-        await ctx.respond(f"Error: {e}")
-
-
-@info_plugin.command
-@lb.add_checks(
-    lb.guild_only, lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS)
-)
-@lb.option("query", "The emote to search for", modifier=lb.OptionModifier.CONSUME_REST)
-@lb.command(
-    "searchemote", "Search for an emote on 7tv", aliases=["se"], pass_options=True
-)
-@lb.implements(lb.PrefixCommand)
-async def search_emote(ctx: lb.Context, query: str) -> None:
-    print("Creating session")
-    mySevenTvSession = seventv.seventv()
-    print("Seventv session created")
-    emotes = await mySevenTvSession.emote_search(query, case_sensitive=True)
-    print("Emotes fetched")
-    try:
-        pages = [
-            hk.Embed(title=f"Emote: {emote.name}")
-            .set_image(f"https:{emote.host_url}/2x.webp")
-            .set_footer(text="Powered by 7tv")
-            for emote in emotes
-        ]
-
-        buttons = [
-            CustomPrevButton(),
-            nav.IndicatorButton(),
-            CustomNextButton(),
-            AddEmoteButton(),
-            KillNavButton(),
-        ]
-        navigator = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons=buttons)
-    except Exception as e:
-        await ctx.respond(e)
-        return
-    await navigator.send(ctx.channel_id)
-    await mySevenTvSession.close()
-
-
-@info_plugin.command
-@lb.add_checks(
-    lb.guild_only, lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS)
-)
-@lb.option("emotes", "The emotes to swipe", modifier=lb.OptionModifier.GREEDY)
-@lb.command(
-    "swipe",
-    "Swipe emotes from one server to another",
-    aliases=["copyemote"],
-    pass_options=True,
-)
-@lb.implements(lb.PrefixCommand)
-async def swipe_emotes(
-    ctx: lb.Context, emotes: t.List[t.Union[hk.CustomEmoji, str]]
-) -> None:
-    try:
-        if not emotes:
-            await ctx.respond("No emotes found")
-            return
-
-        emotes = list(
-            {
-                hk.Emoji.parse(emote)
-                for emote in emotes
-                if hk.Emoji.parse(emote) is not None
-            }
-        )
-
-        for emote in emotes:
-            try:
-                await ctx.bot.rest.create_emoji(
-                    ctx.guild_id, name=emote.name, image=emote
-                )
-                await ctx.respond(f"Added emote: {emote.mention}")
-            except hk.RateLimitTooLongError:
-                await ctx.respond("Rate limit hit. Please try again shortly.")
-                break
-            except hk.BadRequestError:
-                # Reason being server emotes full or invalid value
-                await ctx.respond("Can't add this emote")
-            except hk.InternalServerError:
-                await ctx.respond("Discord went buggy oops")
-                break
-
     except Exception as e:
         await ctx.respond(f"Error: {e}")
 
@@ -831,7 +737,7 @@ async def sticker_removal(ctx: lb.MessageContext):
     "Remove emote or multiple, simple as that",
     aliases=["re", "remote"],
     pass_options=True,
-    # hidden=True,
+    hidden=True,
 )
 @lb.implements(lb.PrefixCommand)
 async def emote_removal(
