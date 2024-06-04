@@ -82,7 +82,7 @@ async def update_status():
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
-@lb.option("user", "The user to trust", hk.User)
+@lb.option("person", "The user to trust", hk.User)
 @lb.command("trust", "Trust a user to access certain test commands", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def trust_user(ctx: lb.PrefixContext, person: hk.User):
@@ -91,18 +91,18 @@ async def trust_user(ctx: lb.PrefixContext, person: hk.User):
         db = ctx.bot.d.con
         cursor = db.cursor()
         cursor.execute(
-            """INSERT INTO trusted_users (user, ) VALUES (?,)""",
+            """INSERT INTO trusted_users (user_id) VALUES (?)""",
             (person.id,),
         )
         db.commit()
         await ctx.respond(f"Added user `{person.username}` to trusted users list")
     except Exception as e:
-        print(e)
+        await ctx.respond(f"Error: {e}")
 
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
-@lb.option("user", "The user to remove from trusted list", hk.User)
+@lb.option("person", "The user to remove from trusted list", hk.User)
 @lb.command("untrust", "Remove a user from the list", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def distrust_user(ctx: lb.PrefixContext, person: hk.User):
@@ -110,11 +110,11 @@ async def distrust_user(ctx: lb.PrefixContext, person: hk.User):
     try:
         db = ctx.bot.d.con
         cursor = db.cursor()
-        cursor.execute("DELETE FROM trusted_users where user = ?", (person.id,))
-        await ctx.respond(f"Removed user `{person.username}` from trusted users list")
+        cursor.execute("DELETE FROM trusted_users where user_id = ?", (person.id,))
         db.commit()
+        await ctx.respond(f"Removed user `{person.username}` from trusted users list")
     except Exception as e:
-        print(e)
+        await ctx.respond(f"Error: {e}")
 
 
 @task_plugin.listener(hk.GuildMessageCreateEvent)
