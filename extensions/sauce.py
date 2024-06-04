@@ -925,7 +925,8 @@ async def _find_the_url(ctx) -> dict:
             ctx = test.last_context
             val = test.num.value
         else:
-            val = 1
+            val = "1"
+            await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
 
         try:
             if not isinstance(eval(val), int):
