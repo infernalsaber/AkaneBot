@@ -86,7 +86,7 @@ async def update_status():
 @lb.command("trust", "Trust a user to access certain test commands", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def trust_user(ctx: lb.PrefixContext, person: hk.User):
-    """Add an alias for a vn trait (fun command)"""
+    """Add a user to the trusted users' list"""
     try:
         db = ctx.bot.d.con
         cursor = db.cursor()
@@ -106,7 +106,7 @@ async def trust_user(ctx: lb.PrefixContext, person: hk.User):
 @lb.command("untrust", "Remove a user from the list", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def distrust_user(ctx: lb.PrefixContext, person: hk.User):
-    """Remove an alias for a vn trait (fun command)"""
+    """Remove user from the trusted users' list"""
     try:
         db = ctx.bot.d.con
         cursor = db.cursor()
@@ -187,6 +187,9 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
             else:
                 return
 
+            commandish = commandish.replace(
+                "@", "@\u200b"
+            )  # Sanitize against ping hijacking
             await app.rest.create_message(
                 event.channel_id,
                 (
