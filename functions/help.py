@@ -328,6 +328,7 @@ class BotHelpCommand(BaseHelpCommand):
         if close_matches:
             possible_commands = [f"`{i}`" for i, *_ in close_matches]
 
+        obj = obj.replace("@", "@\u200b")  # Sanitize against ping hijacking
         await ctx.respond(
             f"Command `{obj}` not found. Did you mean: {humanized_list_join(possible_commands)}?"
         )
