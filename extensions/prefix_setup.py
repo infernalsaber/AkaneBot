@@ -12,14 +12,15 @@ from functions.utils import humanized_list_join
 prefix_manager = lb.Plugin("Prefix", "manager", include_datastore=True)
 prefix_manager.d.help = True
 
-# @prefix_manager.command
-# @lb.command("test", "a")
-# @lb.implements(lb.PrefixCommand)
-# async def testing(ctx: lb.PrefixContext) -> None:
-#     await ctx.respond(emotes.DANBOORU.name)
-#     await ctx.respond(emotes.DANBOORU.value)
-#     await ctx.respond(emotes)
-# TODO remove
+
+def validate_guild_prefix(pfx: str) -> bool:
+    """Ensure a valid guild prefix
+    The validation conditions being:
+    i. The prefix is less than 5 characters
+    ii. The prefix is not empty/space
+    iii. The prefix does not contain a double quote
+    """
+    return len(pfx) < 5 and len(pfx.strip()) > 0 and '"' not in pfx
 
 
 @prefix_manager.command
@@ -67,55 +68,34 @@ async def prefix_group(ctx: lb.PrefixContext) -> None:
 @lb.command("add", "Add prefix(es)", aliases=["a"], pass_options=True)
 @lb.implements(lb.PrefixSubCommand)
 async def add_prefix(ctx: lb.Context, prefixes: t.Sequence[str]) -> None:
-    # prefixes = prefixes.split()
-    # await ctx.respond(prefixes)
     try:
-        # with open("config.json", "r", encoding="utf-8") as file_mngr:
-
         file_mngr = open("config.json", encoding="utf-8")
-        # await ctx.respond('opened file')
 
-        # try:
         config = json.loads(file_mngr.read())
-
-        # await ctx.respond('loaded config')
 
         curr_guild_pfxs = config["GUILD_PREFIX_MAP"].get(str(ctx.guild_id))
 
         if curr_guild_pfxs is None:
             curr_guild_pfxs = ["-"]
 
-        # await ctx.respond(f"Your current pfxs are {curr_guild_pfxs}")
-        # try:
         if len(prefixes + curr_guild_pfxs) > 3:
             await ctx.respond("A server can only have upto 3 prefixes")
             return
 
         for pfx in prefixes:
-            if len(pfx) > 5:
-                await ctx.respond("A prefix can't be longer than 5 charas")
-                return
+            if not validate_guild_prefix(pfx):
+                await ctx.respond(f"Can't add invalid prefix: `{pfx}`")
+                prefixes.remove(pfx)
 
         curr_guild_pfxs += prefixes
-        # except:
-        #     await ctx.respond(sys.exc_info())
 
-        config["GUILD_PREFIX_MAP"][str(ctx.guild_id)] = curr_guild_pfxs
+        config["GUILD_PREFIX_MAP"][str(ctx.guild_id)] = list(set(curr_guild_pfxs))
 
         file_mngr = open("config.json", "w", encoding="utf-8")
         file_mngr.write(json.dumps(config, indent=4))
 
-        # file_mngr.write(json.dumps(config))
     except Exception:
         await ctx.respond(sys.exec_info())
-
-    # await ctx.respond(f"Your pfxs are {curr_guild_pfxs}")
-
-    # if len(prefixes) > 3:
-    # await ctx.respond("Can only have upto 3 guild prefixes")
-    # return
-    # Enforce prefix length to be upto 5 charas
-    # If same as global, then enable global/ignore
 
     prefixes = [f"`{pfx}`" for pfx in prefixes]
     curr_guild_pfxs = [f"`{pfx}`" for pfx in curr_guild_pfxs]
@@ -137,6 +117,9 @@ async def add_prefix(ctx: lb.Context, prefixes: t.Sequence[str]) -> None:
 )
 @lb.implements(lb.PrefixSubCommand)
 async def set_prefix(ctx: lb.Context, prefix_: str) -> None:
+    if not validate_guild_prefix(prefix_):
+        return await ctx.respond(f"Can't set invalid prefix: `{prefix_}`")
+
     f = open("config.json", encoding="utf-8")
     config = json.loads(f.read())
     f.close()
