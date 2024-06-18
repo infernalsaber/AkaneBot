@@ -22,18 +22,6 @@ dotenv.load_dotenv()
 # 1. Nox based testing
 
 
-# Setting the prefix as , for windows (where i run the test bot)
-# and - for others (where it's deployed :) )
-# def return_prefix() -> list[str]:
-#     if os.name == "nt":
-#         return [","]
-#     else:
-#         return ["-"]
-
-
-# guild_prefix_map = {980479965726404670: ["-"]}
-
-
 def make_prefix(app, message: hk.Message) -> list:
     cfg = open("config.json", encoding="utf-8")
     cfg = json.loads(cfg.read())
@@ -47,8 +35,7 @@ def make_prefix(app, message: hk.Message) -> list:
 
 
 # The following snippet is borrowed from:
-# https://github.com/Nereg/ARKMonitorBot/blob/
-# 1a6cedf34d531bddf0f5b11b3238344192998997/src/main.py#L14
+# https://github.com/Nereg/ARKMonitorBot/
 
 
 def setup_logging() -> None:
