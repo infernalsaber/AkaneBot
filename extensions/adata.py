@@ -9,6 +9,7 @@ from typing import Optional
 import hikari as hk
 import lightbulb as lb
 import miru
+import pandas as pd
 from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
@@ -520,6 +521,17 @@ async def remove_trait_map(ctx: lb.PrefixContext, person: str):
 
 
 @al_listener.command
+@lb.add_checks(lb.owner_only)
+@lb.command("traits", "Show all the traits")
+@lb.implements(lb.PrefixCommand)
+async def show_traits(ctx: lb.PrefixContext):
+    """Show all the trait maps"""
+    await ctx.respond(
+        f'```{pd.read_sql("SELECT * FROM traitmap", ctx.bot.d.con).to_string(index=False)}```'
+    )
+
+
+@al_listener.command
 @lb.option(
     "query", "The game to search", modifier=lb.commands.OptionModifier.CONSUME_REST
 )
@@ -712,7 +724,7 @@ query ($id: Int, $search: String, $type: MediaType) {
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
-    no_of_items = response["volumes"] or "NA"
+    no_of_items = response("volumes", "NA")
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -890,7 +902,7 @@ query ($id: Int, $search: String, $type: MediaType) {
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response["meanScore"] or "NA")
+            .add_field("Rating", response.get("meanScore", "NA"))
             .add_field("Genres", ", ".join(response["genres"][:4]))
             .add_field("Status", response["status"].replace("_", " "), inline=True)
             .add_field(
@@ -991,7 +1003,7 @@ query ($id: Int, $search: String, $type: MediaType) {
 
         title = response["title"]["english"] or response["title"]["romaji"]
 
-        no_of_items = response["chapters"] or response["episodes"] or "NA"
+        no_of_items = response.get("chapters", response.get("episodes", "NA"))
 
         if response["description"]:
             response["description"] = parse_description(response["description"])
@@ -1063,15 +1075,15 @@ query ($id: Int, $search: String, $type: MediaType) {
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response["meanScore"] or "NA")
-            .add_field("Genres", ", ".join(response["genres"][:4]) or "NA")
-            .add_field("Status", response["status"] or "NA", inline=True)
+            .add_field("Rating", response.get("meanScore", "NA"))
+            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
+            .add_field("Status", response.get("status", "NA"), inline=True)
             .add_field(
                 "Chapters",
                 no_of_items or "NA",
                 inline=True,
             )
-            .add_field("Summary", response["description"] or "NA")
+            .add_field("Summary", response.get("description", "NA"))
             .set_thumbnail(response["coverImage"]["large"])
             .set_image(response["bannerImage"])
             .set_footer(
@@ -1382,7 +1394,7 @@ async def _search_vn(ctx: lb.Context, query: str):
                 color=colors.VNDB,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", req["results"][0]["rating"] or "NA")
+            .add_field("Rating", req["results"][0].get("rating", "NA"))
             .add_field("Tags", tags)
             .add_field("Released", released, inline=True)
             .add_field(
@@ -1582,7 +1594,7 @@ async def _search_vntag(ctx: lb.Context, query: str):
     else:
         description = "NA"
 
-    tag_aliases = ", ".join(req["results"][0]["aliases"]) or "NA"
+    tag_aliases = ", ".join(req["results"][0].get("aliases", ["NA"]))
 
     req["results"][0]["category"] = (
         req["results"][0]["category"]
