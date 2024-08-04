@@ -1319,7 +1319,7 @@ async def _search_vn(ctx: lb.Context, query: str):
                 "title, image.url, rating, released, length_minutes, "
                 "description, tags.spoiler, tags.name,"
                 "tags.category,"
-                "tags.rating"
+                "tags.rating, screenshots.url"
             ),
             # "sort": "title"
         }
@@ -1387,7 +1387,13 @@ async def _search_vn(ctx: lb.Context, query: str):
 
         view = views.AuthorView(user_id=ctx.author.id)
         view.add_item(btns.KillButton())
-        choice = await ctx.respond(
+
+        if req["results"][0]["length_minutes"]:
+            hour, mins = divmod(req["results"][0]["length_minutes"], 60)
+            time = f"{hour}h {mins}m" if mins else f"{hour}h"
+        else:
+            time = "NA"
+        main_embed = (
             hk.Embed(
                 title=req["results"][0]["title"],
                 url=f"https://vndb.org/{req['results'][0]['id']}",
@@ -1397,20 +1403,31 @@ async def _search_vn(ctx: lb.Context, query: str):
             .add_field("Rating", req["results"][0].get("rating", "NA"))
             .add_field("Tags", tags)
             .add_field("Released", released, inline=True)
-            .add_field(
-                "Est. Time",
-                (
-                    verbose_timedelta(
-                        timedelta(minutes=req["results"][0]["length_minutes"])
-                    )
-                    if req["results"][0]["length_minutes"]
-                    else "NA"
-                ),
-                inline=True,
-            )
+            .add_field("Est. Time", time, inline=True)
             .add_field("Summary", description)
             .set_thumbnail(req["results"][0]["image"]["url"])
-            .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg"),
+            .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg")
+            # components=view,
+        )
+
+        screenshots = "\n".join(
+            ss["url"] for ss in req["results"][0]["screenshots"][:4]
+        )
+
+        view = views.AuthorView(user_id=ctx.author.id)
+        view.add_item(
+            btns.SwapButton(
+                swap_page=screenshots,
+                original_page=main_embed,
+                label1="Screenshots",
+                emoji1=hk.Emoji.parse("📸"),
+                emoji2=hk.Emoji.parse("🔍"),
+            )
+        )
+
+        view.add_item(btns.KillButton())
+        choice = await ctx.respond(
+            embed=main_embed,
             components=view,
         )
         await view.start(choice)
@@ -1430,7 +1447,7 @@ def replace_bbcode_with_markdown(match: re.Match) -> str:
     url = match.group(1)
 
     # Replacing VNDB ids with the corresponding url
-    if url[0] == "/":
+    if url.startswith("/"):
         url = "https://vndb.org" + url
 
     link_text = match.group(2)

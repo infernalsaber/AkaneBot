@@ -64,6 +64,7 @@ class EmoteCollection(Enum):
     SMILE = "<:AkaneSmile:872675969041846272>"
     THINK = "<:AkaneThink:1146885037002858618>"
     POUT = "<:AkanePoutColor:852847827826376736>"
+    BOW = "<a:AkaneBow:1109245003823317052>"
 
     PIXIV = "<:pixiv:1130216490021425352>"
     VNDB = "<:vndb_circle:1130453890307997747>"
@@ -97,6 +98,7 @@ class ColorPalette(IntEnum):
     PINK = 0xEF98CD
     LILAC = 0xC8A2C8
     DAWN_PINK = 0xF4EAE9
+    MANGADEX = 0xFF6740
 
 
 ColourPalette = ColorPalette
@@ -610,7 +612,7 @@ query ($id: Int, $type: MediaType) {
                 color=ColorPalette.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response["meanScore"] or "NA")
+            .add_field("Rating", response.get("meanScore", "NA"))
             .add_field("Genres", ", ".join(response["genres"][:4]))
             .add_field("Status", response["status"].replace("_", " "), inline=True)
             .add_field(

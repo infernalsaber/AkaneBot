@@ -471,8 +471,8 @@ async def bot_stats(ctx: lb.Context) -> None:
         usage += str(item[1])
         usage += "\n"
 
-    command += "```"
-    usage += "```"
+    command += "---\nTotal:```"
+    usage += f"---\n{sum([i[1] for i in result])}```"
 
     await ctx.respond(
         embed=hk.Embed(title="Bot Usage Stats")

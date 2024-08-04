@@ -119,7 +119,9 @@ async def on_starting(event: hk.StartedEvent) -> None:
                         ),
                     )
                     .add_field(
-                        "Rating", update["data"]["meanScore"] or "NA", inline=True
+                        "Rating",
+                        update.get("data", {}).get("meanScore", "NA"),
+                        inline=True,
                     )
                     .add_field(
                         "Genres", ", ".join(update["data"]["genres"][:3]), inline=True

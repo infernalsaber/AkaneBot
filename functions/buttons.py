@@ -5,6 +5,7 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
+from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
 from functions.utils import proxy_img
 
@@ -30,7 +31,7 @@ async def preview_maker(
         pages.append(
             hk.Embed(
                 title=title,
-                color=0xFF6740,
+                color=colors.MANGADEX,
                 url=f"https://mangadex.org/title/{manga_id}",
             )
             .set_image(
@@ -291,7 +292,7 @@ class PreviewButton(nav.NavButton):
             await ctx.respond(
                 (
                     f"Looks like MangaDex doesn't have this series "
-                    f"{hk.Emoji.parse('<a:AkaneBow:1109245003823317052>')}"
+                    f"{hk.Emoji.parse(emotes.BOW)}"
                     f"\nThat or some ungabunga error."
                 ),
                 flags=hk.MessageFlag.EPHEMERAL,

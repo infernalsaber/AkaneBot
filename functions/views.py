@@ -8,6 +8,7 @@ import miru
 from miru.ext import nav
 
 from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
+from functions.utils import check_if_url
 
 
 class SelectView(miru.View):
@@ -48,8 +49,10 @@ class AuthorNavi(nav.NavigatorView):
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
         timeout: t.Optional[t.Union[float, int, timedelta]] = 5 * 60,
         user_id: t.Optional[hk.Snowflake] = None,
+        clean_items: t.Optional[bool] = True,
     ) -> None:
         self.user_id = user_id
+        self.clean_items = clean_items
         if not buttons:
             buttons = [
                 CustomPrevButton(),
@@ -72,6 +75,9 @@ class AuthorNavi(nav.NavigatorView):
         return False
 
     async def on_timeout(self) -> None:
+        if not self.clean_items:
+            return
+
         if self.message:
             new_view = None
             for item in self.children:
@@ -91,19 +97,22 @@ class AuthorView(miru.View):
         timeout: t.Optional[t.Union[float, int, timedelta]] = 5 * 60,
         session: t.Optional[aiohttp_client_cache.CachedSession] = None,
         user_id: t.Optional[hk.Snowflake] = None,
+        clean_items: t.Optional[bool] = True,
     ) -> None:
         self.user_id = user_id
         self.session = session
         self.answer = None
+        self.clean_items = clean_items
         super().__init__(autodefer=autodefer, timeout=timeout)
 
     async def on_timeout(self) -> None:
-        # try:
+        if not self.clean_items:
+            return
+
         if self.message:
-            # await self.message.edit(content=self.children)
             new_view = None
             for item in self.children:
-                if item.url is not None:
+                if not check_if_url(item.url):
                     new_view = self.remove_item(item)
 
             await self.message.edit(components=new_view)
