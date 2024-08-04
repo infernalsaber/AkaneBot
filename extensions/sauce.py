@@ -210,6 +210,7 @@ async def find_video_sacue(ctx: lb.MessageContext):
                 else:
                     # view.
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                    view.clean_items = False
 
                     choice = await ctx.edit_last_response(
                         content=ctx.options.target.make_link(ctx.guild_id),
@@ -223,6 +224,7 @@ async def find_video_sacue(ctx: lb.MessageContext):
             except Exception as e:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                view.clean_items = False
                 choice = await ctx.edit_last_response(
                     embed=embed, components=view, attachments=None
                 )
@@ -322,7 +324,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 
                 else:
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-
+                    view.clean_items = False
                     choice = await ctx.respond(
                         content=message_link,
                         embed=embed,
@@ -431,6 +433,7 @@ async def find_sauce(
 
                 else:
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                    view.clean_items = False
                     choice = await ctx.edit_last_response(
                         content=None, embed=embed, components=view
                     )
@@ -440,6 +443,7 @@ async def find_sauce(
             except Exception:
                 embed, view = await _simple_parsing(ctx, data)
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                view.clean_items = False
                 choice = await ctx.edit_last_response(
                     content=None, embed=embed, components=view
                 )
