@@ -902,7 +902,9 @@ query ($id: Int, $search: String, $type: MediaType) {
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response.get("meanScore", "NA"))
+            .add_field(
+                "Rating", response["meanScore"] if response["meanScore"] else "NA"
+            )
             .add_field("Genres", ", ".join(response["genres"][:4]))
             .add_field("Status", response["status"].replace("_", " "), inline=True)
             .add_field(
