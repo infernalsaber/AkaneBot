@@ -1402,7 +1402,10 @@ async def _search_vn(ctx: lb.Context, query: str):
                 color=colors.VNDB,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", req["results"][0].get("rating", "NA"))
+            .add_field(
+                "Rating",
+                req["results"][0]["ratings"] if req["results"][0]["ratings"] else "NA",
+            )
             .add_field("Tags", tags)
             .add_field("Released", released, inline=True)
             .add_field("Est. Time", time, inline=True)
