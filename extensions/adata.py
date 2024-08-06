@@ -1404,7 +1404,7 @@ async def _search_vn(ctx: lb.Context, query: str):
             )
             .add_field(
                 "Rating",
-                req["results"][0]["ratings"] if req["results"][0]["ratings"] else "NA",
+                req["results"][0]["rating"] if req["results"][0]["rating"] else "NA",
             )
             .add_field("Tags", tags)
             .add_field("Released", released, inline=True)
