@@ -1494,7 +1494,7 @@ async def _search_vnchara(ctx: lb.Context, query: str):
     headers = {"Content-Type": "application/json"}
     data = {
         "filters": ["search", "=", query],
-        "fields": "name, description, age, sex,  image.url, traits.name, traits.group_name",
+        "fields": "name, description, age, sex,  image.url, traits.name, traits.group_name, vns.title",
     }
 
     req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
@@ -1567,7 +1567,13 @@ async def _search_vnchara(ctx: lb.Context, query: str):
             if not i:
                 first_page = embed[0]
 
-            options.append(miru.SelectOption(label=chara["name"], value=chara["name"]))
+            options.append(
+                miru.SelectOption(
+                    label=chara["name"],
+                    value=chara["name"],
+                    description=chara["vns"][0]["title"],
+                )
+            )
             pages[chara["name"]] = embed[0]
 
         view = views.SelectView(user_id=ctx.author.id, pages=pages)
