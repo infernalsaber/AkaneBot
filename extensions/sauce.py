@@ -486,6 +486,7 @@ async def find_sauce(
                         .set_footer(
                             text="Powered by: Trace.Moe",
                         ),
+                        components=view,
                     )
                     await view.start(choice)
                     await view.wait()
@@ -921,7 +922,7 @@ async def _find_the_url(ctx) -> dict:
             }
 
         if len(message.attachments) > 1:
-            test = MyModal(title="test", timeout=60)
+            test = MyModal(title="Sauce Search Image Selection", timeout=60)
             await test.send(ctx.interaction)
             await test.wait(timeout=60)
             if test.last_context is None:

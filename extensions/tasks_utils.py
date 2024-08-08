@@ -288,9 +288,9 @@ async def proxy_img_test(ctx: lb.PrefixContext, image_url: str) -> None:
 @lb.command(
     "latestlogs",
     "Read from the bottom and find the latest logs",
-    aliases=["ll"],
+    aliases=["ll", "log"],
     pass_options=True,
-    hidden=True,
+    # hidden=True,
 )
 @lb.implements(lb.PrefixCommand)
 async def latest_logs(
@@ -299,7 +299,7 @@ async def latest_logs(
     await ctx.user.send(
         hk.Bytes(
             last_n_lines(
-                f"logs/{filename}" if filename else "logs/log.txt", num_lines or 100
+                f"logs/{filename}" if filename else "logs/log.txt", num_lines or 200
             ),
             "log.txt",
         )
