@@ -14,6 +14,7 @@ from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
 from functions.components import SimpleTextSelect
+from functions.models import ColorPalette as colors
 from functions.utils import humanized_list_join
 from functions.views import SelectView
 
@@ -79,7 +80,7 @@ class BotHelpCommand(BaseHelpCommand):
             main_embed = (
                 hk.Embed(
                     title=f"{ctx.bot.get_me().username} Help Menu",
-                    color=0x000000,
+                    color=colors.DEFAULT,
                     description=("An animanga search and sauce bot \n\n" "### Plugins"),
                     timestamp=datetime.now().astimezone(),
                 )
@@ -125,7 +126,7 @@ class BotHelpCommand(BaseHelpCommand):
                 ]
 
                 embed = hk.Embed(
-                    color=0x000000,
+                    color=colors.DEFAULT,
                     title=f"{plugin.name} Help",
                     description=f"{plugin.description or 'No additional details provided.'}\n",
                 ).set_footer(
@@ -186,7 +187,7 @@ class BotHelpCommand(BaseHelpCommand):
         if not ctx.responses:
             await ctx.respond(
                 embed=hk.Embed(
-                    color=0x000000,
+                    color=colors.DEFAULT,
                     title="Command Help",
                     description=(
                         f"**{command.name}** \n"
@@ -201,7 +202,7 @@ class BotHelpCommand(BaseHelpCommand):
             await ctx.edit_last_response(
                 content=None,
                 embed=hk.Embed(
-                    color=0x000000,
+                    color=colors.DEFAULT,
                     title="Command Help",
                     description=(
                         f"**{command.name}** \n"
@@ -283,7 +284,7 @@ class BotHelpCommand(BaseHelpCommand):
         ]
 
         embed = hk.Embed(
-            color=0x000000,
+            color=colors.DEFAULT,
             title=f"{plugin.name} Help",
             description=f"{plugin.description or 'No additional details provided.'}\n",
             timestamp=datetime.now().astimezone(),

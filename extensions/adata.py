@@ -1528,19 +1528,22 @@ async def _search_vnchara(ctx: lb.Context, query: str):
 
             if chara["traits"]:
                 traits = {}
-                traits["body"] = []
-                traits["personality"] = []
+                trait_groups = ["Hair", "Eyes", "Body", "Personality"]
+                traits = {
+                    group: [
+                        trait["name"]
+                        for trait in chara["traits"]
+                        if trait["group_name"] == group
+                    ]
+                    for group in trait_groups
+                }
 
-                for trait in chara["traits"]:
-                    if trait["group_name"] == "Personality":
-                        traits["personality"].append(trait["name"])
-                    elif trait["group_name"] == "Body":
-                        traits["body"].append(trait["name"])
+                traits_string = ""
+                for group, names in traits.items():
+                    if names:
+                        traits_string += f"_{group}_: {', '.join(names[:5])}\n"
 
-                traits = (
-                    f"_Body_: {', '.join(traits['body'][:5])}\n"
-                    f"_Personality_: {', '.join(traits['personality'][:5])}"
-                )
+                traits = traits_string
             else:
                 traits = "NA"
 
