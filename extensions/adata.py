@@ -804,6 +804,9 @@ query ($id: Int, $search: String, $type: MediaType) {
     status
     description (asHtml: false)
     siteUrl
+    nextAiringEpisode {
+        episode
+    }
     trailer {
         id
         site
@@ -879,6 +882,11 @@ query ($id: Int, $search: String, $type: MediaType) {
             if response["duration"]
             else "NA"
         )
+    elif response["nextAiringEpisode"]:
+        if no_of_items == "NA":
+            no_of_items = f"{response['nextAiringEpisode']['episode']}/??"
+        else:
+            no_of_items = f"{response['nextAiringEpisode']['episode']}/{no_of_items}"
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -1392,7 +1400,7 @@ async def _search_vn(ctx: lb.Context, query: str):
 
         if req["results"][0]["length_minutes"]:
             hour, mins = divmod(req["results"][0]["length_minutes"], 60)
-            time = f"{hour}h {mins}m" if mins else f"{hour}h"
+            time = f"{hour} hours, {mins} minutes" if mins else f"{hour} hours"
         else:
             time = "NA"
         main_embed = (
@@ -1404,7 +1412,7 @@ async def _search_vn(ctx: lb.Context, query: str):
             )
             .add_field(
                 "Rating",
-                req["results"][0]["rating"] if req["results"][0]["rating"] else "NA",
+                req["results"][0]["rating"] or "NA",
             )
             .add_field("Tags", tags)
             .add_field("Released", released, inline=True)
@@ -1494,7 +1502,7 @@ async def _search_vnchara(ctx: lb.Context, query: str):
     headers = {"Content-Type": "application/json"}
     data = {
         "filters": ["search", "=", query],
-        "fields": "name, description, age, sex,  image.url, traits.name, traits.group_name, vns.title",
+        "fields": "name, description, age, sex,  image.url, traits.name, traits.group_name, vns.title, birthday",
     }
 
     req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
@@ -1519,8 +1527,7 @@ async def _search_vnchara(ctx: lb.Context, query: str):
     try:
         pages = collections.defaultdict(list)
         options = []
-
-        for i, chara in enumerate(req["results"]):
+        for i, chara in enumerate(req["results"][:15]):
             if chara["description"]:
                 description = parse_vndb_desciption(chara["description"])
             else:
@@ -1547,14 +1554,20 @@ async def _search_vnchara(ctx: lb.Context, query: str):
             else:
                 traits = "NA"
 
+            sex_symbols = {"m": "(♂)", "f": "(♀)", "b": "(⚥)", "n": "(⚲)"}
+            if chara["birthday"]:
+                birthday = f'{chara["birthday"][1]}/{chara["birthday"][0]}'
+            else:
+                birthday = "NA"
+
             embed = [
                 hk.Embed(
-                    title=chara["name"],
+                    title=f'{chara["name"]} {sex_symbols.get(chara["sex"][0])}',
                     url=f"https://vndb.org/{chara['id']}",
                     color=colors.VNDB,
                     timestamp=datetime.now().astimezone(),
                 )
-                .add_field("Sex", chara["sex"][0].upper() or "NA", inline=True)
+                .add_field("Birthday", birthday, inline=True)
                 .add_field("Age", chara["age"] or "NA", inline=True)
                 .add_field("Traits", traits)
                 .add_field("Summary", description)
