@@ -10,6 +10,7 @@ import hikari as hk
 import lightbulb as lb
 import miru
 import pandas as pd
+from curl_cffi import requests
 from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
@@ -1021,61 +1022,88 @@ query ($id: Int, $search: String, $type: MediaType) {
         else:
             response["description"] = "NA"
 
-        print("Using MD")
-        base_url = "https://api.mangadex.org"
-
-        order = {
-            "rating": "desc",
-            "followedCount": "desc",
+        # sess = requests.Session()
+        headers = {
+            "accept": "application/json",
         }
 
-        final_order_query = {f"order[{key}]": value for key, value in order.items()}
+        search = title
+        params = {
+            "page": "1",
+            "limit": "15",
+            "showall": "false",
+            "q": search,
+            "t": "false",
+        }
 
-        # for key, value in order.items():
-        # final_order_query[f"order[{key}]"] = value
-
-        req = await ctx.bot.d.aio_session.get(
-            f"{base_url}/manga",
-            params={**{"title": title}, **final_order_query},
-            timeout=3,
+        res = requests.get(
+            "https://api.comick.fun/v1.0/search/",
+            params=params,
+            headers=headers,
+            impersonate="chrome",
         )
+        if res.ok and len(res.json()):
+            chapter_number = res.json()[0]["last_chapter"]
 
-        if req.ok:
-            try:
-                manga_id = (await req.json())["data"][0]["id"]
+            no_of_items = no_of_items or chapter_number
+            hid = res.json()[0]["hid"]
 
-                languages = ["en"]
+            no_of_items = f"[{no_of_items}](https://comick.io/comic/{hid})"
+        # print("Using MD")
+        # base_url = "https://api.mangadex.org"
 
-                req = await ctx.bot.d.aio_session.get(
-                    f"{base_url}/manga/{manga_id}/aggregate",
-                    params={"translatedLanguage[]": languages},
-                    timeout=3,
-                )
+        # order = {
+        #     "rating": "desc",
+        #     "followedCount": "desc",
+        # }
 
-                print(await req.json())
-                data = await get_imp_info(await req.json())
+        # final_order_query = {f"order[{key}]": value for key, value in order.items()}
 
-                if no_of_items == "NA":
-                    no_of_items = (
-                        f"[{data['latest']['chapter'].split('.')[0]}]("
-                        f"https://cubari.moe/read/mangadex/{manga_id})"
-                    )
-                else:
-                    no_of_items = (
-                        f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
-                    )
+        # # for key, value in order.items():
+        # # final_order_query[f"order[{key}]"] = value
 
-            except IndexError:
-                data = None
-                no_of_items = "NA"
+        # req = await ctx.bot.d.aio_session.get(
+        #     f"{base_url}/manga",
+        #     params={**{"title": title}, **final_order_query},
+        #     timeout=3,
+        # )
 
-            except AttributeError:
-                data = None
-                no_of_items = "NA"
+        # if req.ok:
+        #     try:
+        #         manga_id = (await req.json())["data"][0]["id"]
 
-        else:
-            data = None
-            no_of_items = "NA"
+        #         languages = ["en"]
+
+        #         req = await ctx.bot.d.aio_session.get(
+        #             f"{base_url}/manga/{manga_id}/aggregate",
+        #             params={"translatedLanguage[]": languages},
+        #             timeout=3,
+        #         )
+
+        #         print(await req.json())
+        #         data = await get_imp_info(await req.json())
+
+        #         if no_of_items == "NA":
+        #             no_of_items = (
+        #                 f"[{data['latest']['chapter'].split('.')[0]}]("
+        #                 f"https://cubari.moe/read/mangadex/{manga_id})"
+        #             )
+        #         else:
+        #             no_of_items = (
+        #                 f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
+        #             )
+
+        #     except IndexError:
+        #         data = None
+        #         no_of_items = "NA"
+
+        #     except AttributeError:
+        #         data = None
+        #         no_of_items = "NA"
+
+        # else:
+        #     data = None
+        #     no_of_items = "NA"
 
         pages = [
             hk.Embed(
@@ -1119,17 +1147,17 @@ query ($id: Int, $search: String, $type: MediaType) {
                 ctx.channel_id,
             )
 
-        if data:
-            ctx.bot.d.chapter_info[navigator.message_id] = [
-                base_url,
-                data["first"]["id"],
-                title,
-                manga_id,
-                response["coverImage"]["large"],
-                pages,
-            ]
-        else:
-            ctx.bot.d.chapter_info[navigator.message_id] = None
+        # if data:
+        #     ctx.bot.d.chapter_info[navigator.message_id] = [
+        #         base_url,
+        #         data["first"]["id"],
+        #         title,
+        #         manga_id,
+        #         response["coverImage"]["large"],
+        #         pages,
+        #     ]
+        # else:
+        #     ctx.bot.d.chapter_info[navigator.message_id] = None
 
     except Exception as e:
         await ctx.respond(e)
@@ -1326,10 +1354,10 @@ async def _search_vn(ctx: lb.Context, query: str):
         data = {
             "filters": ["search", "=", query],
             "fields": (
-                "title, image.url, rating, released, length_minutes, "
+                "title, image.url, rating, released, length_minutes, length,"
                 "description, tags.spoiler, tags.name,"
-                "tags.category,"
-                "tags.rating, screenshots.url"
+                "tags.category, tags.rating,"
+                "screenshots.url, screenshots.sexual, screenshots.violence"
             ),
             # "sort": "title"
         }
@@ -1402,7 +1430,15 @@ async def _search_vn(ctx: lb.Context, query: str):
             hour, mins = divmod(req["results"][0]["length_minutes"], 60)
             time = f"{hour} hours, {mins} minutes" if mins else f"{hour} hours"
         else:
-            time = "NA"
+            len_map = {
+                1: "Very Short (<2 hours)",
+                2: "Short (2-10 hours)",
+                3: "Medium (10-30 hours)",
+                4: "Long (30-50 hours)",
+                5: "Very Long (>50 hours)",
+            }
+            time = len_map.get(req["results"][0]["length_minutes"], "NA")
+
         main_embed = (
             hk.Embed(
                 title=req["results"][0]["title"],
@@ -1424,7 +1460,9 @@ async def _search_vn(ctx: lb.Context, query: str):
         )
 
         screenshots = "\n".join(
-            ss["url"] for ss in req["results"][0]["screenshots"][:4]
+            ss["url"]
+            for ss in req["results"][0]["screenshots"][:4]
+            if not (ss["sexual"] == 2 or ss["violence"] == 2)
         )
 
         view = views.AuthorView(user_id=ctx.author.id)
