@@ -14,7 +14,7 @@ line-length = 180
 
 
 [tool.isort]
-known_third_party = ["PIL", "aiohttp_client_cache", "arrow", "bs4", "ciso8601", "dateutil", "dotenv", "fast_colorthief", "feedparser", "hikari", "isodate", "lightbulb", "miru", "orjson", "pandas", "plotly", "psutil", "pytz", "rapidfuzz", "requests_html", "seventv"]
+known_third_party = ["PIL", "aiohttp_client_cache", "arrow", "bs4", "ciso8601", "curl_cffi", "dateutil", "dotenv", "fast_colorthief", "feedparser", "hikari", "isodate", "lightbulb", "miru", "orjson", "pandas", "plotly", "psutil", "pytz", "rapidfuzz", "requests_html", "seventv"]
 profile= "black"
 
 [tool.black]
