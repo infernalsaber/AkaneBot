@@ -11,8 +11,6 @@ akane_db.db
 my_cache.sqlite
 ntfc.py
 config.json
-extensions/prefix_setup.py
 extensions/x.py
 key value pair.pem
-test.ipynb
 db_ops.py

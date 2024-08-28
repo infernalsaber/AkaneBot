@@ -47,7 +47,7 @@ class AuthorNavi(nav.NavigatorView):
         *,
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
-        timeout: t.Optional[t.Union[float, int, timedelta]] = 5 * 60,
+        timeout: t.Optional[t.Union[float, int, timedelta]] = 15 * 60,
         user_id: t.Optional[hk.Snowflake] = None,
         clean_items: t.Optional[bool] = True,
     ) -> None:
@@ -94,7 +94,7 @@ class AuthorView(miru.View):
         self,
         *,
         autodefer: bool = True,
-        timeout: t.Optional[t.Union[float, int, timedelta]] = 5 * 60,
+        timeout: t.Optional[t.Union[float, int, timedelta]] = 15 * 60,
         session: t.Optional[aiohttp_client_cache.CachedSession] = None,
         user_id: t.Optional[hk.Snowflake] = None,
         clean_items: t.Optional[bool] = True,
@@ -139,7 +139,7 @@ class PreView(nav.NavigatorView):
         session: aiohttp_client_cache.CachedSession,
         pages: t.Sequence[t.Union[str, hk.Embed, t.Sequence[hk.Embed]]],
         buttons: t.Optional[t.Sequence[nav.NavButton]] = None,
-        timeout: t.Optional[t.Union[float, int, timedelta]] = 180.0,
+        timeout: t.Optional[t.Union[float, int, timedelta]] = 15 * 60,
         user_id: t.Optional[hk.Snowflake] = None,
     ) -> None:
         self.user_id = user_id
@@ -148,10 +148,6 @@ class PreView(nav.NavigatorView):
         super().__init__(pages=pages, buttons=buttons, timeout=timeout)
 
     async def on_timeout(self) -> None:
-        # Clearing the memory occupied by the pages
-        if self.message.app.d.chapter_info[self.message_id]:
-            self.message.app.d.chapter_info[self.message_id] = None
-
         if self.message:
             await self.message.edit(components=[])
 

@@ -53,7 +53,7 @@ async def compiler(ctx: lb.Context, code: str) -> None:
     with subprocess.Popen(
         ["python3", "ntfc.py"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as result:
-        output, error = result.communicate(timeout=12)
+        output, error = result.communicate(timeout=25)
 
         if error:
             await ctx.respond(

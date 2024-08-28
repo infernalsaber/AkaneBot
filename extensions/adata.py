@@ -473,7 +473,7 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
                 ).set_image(i)
             )
 
-        navigator = views.AuthorNavi(pages=pages, timeout=180, user_id=ctx.author.id)
+        navigator = views.AuthorNavi(pages=pages, timeout=1800, user_id=ctx.author.id)
         await navigator.send(ctx.channel_id)
 
     else:
@@ -1045,7 +1045,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         if res.ok and len(res.json()):
             chapter_number = res.json()[0]["last_chapter"]
 
-            no_of_items = no_of_items or chapter_number
+            no_of_items = no_of_items or chapter_number or "Nil"
             hid = res.json()[0]["hid"]
 
             no_of_items = f"[{no_of_items}](https://comick.io/comic/{hid})"

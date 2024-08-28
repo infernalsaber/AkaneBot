@@ -1,60 +1,52 @@
 """Custom Button classes"""
+import re
 import typing as t
 
 import hikari as hk
 import miru
+from curl_cffi import requests
 from miru.ext import nav
 
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
-from functions.utils import proxy_img
-
-# from functions.views import AuthorView
-
-# from bs4 import BeautifulSoup
 
 
-async def preview_maker(
-    base_url, data_id, title, manga_id, cover, session
-) -> t.Union[list[hk.Embed], None]:
+async def preview_maker(series_id) -> t.Union[list[hk.Embed], None]:
     """A preview maker function for the manga previews"""
 
-    req = await session.get(f"{base_url}/at-home/server/{data_id}", timeout=10)
+    session = requests.Session(impersonate="chrome")
+    headers = {"accept": "application/json"}
 
-    if not req.ok:
-        return None
-
-    r_json = await req.json()
-    pages = []
-
-    for page in r_json["chapter"]["dataSaver"]:
-        pages.append(
-            hk.Embed(
-                title=title,
-                color=colors.MANGADEX,
-                url=f"https://mangadex.org/title/{manga_id}",
-            )
-            .set_image(
-                proxy_img(
-                    f"{r_json['baseUrl']}/data-saver/{r_json['chapter']['hash']}/{page}"
-                )
-            )
-            .set_footer(
-                "Fetched via: MangaDex",
-                icon="https://avatars.githubusercontent.com/u/100574686?s=280&v=4",
-            )
-        )
-    # Kill the process if there are no pages
-    if not pages:
-        return None
-    pages.append(
-        hk.Embed(title=title, url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1")
-        .set_image(cover)
-        .set_author(
-            name="Click here to continue reading",
-            url=f"https://cubari.moe/read/mangadex/{manga_id}/2/1",
-        )
+    chapters = session.get(
+        f"https://api.comick.fun/comic/{series_id}/chapters?lang=en&chap-order=1",
+        headers=headers,
     )
+    for chapter in chapters.json()["chapters"]:
+        if chapter["chap"] == "1":
+            chapter_id = chapter["hid"]
+            title = chapter["title"] or "Chapter 1"
+            break
+    else:
+        return None
+
+    images = session.get(
+        f"https://api.comick.fun/chapter/{chapter_id}/get_images", headers=headers
+    )
+    CDN_URL = "https://meo4.comick.pictures"
+
+    pages = [
+        hk.Embed(
+            title=title,
+            color=colors.COMICK,
+            url=f"https://comick.io/comic/{series_id}/{chapter_id}-chapter-1-en",
+        )
+        .set_image(f"{CDN_URL}/{image['b2key']}")
+        .set_footer(
+            "Fetched via: Comick",
+            icon="https://i.imgur.com/Jr74lTA.png",
+        )
+        for image in images.json()
+    ]
 
     return pages
 
@@ -241,6 +233,9 @@ class PreviewButton(nav.NavButton):
         )
 
     async def callback(self, ctx: miru.ViewContext):
+        if not hasattr(self, "spare_pages"):
+            self.spare_pages = self.view.pages
+
         if self.label == "🔍":
             self.label = "Preview"
             self.emoji = hk.Emoji.parse("<a:peek:1061709886712455308>")
@@ -253,21 +248,22 @@ class PreviewButton(nav.NavButton):
             view.add_item(self)
             view.add_item(KillNavButton())
 
-            await self.view.swap_pages(
-                ctx, ctx.bot.d.chapter_info[self.view.message_id][5]
-            )
+            t = self.view.pages
+
+            await self.view.swap_pages(ctx, self.spare_pages)
+            self.spare_pages = t
 
             return
 
         for item in self.view.children:
             if not item == self:
                 self.view.remove_item(item)
-        data = ctx.bot.d.chapter_info[self.view.message_id]
         swap_pages = None
-        if hasattr(self.view, "session"):
-            swap_pages = await preview_maker(
-                data[0], data[1], data[2], data[3], data[4], self.view.session
-            )
+
+        match = re.search(r"/comic/(\w+)", self.view.pages[0].fields[3].value)
+        series_id = match.group(0).split("/")[-1] if match else None
+
+        swap_pages = await preview_maker(series_id)
 
         self.view.add_item(
             CustomPrevButton(
@@ -287,13 +283,15 @@ class PreviewButton(nav.NavButton):
         self.label = "🔍"
         self.emoji = None
         if swap_pages:
+            t = self.view.pages
             await self.view.swap_pages(ctx, swap_pages)
+            self.spare_pages = t
         else:
             await ctx.respond(
                 (
-                    f"Looks like MangaDex doesn't have this series "
+                    f"Looks like Comick doesn't have this series "
                     f"{hk.Emoji.parse(emotes.BOW)}"
-                    f"\nThat or some ungabunga error."
+                    f"\nThat or some unknown error."
                 ),
                 flags=hk.MessageFlag.EPHEMERAL,
             )

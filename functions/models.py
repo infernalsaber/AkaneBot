@@ -43,7 +43,7 @@ class YTVideo:
                 f"https://youtube.googleapis.com/youtube/v3/videos?part=snippet%2Ccontent"
                 f"Details%2Cstatistics&id={self.vid_id}&regionCode=US&key={YT_KEY}"
             ),
-            timeout=2,
+            timeout=3,
         )
         ytapi2 = await ytapi2.json()
         self.vid_duration = str(
@@ -99,6 +99,7 @@ class ColorPalette(IntEnum):
     LILAC = 0xC8A2C8
     DAWN_PINK = 0xF4EAE9
     MANGADEX = 0xFF6740
+    COMICK = 0x1F2937
 
 
 ColourPalette = ColorPalette
