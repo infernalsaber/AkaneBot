@@ -1,5 +1,6 @@
 """Utility functions for the bot"""
 import io
+import os
 import random
 import typing as t
 from datetime import timedelta
@@ -28,16 +29,17 @@ async def poor_mans_proxy(link: str, session: CachedSession) -> io.BytesIO:
     Returns:
         io.BytesIO: The image bytes
     """
-    resp = await session.get(link, timeout=2)
+    resp = await session.get(link, timeout=3)
     return io.BytesIO(await resp.read())
 
 
-PROXY_URL = "https://image-proxy-three.vercel.app"
+# Using an optional proxy microservice, based on https://github.com/infernalsaber/Flask-Image-Proxy
+PROXY_URL = os.getenv("PROXY_URL")
 
 
 def proxy_img(img_url: str) -> str:
     """Simple image proxy"""
-    return f"{PROXY_URL}/proxy?url={img_url}"
+    return f"{PROXY_URL}/proxy?url={img_url}" if PROXY_URL else img_url
 
 
 @lru_cache(maxsize=3, typed=False)
@@ -199,7 +201,7 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
             "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
         }
 
-        async with session.get(link, headers=headers, timeout=2) as response:
+        async with session.get(link, headers=headers, timeout=5) as response:
             soup = BeautifulSoup(await response.read(), "lxml")
 
         return soup.find("meta", {"itemprop": "contentUrl"})["content"]

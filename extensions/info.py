@@ -438,7 +438,7 @@ async def add_emote(
 
         elif image_type == 1:
             try:
-                async with ctx.bot.d.aio_session.get(emote, timeout=2) as resp:
+                async with ctx.bot.d.aio_session.get(emote, timeout=3) as resp:
                     img_bytes = await resp.read()
 
                     ratio = len(img_bytes) / (1024 * 256)

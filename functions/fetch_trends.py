@@ -110,7 +110,7 @@ query ($id: Int, $search: String) {
         response = await session.post(
             "https://graphql.anilist.co",
             json={"query": query, "variables": variables},
-            timeout=2,
+            timeout=3,
         )
 
         if response.ok:

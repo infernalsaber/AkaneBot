@@ -57,7 +57,7 @@ async def youtube_search(ctx: lb.Context, query: str) -> None:
     response = await ctx.bot.d.aio_session.get(
         "https://youtube.googleapis.com/youtube/v3/search",
         params=response_params,
-        timeout=2,
+        timeout=3,
     )
 
     if not response.ok:

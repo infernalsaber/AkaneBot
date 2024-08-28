@@ -500,7 +500,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
     """A usually stable method to form an embed via sauce results"""
     sauce = "😵"
 
-    view = AuthorView(user_id=ctx.author.id, timeout=10 * 60)
+    view = AuthorView(user_id=ctx.author.id, timeout=15 * 60)
 
     if "MangaDex" in data["header"]["index_name"]:
         try:
