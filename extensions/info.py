@@ -104,7 +104,8 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
         for member in ctx.bot.cache.get_members_view_for_guild(ctx.guild_id).values():
             if role.id in member.role_ids:
                 d1 += f"{member.id: <20}\n"
-                d2 += f"{member.username}\n"
+                username = member.username.replace("_", r"\_")
+                d2 += f"{username}\n"
                 counter += 1
 
         if not counter:
