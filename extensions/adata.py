@@ -14,7 +14,6 @@ from curl_cffi import requests
 from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
-from requests_html import HTMLSession
 
 from functions import buttons as btns
 from functions import views as views
@@ -230,7 +229,48 @@ async def user_al(ctx: lb.PrefixContext, user: str):
         query (str): The user
     """
 
-    await ctx.respond(f"https://anilist.co/user/{user}")
+    query = """
+query Query($name: String) {
+  User(name: $name) {
+    id
+    name
+    about
+    avatar {
+      medium
+    }
+  }
+}
+"""
+
+    variables = {"name": user}
+
+    response = await ctx.bot.d.aio_session.post(
+        "https://graphql.anilist.co",
+        json={"query": query, "variables": variables},
+        timeout=3,
+    )
+    
+    if not response.ok:
+        return await ctx.respond(f"https://anilist.co/user/{user}")
+    
+    resp = (await response.json())["data"]["User"]
+    
+    # await ctx.respond(resp)
+    
+    description = resp["about"] or "No description available"
+    
+    await ctx.respond(
+        content=f"https://anilist.co/user/{resp['id']}",
+        embed=hk.Embed(
+            title=f"{resp['name']}",
+            url=f"https://anilist.co/user/{resp['name']}",
+            description=f"{resp['name']}'s Anilist profile",
+            color=colors.ANILIST,
+            timestamp=datetime.now().astimezone()
+        )
+        .set_image(f"https://img.anili.st/user/{resp['id']}")
+    )
+        
 
 
 @al_listener.command
@@ -565,7 +605,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
     #     return
     # await ctx.edit_last_response("fuzz")
 
-    session = HTMLSession()
+    session = requests.Session()
 
     params = {
         "term": {query},
