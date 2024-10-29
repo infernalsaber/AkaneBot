@@ -15,7 +15,6 @@ import isodate
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
 from ciso8601 import parse_datetime
-from fast_colorthief import get_dominant_color
 from orjson import dumps
 
 
@@ -210,25 +209,6 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
         print(e)
         return link
 
-
-@lru_cache(maxsize=3)
-async def get_image_dominant_colour(link: str) -> hk.Color:
-    """Get the dominant colour of an image from a link to it
-
-    Args:
-        link (str): Link to the image
-
-    Returns:
-        hk.Color: Dominant Colour
-    """
-    session = CachedSession()
-
-    async with session.get(link, stream=True, timeout=10) as res:
-        input_bytes = await res.read()
-
-    session.close()
-
-    return hk.Color.of(get_dominant_color(io.BytesIO(input_bytes)))
 
 
 def humanized_list_join(lst: list, *, conj: t.Optional[str] = "or") -> str:
