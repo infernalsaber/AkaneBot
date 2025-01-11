@@ -10,6 +10,7 @@ import hikari as hk
 import lightbulb as lb
 import miru
 import pandas as pd
+from bs4 import BeautifulSoup
 from curl_cffi import requests
 from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
@@ -247,7 +248,6 @@ query Query($name: String) {
     response = await ctx.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
-        timeout=3,
     )
     
     if not response.ok:
@@ -345,7 +345,7 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
     elif filtr in ["airing", "weekly", "week"]:
         url = "https://raw.githubusercontent.com/infernalsaber/Anicharts_API/main/anime_images.json"
         try:
-            data = await (await ctx.bot.d.aio_session.get(url, timeout=3)).json()
+            data = await (await ctx.bot.d.aio_session.get(url)).json()
             anitrendz = data[max(data.keys())]["anitrendz"]
             animecorner = data[max(data.keys())]["animecorner"]
         except Exception as e:
@@ -605,7 +605,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
     #     return
     # await ctx.edit_last_response("fuzz")
 
-    session = requests.Session()
+    session = requests.Session(impersonate='chrome')
 
     params = {
         "term": {query},
@@ -619,17 +619,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
         "search_creators_and_tags": 1,
     }
 
-    r = session.get("https://store.steampowered.com/search/suggest", params=params)
-    # if r.ok:
-    #     await ctx.respond(r.html.find('a')[0].attrs['href'])
-    #     return
-    # else:
-    #     await ctx.respond("No matches found")
-    #     return
-    # resp = await ctx.bot.d.aio_session.get(
-    #     f"https://store.steampowered.com/search/suggest?term={query}&f=games&cc=GB&realm=1&l=english&v=22790766&use_store_query=1&use_search_spellcheck=1&search_creators_and_tags=1",
-    #     timeout=5,
-    # )
+    r = session.get("https://store.steampowered.com/search/suggest", params=params, timeout=5)
 
     if not r.ok:
         await ctx.respond(
@@ -643,15 +633,12 @@ async def game_search(ctx: lb.PrefixContext, query: str):
         )
         return
 
-    # await ctx.respond("resp got")
 
-    # soup = BeautifulSoup(resp, "lxml")
-    # for a in soup.find_all('a'):
-    # print(a.get('href'))
-    # await ctx.respond(resp)
-    sup = r.html.find("a")
+    soup = BeautifulSoup(r.content, "lxml")
 
-    if not sup or len(sup) == 0:
+    sup = soup.find("a")
+
+    if not sup:
         await ctx.respond(
             hk.Embed(
                 title="CAN'T FIND THE REQUESTED GAME",
@@ -662,8 +649,7 @@ async def game_search(ctx: lb.PrefixContext, query: str):
             delete_after=15,
         )
         return
-    sup = sup[0].attrs["href"]
-    # await ctx.edit_last_response("parseley")
+    sup = sup.get("href")
 
     pattern = re.compile(r"https://store.steampowered.com/app/(\d+)")
     match = pattern.search(str(sup))
@@ -752,7 +738,6 @@ query ($id: Int, $search: String, $type: MediaType) {
     response = await ctx.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
-        timeout=3,
     )
 
     if not response.ok:
@@ -804,10 +789,6 @@ query ($id: Int, $search: String, $type: MediaType) {
     await view.start(choice)
     await view.wait()
 
-    # if hasattr(view, "answer"):  # Check if there is an answer
-    #     pass
-    # else:
-    #     await ctx.edit_last_response(components=[])
 
 
 async def _search_anime(ctx, anime: str):
@@ -863,12 +844,13 @@ query ($id: Int, $search: String, $type: MediaType) {
     response = await ctx.bot.d.aio_session.post(
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
-        timeout=3,
     )
 
-    if not response.ok or not len((await response.json())["data"]["Page"]["media"]):
+    if not response.ok:
         await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
         return
+    if not len((await response.json())["data"]["Page"]["media"]):
+        await ctx.respond("Your query doesn't match any results 😵")
 
     view = views.AuthorView(user_id=ctx.author.id)
     if not len((await response.json())["data"]["Page"]["media"]) == 1:
@@ -925,9 +907,9 @@ query ($id: Int, $search: String, $type: MediaType) {
         )
     elif response["nextAiringEpisode"]:
         if no_of_items == "NA":
-            no_of_items = f"{response['nextAiringEpisode']['episode']}/??"
+            no_of_items = f"{response['nextAiringEpisode']['episode']-1}/??"
         else:
-            no_of_items = f"{response['nextAiringEpisode']['episode']}/{no_of_items}"
+            no_of_items = f"{response['nextAiringEpisode']['episode']-1}/{no_of_items}"
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -1038,7 +1020,6 @@ query ($id: Int, $search: String, $type: MediaType) {
         response = await ctx.bot.d.aio_session.post(
             "https://graphql.anilist.co",
             json={"query": query, "variables": variables},
-            timeout=3,
         )
 
         if not response.ok:
@@ -1284,7 +1265,6 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             response = await ctx.bot.d.aio_session.post(
                 "https://graphql.anilist.co",
                 json={"query": query_, "variables": variables},
-                timeout=3,
             )
 
             if not response.ok:
@@ -1403,7 +1383,7 @@ async def _search_vn(ctx: lb.Context, query: str):
         }
         # try:
         req = await ctx.bot.d.aio_session.post(
-            url, headers=headers, json=data, timeout=3
+            url, headers=headers, json=data
         )
 
         if not req.ok:
@@ -1583,7 +1563,7 @@ async def _search_vnchara(ctx: lb.Context, query: str):
         "fields": "name, description, age, sex,  image.url, traits.name, traits.group_name, vns.title, birthday",
     }
 
-    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         await ctx.respond("Couldn't find the character you asked for.")
@@ -1692,7 +1672,7 @@ async def _search_vntag(ctx: lb.Context, query: str):
         "fields": "name, aliases, description, category, vn_count",
         # "sort": "title"
     }
-    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         await ctx.respond("Couldn't find the tag you asked for.")
@@ -1767,7 +1747,7 @@ async def _search_vntrait(ctx: lb.Context, query: str):
         # "sort": "title"
     }
 
-    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data, timeout=3)
+    req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         await ctx.respond("Couldn't find the trait you asked for.")
@@ -1887,7 +1867,6 @@ query ($id: Int, $search: String, $type: MediaType) { )
             response = await al_listener.bot.d.aio_session.post(
                 "https://graphql.anilist.co",
                 json={"query": query, "variables": variables},
-                timeout=10,
             )
             if not response.ok:
                 return

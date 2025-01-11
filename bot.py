@@ -7,7 +7,8 @@ import sqlite3
 from datetime import datetime
 
 import aiohttp_client_cache
-import dotenv
+from aiohttp import ClientTimeout
+from dotenv import load_dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
@@ -16,7 +17,7 @@ from lightbulb.ext import tasks
 from functions.help import BotHelpCommand
 from functions.utils import verbose_timedelta
 
-dotenv.load_dotenv()
+load_dotenv()
 
 # TODO
 # 1. Nox based testing
@@ -89,7 +90,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
         expire_after=24 * 60 * 60,
         urls_expire_after={
             "*.mangadex.org": 15 * 60,
-            "*.steampowered.com": 2 * 60 * 60,
+            "*.steampowered.com": 1 * 60 * 60,
         },
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
@@ -97,14 +98,14 @@ async def on_starting(event: hk.StartingEvent) -> None:
         ignored_params=[
             "auth_token"
         ],  # Keep using the cached response even if this param changes
-        timeout=10,
+        timeout=ClientTimeout(total=10),
     )
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.update_channels = ["1127609035374461070"]
     bot.d.con = sqlite3.connect("akane_db.db")
-    if not os.path.exists("pictures"):
-        os.mkdir("pictures")
+    os.makedirs("pictures", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
         pass
 

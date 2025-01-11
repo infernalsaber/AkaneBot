@@ -71,7 +71,7 @@ async def pfp_sauce(ctx: lb.UserContext):
     }
 
     async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params, timeout=3
+        "https://saucenao.com/search.php?", params=params
     ) as res:
         if res.ok:
             res = await res.json()
@@ -154,7 +154,7 @@ async def find_video_sacue(ctx: lb.MessageContext):
     }
 
     async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params, timeout=3
+        "https://saucenao.com/search.php?", params=params
     ) as res:
         if res.ok:
             res = await res.json()
@@ -270,7 +270,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
     }
 
     async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params, timeout=3
+        "https://saucenao.com/search.php?", params=params
     ) as res:
         if res.ok:
             res = await res.json()
@@ -382,7 +382,7 @@ async def find_sauce(
 
     if service != "TraceMoe":
         res = await ctx.bot.d.aio_session.get(
-            "https://saucenao.com/search.php?", params=params, timeout=3
+            "https://saucenao.com/search.php?", params=params
         )
         if res.ok:
             res = await res.json()
@@ -455,14 +455,23 @@ async def find_sauce(
     else:
         try:
             async with ctx.bot.d.aio_session.get(
-                "https://api.trace.moe/search", params={"url": link}, timeout=3
+                "https://api.trace.moe/search", params={"url": link}
             ) as res:
                 if res.ok:
                     res = (await res.json())["result"]
+                    raw_filename = res[0]['filename']
+                    raw_filename = raw_filename.replace('.mkv', '').replace('.mp4', '')
+                    sauce = re.sub(r'\[.*?\]', '', re.sub(r'\(.*?\)', '', raw_filename)).strip()
+                    sauce += f" [Clip]({res[0].get('video')})"
 
-                    sauce = f"[{res[0]['filename']}](https://anilist.co/anime/{res[0]['anilist']})"
-
-                    view = AuthorView(user_id=ctx.author.id)
+                    view = AuthorView(user_id=ctx.author.id, timeout=15*60)
+                    view.add_item(
+                        GenericButton(
+                            style=hk.ButtonStyle.LINK,
+                            emoji=hk.Emoji.parse(emotes.AL.value),
+                            url=f"https://anilist.co/anime/{res[0]['anilist']}",
+                        )
+                    )
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
 
                     choice = await ctx.edit_last_response(
@@ -476,8 +485,9 @@ async def find_sauce(
                         .add_field(
                             "Timestamp",
                             (
-                                f"{int(res[0]['from']//60)}m{int(res[0]['from']%60)}s -"
-                                f" {int(res[0]['to']//60)}m{int(res[0]['to']%60)}s"
+                                f"{int(res[0]['from']//60)}:{int(res[0]['from']%60)} -"
+                                f" {int(res[0]['to']//60)}:{int(res[0]['to']%60)}"
+                                f""
                             ),
                             inline=True,
                         )
@@ -563,7 +573,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                     "include": "anilist",
                 }
                 res = await ctx.bot.d.aio_session.get(
-                    "https://arm.haglund.dev/api/v2/ids", params=params, timeout=2
+                    "https://arm.haglund.dev/api/v2/ids", params=params
                 )
 
                 if res.ok:
@@ -790,7 +800,6 @@ async def al_from_mal(
             await sauce_plugin.bot.d.aio_session.post(
                 "https://graphql.anilist.co",
                 json={"query": query, "variables": variables},
-                timeout=3,
             )
         ).json()
     )["data"]["Media"]["siteUrl"]
@@ -816,7 +825,7 @@ async def vndb_url(text: str) -> t.Union[str, None]:
         # "sort": "title"
     }
     req = await sauce_plugin.bot.d.aio_session.post(
-        url, headers=headers, json=data, timeout=3
+        url, headers=headers, json=data
     )
 
     if not req.ok:
