@@ -90,7 +90,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
         expire_after=24 * 60 * 60,
         urls_expire_after={
             "*.mangadex.org": 15 * 60,
-            "*.steampowered.com": 2 * 60 * 60,
+            "*.steampowered.com": 1 * 60 * 60,
         },
         allowed_codes=(200, 403, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
@@ -104,8 +104,8 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.chapter_info = {}
     bot.d.update_channels = ["1127609035374461070"]
     bot.d.con = sqlite3.connect("akane_db.db")
-    if not os.path.exists("pictures"):
-        os.mkdir("pictures")
+    os.makedirs("pictures", exist_ok=True)
+    os.makedirs("logs", exist_ok=True)
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
         pass
 
