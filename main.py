@@ -1,6 +1,7 @@
 import asyncio
 import os
 import subprocess
+import sys
 
 check = "ps aux | grep bot.py | grep -v 'grep' | awk '{print $2}'"
 
@@ -20,10 +21,7 @@ async def main_bot_loop():
                 print("Starting bot.")
                 if not os.path.exists("logs"):
                     os.mkdir("logs")
-                if os.name == "nt":
-                    os.system("nohup python -OO bot.py >> logs/output.log 2>&1 &")
-                else:
-                    os.system("nohup python3 -OO bot.py >> logs/output.log 2>&1 &")
+                os.system(f"nohup {sys.executable} -OO bot.py >> logs/output.log 2>&1 &")
 
             else:
                 # Bot is already up
