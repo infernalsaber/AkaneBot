@@ -1,11 +1,10 @@
-hikari[speedups]==2.0.0.dev120
-hikari-lightbulb==2.3.3
-hikari-miru==3.2.0
+hikari[speedups]==2.0.0
+hikari-lightbulb==2.3
+hikari-miru==3
 
 python-dotenv>=0.21.0
 
 arrow
-aiohttp==3.8.3
 plotly==5.15.0
 isodate==0.6.1
 psutil
@@ -17,6 +16,8 @@ lxml
 rapidfuzz
 pandas
 seventv
+pillow
+requests
 
 # Putting this at the end coz W*ndows doesn't need it
-uvloop
+# uvloop

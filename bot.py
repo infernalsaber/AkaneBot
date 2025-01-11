@@ -7,7 +7,8 @@ import sqlite3
 from datetime import datetime
 
 import aiohttp_client_cache
-import dotenv
+from aiohttp import ClientTimeout
+from dotenv import load_dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
@@ -16,7 +17,7 @@ from lightbulb.ext import tasks
 from functions.help import BotHelpCommand
 from functions.utils import verbose_timedelta
 
-dotenv.load_dotenv()
+load_dotenv()
 
 # TODO
 # 1. Nox based testing
@@ -97,7 +98,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
         ignored_params=[
             "auth_token"
         ],  # Keep using the cached response even if this param changes
-        timeout=10,
+        timeout=ClientTimeout(total=10),
     )
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
