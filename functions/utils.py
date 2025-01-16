@@ -8,7 +8,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 import feedparser
-import hikari as hk
+import lightbulb as lb
 import isodate
 
 # if t.TYPE_CHECKING:
@@ -39,6 +39,12 @@ PROXY_URL = os.getenv("PROXY_URL")
 def proxy_img(img_url: str) -> str:
     """Simple image proxy"""
     return f"{PROXY_URL}/proxy?url={img_url}" if PROXY_URL else img_url
+
+async def dlogger(ctx: lb.Context, message: str):
+    await ctx.bot.rest.create_message(
+        1129030476695343174,
+        message
+    )
 
 
 @lru_cache(maxsize=3, typed=False)

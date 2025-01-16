@@ -5,12 +5,13 @@ import os
 import re
 import typing as t
 from datetime import datetime
-
+import traceback
 import dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
 from miru.ext import nav
+from urllib.parse import quote
 
 from functions.buttons import (
     GenericButton,
@@ -30,6 +31,7 @@ from functions.utils import (
     iso_to_timestamp,
     poor_mans_proxy,
     tenor_link_from_gif,
+    dlogger
 )
 from functions.views import AuthorNavi, AuthorView
 
@@ -83,10 +85,10 @@ async def pfp_sauce(ctx: lb.UserContext):
             try:
                 embed, view = await _complex_parsing(ctx, res["results"][0])
                 if float(res["results"][0]["header"]["similarity"]) < 60.0:
-                    url["url"] = url["url"].split("?")[0]
+                    # url["url"] = url["url"].split("?")[0]
                     view.add_item(
                         GenericButton(
-                            url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
+                            url=f"https://yandex.com/images/search?url={quote(url['url'])}&rpt=imageview",
                             label="Search Yandex",
                         )
                     )
@@ -96,13 +98,14 @@ async def pfp_sauce(ctx: lb.UserContext):
                     components=view,
                     # flags=hk.MessageFlag.EPHEMERAL,
                 )
-            except Exception:
+            except Exception as e:
+                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 await ctx.respond(
                     embed=embed,
                     components=view,
-                    # flags=hk.MessageFlag.EPHEMERAL
                 )
+                
         else:
             await ctx.respond(f"Ran into en error, `code : {res.status}`")
 
@@ -198,7 +201,7 @@ async def find_video_sacue(ctx: lb.MessageContext):
                                 ],
                             ),
                             NavButton(
-                                url=f"https://yandex.com/images/search?url={link}&rpt=imageview",
+                                url=f"https://yandex.com/images/search?url={quote(link)}&rpt=imageview",
                                 label="Search Yandex",
                             ),
                             KillNavButton(style=hk.ButtonStyle.SECONDARY),
@@ -222,6 +225,7 @@ async def find_video_sacue(ctx: lb.MessageContext):
                     await view.start(choice)
                     await view.wait()
             except Exception as e:
+                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 view.clean_items = False
@@ -313,14 +317,14 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                                 ],
                             ),
                             NavButton(
-                                url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
+                                url=f"https://yandex.com/images/search?url={quote(url['url'])}&rpt=imageview",
                                 label="Search Yandex",
                             ),
                             KillNavButton(style=hk.ButtonStyle.SECONDARY),
                         ],
                         user_id=ctx.author.id,
                     )
-                    await view.send(ctx.interaction, responded=True)
+                    await view.send(ctx, responded=True)
 
                 else:
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
@@ -333,6 +337,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                     await view.start(choice)
                     await view.wait()
             except Exception as e:
+                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 choice = await ctx.respond(embed=embed, components=view)
@@ -417,10 +422,10 @@ async def find_sauce(
                             swap_page=embed,
                         )
                     )
-                    url["url"] = url["url"].split("?")[0]
+                    # url["url"] = url["url"].split("?")[0]
                     view.add_item(
                         GenericButton(
-                            url=f"https://yandex.com/images/search?url={url['url']}&rpt=imageview",
+                            url=f"https://yandex.com/images/search?url={quote(url['url'])}&rpt=imageview",
                             label="Search Yandex",
                         )
                     )
@@ -441,6 +446,7 @@ async def find_sauce(
                     await view.wait()
 
             except Exception:
+                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
                 embed, view = await _simple_parsing(ctx, data)
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 view.clean_items = False
@@ -503,7 +509,8 @@ async def find_sauce(
                 else:
                     await ctx.respond("Couldn't find it.")
         except Exception as e:
-            await ctx.respond(f"Ran into an unknown exception: ```{e}```")
+            await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
+            await ctx.respond(f"Ran into an unknown exception")
 
 
 async def _complex_parsing(ctx: lb.Context, data: dict):
@@ -532,6 +539,7 @@ async def _complex_parsing(ctx: lb.Context, data: dict):
                 )
         except Exception:
             pass
+
         view.add_item(
             GenericButton(
                 style=hk.ButtonStyle.LINK,
@@ -885,7 +893,7 @@ async def _find_the_url(ctx) -> dict:
                 # If the tenor scrapping fails, then it sends the original link back
                 link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
-                    return {"url": None, "errorMessage": "Unknown error"}
+                    return {"url": None, "errorMessage": "Unknown error fetching tenor url"}
                 return {"url": link, "errorMessage": None}
 
             if not await is_image(url, ctx.bot.d.aio_session):
@@ -917,11 +925,10 @@ async def _find_the_url(ctx) -> dict:
             if _is_tenor_link(url):
                 link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
-                    return ctx, {"url": url, "errorMessage": "Unknown error"}
+                    return ctx, {"url": url, "errorMessage": "Unknown error fetching tenor url"}
                 return ctx, {"url": link, "errorMessage": None}
 
-        url = None
-        errorMessage = "No valid url found"
+
 
         if not message.attachments:
             msg = f"There's nothing here to find the sauce of {emotes.SIP.value}"
@@ -932,12 +939,13 @@ async def _find_the_url(ctx) -> dict:
 
         if len(message.attachments) > 1:
             test = MyModal(title="Sauce Search Image Selection", timeout=60)
-            await test.send(ctx.interaction)
+            await test.send(ctx)
             await test.wait(timeout=60)
             if test.last_context is None:
                 return
             ctx = test.last_context
             val = test.num.value
+            # await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
         else:
             val = "1"
             await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
@@ -961,7 +969,8 @@ async def _find_the_url(ctx) -> dict:
                 }
             return ctx, {"url": url, "errorMessage": errorMessage}
         except Exception as e:
-            await ctx.respond(f"Error: {e}")
+            await dlogger(ctx, f"Error while trying to find img url: ```{traceback.format_exc()}```")
+            await ctx.respond("Unknown Error")
 
     return {
         "url": None,
