@@ -310,18 +310,11 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
   }
 }
 """
-        # await ctx.respond("In")
         try:
             variables = collections.defaultdict(list)
 
-            # if id_:
             variables["id"] = self.id
 
-            # elif character:
-            # variables["search"] = character
-
-            # else:
-            # raise lb.NotEnoughArguments
 
             resp = await self.session.post(
                 "https://graphql.anilist.co",
@@ -337,7 +330,6 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                         "\nTry typing the full name of the character."
                     ),
                 )
-                # return
             resp_json = await resp.json()
 
             response = resp_json["data"]["Character"]
@@ -352,7 +344,6 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 dob = "NA"
 
             if response["description"]:
-                # response["description"] = parse_description(response["description"])\
                 response["description"] = self.parse_description(
                     response["description"]
                 )
@@ -373,7 +364,6 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 .add_field("Favourites", f"{response['favourites']}❤", inline=True)
                 .add_field("Character Description", response["description"])
                 .set_thumbnail(response["image"]["large"])
-                # .set_author(url=response["siteUrl"], name=title)
                 .set_footer(
                     text="Source: AniList",
                     icon="https://anilist.co/img/icons/android-chrome-512x512.png",

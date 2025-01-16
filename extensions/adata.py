@@ -1070,61 +1070,7 @@ query ($id: Int, $search: String, $type: MediaType) {
             hid = res.json()[0]["hid"]
 
             no_of_items = f"[{no_of_items}](https://comick.io/comic/{hid})"
-        # print("Using MD")
-        # base_url = "https://api.mangadex.org"
 
-        # order = {
-        #     "rating": "desc",
-        #     "followedCount": "desc",
-        # }
-
-        # final_order_query = {f"order[{key}]": value for key, value in order.items()}
-
-        # # for key, value in order.items():
-        # # final_order_query[f"order[{key}]"] = value
-
-        # req = await ctx.bot.d.aio_session.get(
-        #     f"{base_url}/manga",
-        #     params={**{"title": title}, **final_order_query},
-        #     timeout=3,
-        # )
-
-        # if req.ok:
-        #     try:
-        #         manga_id = (await req.json())["data"][0]["id"]
-
-        #         languages = ["en"]
-
-        #         req = await ctx.bot.d.aio_session.get(
-        #             f"{base_url}/manga/{manga_id}/aggregate",
-        #             params={"translatedLanguage[]": languages},
-        #             timeout=3,
-        #         )
-
-        #         print(await req.json())
-        #         data = await get_imp_info(await req.json())
-
-        #         if no_of_items == "NA":
-        #             no_of_items = (
-        #                 f"[{data['latest']['chapter'].split('.')[0]}]("
-        #                 f"https://cubari.moe/read/mangadex/{manga_id})"
-        #             )
-        #         else:
-        #             no_of_items = (
-        #                 f"[{no_of_items}](https://cubari.moe/read/mangadex/{manga_id})"
-        #             )
-
-        #     except IndexError:
-        #         data = None
-        #         no_of_items = "NA"
-
-        #     except AttributeError:
-        #         data = None
-        #         no_of_items = "NA"
-
-        # else:
-        #     data = None
-        #     no_of_items = "NA"
 
         pages = [
             hk.Embed(

@@ -17,7 +17,7 @@ rapidfuzz
 pandas
 seventv
 pillow
-requests
+curl_cffi
 
 # Putting this at the end coz W*ndows doesn't need it
 # uvloop
