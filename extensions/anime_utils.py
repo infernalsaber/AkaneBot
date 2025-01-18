@@ -24,7 +24,7 @@ async def zzz_chara(ctx: lb.Context, agent: str) -> None:
     
     
     view = views.SelectView(user_id=ctx.author.id, pages=pages)
-    view.add_item(SimpleTextSelect(options=options, placeholder="More Fun Stuff"))
+    view.add_item(SimpleTextSelect(options=options, placeholder="More Info Stuff"))
     view.add_item(btns.KillButton())
 
     resp = await ctx.respond(content=None, embed=first_page, components=view)
