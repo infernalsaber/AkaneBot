@@ -63,27 +63,23 @@ class ZZZCharacter(HakushCharacter):
         
         pages = collections.defaultdict(list)
         options = []
-        # pg = [
         if agent_info['Name'] == agent_info['PartnerInfo']['FullName']:
             display_name = agent_info['PartnerInfo']['FullName']
         else:
             display_name = f"{agent_info['PartnerInfo']['FullName']} ({agent_info['Name']})" 
-        # display_name = agent_info['PartnerInfo']['FullName']
         thumbnail = f"{self.cdn}/zzz/UI/{agent_info['Icon']}.webp"
         
         pages['Story'] = (
             hk.Embed(
                 title=display_name,
-                url=f"https://zzz.hakush.in/character/{self.id}",
-                # description=thumbnail
-                # description="**Profile Info**" + agent_info['PartnerInfo']['TrustLv']['1'][:200]
+                url=f"https://zzz.hakush.in/character/{self.id}"
             )
             .set_image(thumbnail)
             .add_field("Birthday", agent_info['PartnerInfo']['Birthday'], inline=True)
             .add_field("Camp", agent_info['PartnerInfo']['Race'], inline=True)
             .add_field("\u200b", "\u200b")
             .add_field("Profile Info", agent_info['PartnerInfo']['TrustLv']['1'][:400] + "...")
-            .set_footer("Via: zzz.hakush.in", icon='https://zzz.hakush.in/_app/immutable/assets/hakushin.Dy6InycZ.svg')
+            .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
             
         )
         
@@ -102,7 +98,7 @@ class ZZZCharacter(HakushCharacter):
                 )
             )
             .set_image(thumbnail)
-            .set_footer("Via: zzz.hakush.in")
+            .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
         )
         
         pages['Mindscape'] = (    
@@ -110,7 +106,7 @@ class ZZZCharacter(HakushCharacter):
                 title="Mindscape Cinema Lv.3"
             )
             .set_image(f"{self.cdn}/zzz/UI/Mindscape_{self.id}_3.webp")
-            .set_footer("Via: zzz.hakush.in")
+            .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
         )
         
         
