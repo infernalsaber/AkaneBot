@@ -211,7 +211,7 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
 )
 @lb.implements(lb.PrefixCommand)
 async def slideshow(ctx: lb.Context, content: str) -> None:
-    view = AuthorNavi(pages=content.split("\n"), user_id=ctx.author.id)
+    view = AuthorNavi(pages=content.split("\n"), user_id=ctx.author.id, buttons='default')
     await view.send(ctx.channel_id)
 
 

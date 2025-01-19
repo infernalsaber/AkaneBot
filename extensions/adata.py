@@ -20,7 +20,7 @@ from functions import buttons as btns
 from functions import views as views
 from functions.components import CharacterSelect, SimpleTextSelect
 from functions.errors import RequestsFailedError
-from functions.models import ALCharacter
+from functions.anilist import ALCharacter
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
 from functions.utils import verbose_date, verbose_timedelta
