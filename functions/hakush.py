@@ -48,6 +48,20 @@ class HakushCharacter:
 
     async def get_character_info(self, service):
         return await (await self.session.get(f"https://api.hakush.in/{service}/data/en/character/{self.id}.json")).json()
+    
+    @staticmethod
+    async def get_gallery_images(name, session, max_imgs=10):
+        response = await session.get(f"https://danbooru.donmai.us/tags.json?search[name_matches]={name}")
+        if not response.ok or not (await response.json()):
+            return None
+                
+        tag = (await response.json())[0]['name']
+        
+        response = await session.get(f"https://danbooru.donmai.us/posts.json?tags={tag}+rating%3Ageneral+&z=5")
+        if not response.ok or not (await response.json()):
+            return None
+        
+        return [img['file_url'] for img in (await response.json())[:max_imgs]]
 
 class ZZZCharacter(HakushCharacter):
     
@@ -63,52 +77,66 @@ class ZZZCharacter(HakushCharacter):
         
         pages = collections.defaultdict(list)
         options = []
-        if agent_info['Name'] == agent_info['PartnerInfo']['FullName']:
-            display_name = agent_info['PartnerInfo']['FullName']
+        if agent_info.get('Name') == agent_info.get('PartnerInfo', {}).get('FullName'):
+            display_name = agent_info.get('PartnerInfo', {}).get('FullName')
         else:
-            display_name = f"{agent_info['PartnerInfo']['FullName']} ({agent_info['Name']})" 
-        thumbnail = f"{self.cdn}/zzz/UI/{agent_info['Icon']}.webp"
+            display_name = f"{agent_info.get('PartnerInfo', {}).get('FullName')} ({agent_info.get('Name')})" 
+        thumbnail = f"{self.cdn}/zzz/UI/{agent_info.get('Icon')}.webp"
         
-        pages['Story'] = (
+        pages['Story'] = [
             hk.Embed(
                 title=display_name,
                 url=f"https://zzz.hakush.in/character/{self.id}"
             )
             .set_image(thumbnail)
-            .add_field("Birthday", agent_info['PartnerInfo']['Birthday'], inline=True)
-            .add_field("Camp", agent_info['PartnerInfo']['Race'], inline=True)
+            .add_field("Birthday", agent_info.get('PartnerInfo', {}).get('Birthday'), inline=True)
+            .add_field("Camp", agent_info.get('PartnerInfo', {}).get('Race'), inline=True)
             .add_field("\u200b", "\u200b")
-            .add_field("Profile Info", agent_info['PartnerInfo']['TrustLv']['1'][:400] + "...")
+            .add_field("Profile Info", agent_info.get('PartnerInfo', {}).get('TrustLv', {}).get('1', '')[:400] + "...")
             .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
             
-        )
+        ]
         
-        pages['Stats'] = (
+        pages['Stats'] = [
             hk.Embed(
                 title=display_name,
                 url=f"https://zzz.hakush.in/character/{self.id}",
                 description=(
-                    f"**Base HP: ** {agent_info['Stats']['HpMax']}\n"
-                    f"**Base ATK: ** {agent_info['Stats']['Attack']}\n"
-                    f"**Impact: ** {agent_info['Stats']['BreakStun']}\n"
-                    f"**Crit. Rate: ** {agent_info['Stats']['Crit']/100}%\n"
-                    f"**Crit. DMG: ** {agent_info['Stats']['CritDamage']/100}%\n"
-                    f"**Anomaly Prof: ** {agent_info['Stats']['ElementAbnormalPower']}\n"
-                    f"**Anomaly Mastery: ** {agent_info['Stats']['ElementMystery']}\n"                    
+                    f"**Base HP: ** {agent_info.get('Stats', {}).get('HpMax')}\n"
+                    f"**Base ATK: ** {agent_info.get('Stats', {}).get('Attack')}\n"
+                    f"**Impact: ** {agent_info.get('Stats', {}).get('BreakStun')}\n"
+                    f"**Crit. Rate: ** {agent_info.get('Stats', {}).get('Crit', 0.1)/100}%\n"
+                    f"**Crit. DMG: ** {agent_info.get('Stats', {}).get('CritDamage', 0.1)/100}%\n"
+                    f"**Anomaly Prof: ** {agent_info.get('Stats', {}).get('ElementAbnormalPower')}\n"
+                    f"**Anomaly Mastery: ** {agent_info.get('Stats', {}).get('ElementMystery')}\n"                    
                 )
             )
             .set_image(thumbnail)
             .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
-        )
+        ]
         
-        pages['Mindscape'] = (    
+        pages['Mindscape'] = [    
             hk.Embed(
-                title="Mindscape Cinema Lv.3"
+                title=f"Mindscape Cinema Lv.{i}"
             )
-            .set_image(f"{self.cdn}/zzz/UI/Mindscape_{self.id}_3.webp")
+            .set_image(f"{self.cdn}/zzz/UI/Mindscape_{self.id}_{i}.webp")
             .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
-        )
+            for i in [2,3,1]
+        ]
         
+        
+        character_images = await self.get_gallery_images(
+            agent_info.get('PartnerInfo', {}).get('FullName'), self.session
+        )
+        if character_images:
+            pages["Gallery"] = [
+                hk.Embed(
+                    title=f"{self.name} Image Gallery"
+                )
+                .set_image(img)
+                .set_footer("Via: Danbooru", icon="https://danbooru.donmai.us/packs/static/danbooru-logo-128x128-ea111b6658173e847734.png") 
+                for img in character_images
+            ]
         
         for key in pages.keys():
             options.append(
