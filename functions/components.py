@@ -4,8 +4,8 @@ import typing as t
 import hikari as hk
 import miru
 from miru.ext import nav
-import functions.buttons as btns
 
+import functions.buttons as btns
 from functions.anilist import ALCharacter
 
 
@@ -55,8 +55,8 @@ class CharacterSelect(miru.TextSelect):
         except Exception as e:
             await ctx.respond(content=f"Error: {e}", flags=hk.MessageFlag.EPHEMERAL)
 
+
 class NavSelector(nav.NavTextSelect):
-    
     def __init__(
         self,
         *,
@@ -79,16 +79,21 @@ class NavSelector(nav.NavTextSelect):
         )
 
     async def callback(self, ctx: miru.ViewContext) -> None:
-        if hasattr(self.view, "dropdown_options") and hasattr(self.view, "dropdown_components"):
-
+        if hasattr(self.view, "dropdown_options") and hasattr(
+            self.view, "dropdown_components"
+        ):
             base_components = [self, btns.KillNavButton()]
-            new_components = self.view.dropdown_components.get(self.values[0], []) + base_components
+            new_components = (
+                self.view.dropdown_components.get(self.values[0], []) + base_components
+            )
             try:
-
-                await self.view.swap_pages(ctx, self.view.dropdown_options[self.values[0]])
                 view = self.view
+
                 self.view.clear_items()
+
                 for component in new_components:
-                    view.add_item(component)
+                    if component not in view.children:
+                        view.add_item(component)
+                await view.swap_pages(ctx, view.dropdown_options[self.values[0]])
             except Exception as e:
                 await ctx.respond(e)
