@@ -145,6 +145,7 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
         view = AuthorNavi(
             pages=pages,
             user_id=ctx.author.id,
+            buttons='default'
         )
 
         await view.send(ctx.channel_id)
@@ -257,6 +258,7 @@ async def inevent_cmd(ctx: lb.Context, event: str):
             view = AuthorNavi(
                 pages=pages,
                 user_id=ctx.author.id,
+                buttons='default'
             )
             await view.send(ctx.channel_id)
 

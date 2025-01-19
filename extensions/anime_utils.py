@@ -3,7 +3,7 @@ import lightbulb as lb
 from functions.hakush import ZZZCharacter
 from functions import views as views
 from functions import buttons as btns
-from functions.components import SimpleTextSelect
+from functions.components import NavSelector
 
 anime_misc = lb.Plugin('Misc', 'Misc. stuff')
 
@@ -20,16 +20,24 @@ async def zzz_chara(ctx: lb.Context, agent: str) -> None:
     chara: ZZZCharacter = await ZZZCharacter.from_search(agent, ctx.bot.d.aio_session)
     
     pages, options = await chara.make_pages()
-    first_page = pages['Story']
-    
-    
-    view = views.SelectView(user_id=ctx.author.id, pages=pages)
-    view.add_item(SimpleTextSelect(options=options, placeholder="More Info Stuff"))
-    view.add_item(btns.KillButton())
 
-    resp = await ctx.respond(content=None, embed=first_page, components=view)
-    await view.start(resp)
-    await view.wait()
+    try:
+        components = {}
+        for page_name, page_value in pages.items():
+            if len(page_value) > 1:
+                components[page_name] = [btns.CustomNextButton(), btns.CustomNextButton()]
+            else:
+                components[page_name] = []
+        
+        # view = views.SelectView(user_id=ctx.author.id, pages=pages)
+        view = views.SelectNavigator(user_id=ctx.author.id, dropdown_options=pages, dropdown_components=components, first_page='Story')
+        view.add_item(NavSelector(options=options, placeholder="More Info"))
+        view.add_item(btns.KillNavButton())
+        await view.send(ctx.channel_id)
+        
+    except Exception as e:
+        await ctx.respond(e)
+
     
 
 def load(bot: lb.BotApp) -> None:

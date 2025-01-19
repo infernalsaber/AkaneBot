@@ -513,7 +513,7 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
                 ).set_image(i)
             )
 
-        navigator = views.AuthorNavi(pages=pages, timeout=1800, user_id=ctx.author.id)
+        navigator = views.AuthorNavi(pages=pages, timeout=1800, user_id=ctx.author.id, buttons='default')
         await navigator.send(ctx.channel_id)
 
     else:
