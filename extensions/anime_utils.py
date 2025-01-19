@@ -25,7 +25,7 @@ async def zzz_chara(ctx: lb.Context, agent: str) -> None:
         components = {}
         for page_name, page_value in pages.items():
             if len(page_value) > 1:
-                components[page_name] = [btns.CustomNextButton(), btns.CustomNextButton()]
+                components[page_name] = [btns.CustomPrevButton(), btns.CustomNextButton()]
             else:
                 components[page_name] = []
         
