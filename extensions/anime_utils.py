@@ -5,7 +5,10 @@ from functions import views as views
 from functions.components import NavSelector
 from functions.hakush import ZZZCharacter
 
-anime_misc = lb.Plugin("Misc", "Misc. stuff")
+anime_misc = lb.Plugin("Gacha", "Misc. stuff", include_datastore=True)
+anime_misc.d.help = True
+anime_misc.d.help_image = "https://i.imgur.com/YxvyvaF.png"
+anime_misc.d.help_emoji = "🤔"
 
 
 @anime_misc.command
