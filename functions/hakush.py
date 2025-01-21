@@ -17,6 +17,7 @@ import asyncio
 import hikari as hk
 import miru
 import collections
+from random import shuffle
 
 class HakushCharacter:
     
@@ -47,21 +48,34 @@ class HakushCharacter:
         return cls(name_code_mapping[closest_match], closest_match, session)
 
     async def get_character_info(self, service):
-        return await (await self.session.get(f"https://api.hakush.in/{service}/data/en/character/{self.id}.json")).json()
+        resp = await self.session.get(f"https://api.hakush.in/{service}/data/en/character/{self.id}.json")
+        r_json = (await resp.json())
+        return r_json
     
     @staticmethod
-    async def get_gallery_images(name, session, max_imgs=10):
-        response = await session.get(f"https://danbooru.donmai.us/tags.json?search[name_matches]={name}")
+    async def get_gallery_images(name, session, max_imgs=10, searchword=''):
+        response = await session.get(f"https://danbooru.donmai.us/tags.json?search[name_matches]={name}*")
         if not response.ok or not (await response.json()):
             return None
                 
-        tag = (await response.json())[0]['name']
+        tags = (await response.json())
+        tags = sorted(tags, key=lambda x: x['post_count'], reverse=True)
+        tag = tags[0]['name']
+        for tag_search in tags:
+            if searchword in tag_search['name']:
+                tag = tag_search['name']
+                break
         
         response = await session.get(f"https://danbooru.donmai.us/posts.json?tags={tag}+rating%3Ageneral+&z=5")
         if not response.ok or not (await response.json()):
             return None
-        
-        return [img['file_url'] for img in (await response.json())[:max_imgs]]
+
+        images = (await response.json())
+        shuffle(images)
+
+        return [
+            {"url": img['file_url'], 'source': img.get('source', 'https://danbooru.donmai.us'), 'artist': img.get('tag_string_artist', 'UNKNOWN ARTIST')} for img in (images)[:max_imgs]
+        ]
 
 class ZZZCharacter(HakushCharacter):
     
@@ -89,8 +103,8 @@ class ZZZCharacter(HakushCharacter):
                 url=f"https://zzz.hakush.in/character/{self.id}"
             )
             .set_image(thumbnail)
-            .add_field("Birthday", agent_info.get('PartnerInfo', {}).get('Birthday'), inline=True)
-            .add_field("Camp", agent_info.get('PartnerInfo', {}).get('Race'), inline=True)
+            .add_field("Birthday", agent_info.get('PartnerInfo', {}).get('Birthday', "NA"), inline=True)
+            .add_field("Camp", agent_info.get('PartnerInfo', {}).get('Race', "NA"), inline=True)
             .add_field("\u200b", "\u200b")
             .add_field("Profile Info", agent_info.get('PartnerInfo', {}).get('TrustLv', {}).get('1', '')[:400] + "...")
             .set_footer("Via: zzz.hakush.in", icon='https://hakush.in/bangboo.png')
@@ -126,16 +140,19 @@ class ZZZCharacter(HakushCharacter):
         
         
         character_images = await self.get_gallery_images(
-            agent_info.get('PartnerInfo', {}).get('FullName'), self.session
+            agent_info.get('PartnerInfo', {}).get('FullName'), self.session, searchword='zenless'
         )
         if character_images:
+            total = len(character_images)
             pages["Gallery"] = [
                 hk.Embed(
-                    title=f"{self.name} Image Gallery"
+                    title=f"{self.name} Image Gallery",
+                    url=img['source']
                 )
-                .set_image(img)
-                .set_footer("Via: Danbooru", icon="https://danbooru.donmai.us/packs/static/danbooru-logo-128x128-ea111b6658173e847734.png") 
-                for img in character_images
+                .set_image(img['url'])
+                .set_author(name=img['artist'])
+                .set_footer(f"Via: Danbooru | Page {i+1}/{total}", icon="https://danbooru.donmai.us/packs/static/danbooru-logo-128x128-ea111b6658173e847734.png") 
+                for i, img in enumerate(character_images)
             ]
         
         for key in pages.keys():
@@ -154,10 +171,11 @@ class ZZZCharacter(HakushCharacter):
 async def main():
     session = CachedSession()
 
-    ccc = await ZZZCharacter.from_search("lucy", session)
-    ci = await ccc.get_character_info('zzz')
+    ccc = await ZZZCharacter.from_search("caesar", session)
+    # ci = await ccc.get_character_info('zzz')
 
     pgs, opts = await ccc.make_pages()
+    await session.close()
     import ipdb; ipdb.set_trace()
 
 if __name__ == "__main__":
