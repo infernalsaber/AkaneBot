@@ -1379,7 +1379,7 @@ async def _search_vn(ctx: lb.Context, query: str):
             for tag in sorted(
                 req["results"][0]["tags"], key=itemgetter("rating"), reverse=True
             ):
-                if tag["category"] == "cont" and tag["spoiler"] == 0: # spoiler returns an int, 0 being not a spoiler, 1 being minor spoiler, 2 being major.
+                if tag["category"] == "cont" and tag["spoiler"] != 2: # spoiler returns an int, 0 being not a spoiler, 1 being minor spoiler, 2 being major.
                     tags.append(tag["name"])
 
                 if len(tags) == 7:
