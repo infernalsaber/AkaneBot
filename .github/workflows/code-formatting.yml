@@ -31,7 +31,7 @@ jobs:
 
       - name: Auto-fix with Ruff
         run: |
-          ruff . --fix --ignore E501
+          ruff check . --fix --ignore E501
 
       - name: Commit and push changes
         run: |
