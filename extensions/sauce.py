@@ -950,14 +950,18 @@ async def _find_the_url(ctx) -> dict:
             }
 
         if len(message.attachments) > 1:
-            test = MyModal(title="Sauce Search Image Selection", timeout=60)
-            await test.send(ctx)
-            await test.wait(timeout=60)
-            if test.last_context is None:
-                return
-            ctx = test.last_context
-            val = test.num.value
-            # await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
+            # Temp disable due to modal/api issues
+            # test = MyModal(title="Sauce Search Image Selection", timeout=60)
+            # await test.send(ctx)
+            # await test.wait(timeout=60)
+            # if test.last_context is None:
+            #     return
+            # ctx = test.last_context
+            
+            
+            # val = test.num.value
+            val = "1"
+            await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
         else:
             val = "1"
             await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
