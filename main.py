@@ -22,7 +22,7 @@ async def main_bot_loop():
                 if not os.path.exists("logs"):
                     os.mkdir("logs")
                 os.system(
-                    f"nohup {sys.executable} -OO bot.py >> logs/output.log 2>&1 &"
+                    f"nohup {sys.executable.split('/')[-1]} -OO bot.py >> logs/output.log 2>&1 &"
                 )
 
             else:
