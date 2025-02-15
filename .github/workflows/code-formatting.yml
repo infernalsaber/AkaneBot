@@ -1,9 +1,6 @@
 name: Code Formatting
 
-on:
-  push:
-    branches:
-      - main
+on: [push, pull_request]
 
 jobs:
   format:
@@ -16,6 +13,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: "3.x"
+          token: ${{ secrets.ACTION_TOKEN }}
 
       - name: Install formatters
         run: |
@@ -41,3 +39,6 @@ jobs:
           # Skip commit if no changes
           git diff --quiet && git diff --staged --quiet || \
             (git commit -m "refactor: format code [skip ci]" && git push)
+        env:
+          GITHUB_TOKEN: ${{ secrets.ACTION_TOKEN }}
+          
