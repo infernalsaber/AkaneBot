@@ -3,15 +3,16 @@
 
 import os
 import re
+import traceback
 import typing as t
 from datetime import datetime
-import traceback
+from urllib.parse import quote
+
 import dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
 from miru.ext import nav
-from urllib.parse import quote
 
 from functions.buttons import (
     GenericButton,
@@ -19,19 +20,19 @@ from functions.buttons import (
     KillNavButton,
     NavButton,
     SwapButton,
-    SwapNaviButton,
+    SwapNaviButton
 )
 from functions.checks import trusted_user_check
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
 from functions.utils import (
     check_if_url,
+    dlogger,
     get_random_quote,
     is_image,
     iso_to_timestamp,
     poor_mans_proxy,
-    tenor_link_from_gif,
-    dlogger
+    tenor_link_from_gif
 )
 from functions.views import AuthorNavi, AuthorView
 
@@ -96,16 +97,17 @@ async def pfp_sauce(ctx: lb.UserContext):
                     content=f"User: {ctx.options.target.mention}",
                     embed=embed,
                     components=view,
-                    # flags=hk.MessageFlag.EPHEMERAL,
                 )
-            except Exception as e:
-                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
+            except Exception:
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 await ctx.respond(
                     embed=embed,
                     components=view,
                 )
-                
+                await dlogger(
+                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
+                )
+
         else:
             await ctx.respond(f"Ran into en error, `code : {res.status}`")
 
@@ -225,7 +227,9 @@ async def find_video_sacue(ctx: lb.MessageContext):
                     await view.start(choice)
                     await view.wait()
             except Exception as e:
-                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
+                await dlogger(
+                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
+                )
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 view.clean_items = False
@@ -337,7 +341,9 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                     await view.start(choice)
                     await view.wait()
             except Exception as e:
-                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
+                await dlogger(
+                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
+                )
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 choice = await ctx.respond(embed=embed, components=view)
@@ -446,7 +452,9 @@ async def find_sauce(
                     await view.wait()
 
             except Exception:
-                await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
+                await dlogger(
+                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
+                )
                 embed, view = await _simple_parsing(ctx, data)
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 view.clean_items = False
@@ -465,12 +473,14 @@ async def find_sauce(
             ) as res:
                 if res.ok:
                     res = (await res.json())["result"]
-                    raw_filename = res[0]['filename']
-                    raw_filename = raw_filename.replace('.mkv', '').replace('.mp4', '')
-                    sauce = re.sub(r'\[.*?\]', '', re.sub(r'\(.*?\)', '', raw_filename)).strip()
+                    raw_filename = res[0]["filename"]
+                    raw_filename = raw_filename.replace(".mkv", "").replace(".mp4", "")
+                    sauce = re.sub(
+                        r"\[.*?\]", "", re.sub(r"\(.*?\)", "", raw_filename)
+                    ).strip()
                     sauce += f" [Clip]({res[0].get('video')})"
 
-                    view = AuthorView(user_id=ctx.author.id, timeout=15*60)
+                    view = AuthorView(user_id=ctx.author.id, timeout=15 * 60)
                     view.add_item(
                         GenericButton(
                             style=hk.ButtonStyle.LINK,
@@ -508,9 +518,9 @@ async def find_sauce(
                     await view.wait()
                 else:
                     await ctx.respond("Couldn't find it.")
-        except Exception as e:
-            await dlogger(ctx, f"Sauce parser failed, json returned: ```{res}```")
-            await ctx.respond(f"Ran into an unknown exception")
+        except Exception:
+            await dlogger(ctx.bot, f"Sauce parser failed, json returned: ```{res}```")
+            await ctx.respond("Ran into an unknown exception")
 
 
 async def _complex_parsing(ctx: lb.Context, data: dict):
@@ -832,9 +842,7 @@ async def vndb_url(text: str) -> t.Union[str, None]:
         "fields": "title",
         # "sort": "title"
     }
-    req = await sauce_plugin.bot.d.aio_session.post(
-        url, headers=headers, json=data
-    )
+    req = await sauce_plugin.bot.d.aio_session.post(url, headers=headers, json=data)
 
     if not req.ok:
         return
@@ -893,7 +901,10 @@ async def _find_the_url(ctx) -> dict:
                 # If the tenor scrapping fails, then it sends the original link back
                 link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
-                    return {"url": None, "errorMessage": "Unknown error fetching tenor url"}
+                    return {
+                        "url": None,
+                        "errorMessage": "Unknown error fetching tenor url",
+                    }
                 return {"url": link, "errorMessage": None}
 
             if not await is_image(url, ctx.bot.d.aio_session):
@@ -925,10 +936,11 @@ async def _find_the_url(ctx) -> dict:
             if _is_tenor_link(url):
                 link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
                 if link == url:
-                    return ctx, {"url": url, "errorMessage": "Unknown error fetching tenor url"}
+                    return ctx, {
+                        "url": url,
+                        "errorMessage": "Unknown error fetching tenor url",
+                    }
                 return ctx, {"url": link, "errorMessage": None}
-
-
 
         if not message.attachments:
             msg = f"There's nothing here to find the sauce of {emotes.SIP.value}"
@@ -968,8 +980,11 @@ async def _find_the_url(ctx) -> dict:
                     "errorMessage": None,
                 }
             return ctx, {"url": url, "errorMessage": errorMessage}
-        except Exception as e:
-            await dlogger(ctx, f"Error while trying to find img url: ```{traceback.format_exc()}```")
+        except Exception:
+            await dlogger(
+                ctx.bot,
+                f"Error while trying to find img url: ```{traceback.format_exc()}```",
+            )
             await ctx.respond("Unknown Error")
 
     return {

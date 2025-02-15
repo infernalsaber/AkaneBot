@@ -8,9 +8,9 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 import feedparser
-import lightbulb as lb
+import hikari as hk
 import isodate
-
+import lightbulb as lb
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
@@ -28,7 +28,7 @@ async def poor_mans_proxy(link: str, session: CachedSession) -> io.BytesIO:
     Returns:
         io.BytesIO: The image bytes
     """
-    resp = await session.get(link, timeout=3)
+    resp = await session.get(link)
     return io.BytesIO(await resp.read())
 
 
@@ -40,12 +40,14 @@ def proxy_img(img_url: str) -> str:
     """Simple image proxy"""
     return f"{PROXY_URL}/proxy?url={img_url}" if PROXY_URL else img_url
 
-async def dlogger(ctx: lb.Context, message: str):
-    await ctx.bot.rest.create_message(
-        1129030476695343174,
-        message
-    )
 
+async def dlogger(bot: lb.BotApp, message: str):
+    logs_channel = bot.d.config.get("LOGS_CHANNEL")
+    if logs_channel:
+        if len(message) < 2000:
+            await bot.rest.create_message(logs_channel, message)
+        else:
+            await bot.rest.create_message(logs_channel, hk.Bytes(message.encode(), "error_message.txt"))
 
 @lru_cache(maxsize=3, typed=False)
 def check_if_url(link: str) -> bool:
@@ -67,7 +69,7 @@ async def is_image(link: str, session: CachedSession) -> int:
         int: 0 if not image, 1/2 if yes
     """
     try:
-        async with session.head(link, timeout=2) as r:
+        async with session.head(link) as r:
             if r.headers["content-type"] in ["image/png", "image/jpeg", "image/jpg"]:
                 return 1
             if r.headers["content-type"] in ["image/webp", "image/gif"]:
@@ -206,7 +208,7 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
             "User-Agent": "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)",
         }
 
-        async with session.get(link, headers=headers, timeout=5) as response:
+        async with session.get(link, headers=headers) as response:
             soup = BeautifulSoup(await response.read(), "lxml")
 
         return soup.find("meta", {"itemprop": "contentUrl"})["content"]
@@ -214,7 +216,6 @@ async def tenor_link_from_gif(link: str, session: CachedSession):
     except Exception as e:
         print(e)
         return link
-
 
 
 def humanized_list_join(lst: list, *, conj: t.Optional[str] = "or") -> str:
