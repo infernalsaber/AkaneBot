@@ -7,20 +7,18 @@ import sqlite3
 from datetime import datetime
 
 import aiohttp_client_cache
-from aiohttp import ClientTimeout
-from dotenv import load_dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
+from aiohttp import ClientTimeout
+from dotenv import load_dotenv
 from lightbulb.ext import tasks
 
 from functions.help import BotHelpCommand
-from functions.utils import verbose_timedelta
+from functions.utils import dlogger, verbose_timedelta
 
 load_dotenv()
 
-# TODO
-# 1. Nox based testing
 
 
 def make_prefix(app, message: hk.Message) -> list:
@@ -28,10 +26,7 @@ def make_prefix(app, message: hk.Message) -> list:
     cfg = json.loads(cfg.read())
 
     guild_prefix_map = cfg["GUILD_PREFIX_MAP"]
-
     prefixes = guild_prefix_map.get(str(message.guild_id), ["-"])
-    # print("Guild prefixes", prefixes, type(prefixes))
-
     return prefixes
 
 
@@ -92,7 +87,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
             "*.mangadex.org": 15 * 60,
             "*.steampowered.com": 1 * 60 * 60,
         },
-        allowed_codes=(200, 403, 404),  # Cache responses with these status codes
+        allowed_codes=(200, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
         include_headers=True,
         ignored_params=[
@@ -100,6 +95,8 @@ async def on_starting(event: hk.StartingEvent) -> None:
         ],  # Keep using the cached response even if this param changes
         timeout=ClientTimeout(total=10),
     )
+    with open("config.json") as f:
+        bot.d.config = json.load(f)
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.update_channels = ["1127609035374461070"]
@@ -116,8 +113,8 @@ async def on_starting(event: hk.StartingEvent) -> None:
 async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
 
-    await bot.rest.create_message(
-        1129030476695343174,
+    await dlogger(
+        bot,
         f"Bot closed with {verbose_timedelta(datetime.now().astimezone()-bot.d.timeup)} uptime",
     )
 
