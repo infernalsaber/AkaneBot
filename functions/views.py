@@ -11,10 +11,6 @@ from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
 from functions.utils import check_if_url
 
 
-
-
-
-
 class PeristentViewTest(miru.View):
     """A subclassed view designed to make persistent views(wip)"""
 
@@ -36,7 +32,7 @@ class AuthorNavi(nav.NavigatorView):
     ) -> None:
         self.user_id = user_id
         self.clean_items = clean_items
-        if buttons == 'default':
+        if buttons == "default":
             buttons = [
                 CustomPrevButton(),
                 nav.IndicatorButton(),
@@ -112,6 +108,7 @@ class AuthorView(miru.View):
         )
         return False
 
+
 class SelectView(AuthorView):
     """A subclassed view designed for Text Select"""
 
@@ -119,13 +116,26 @@ class SelectView(AuthorView):
         self.pages = pages
         super().__init__(timeout=60 * 60, clean_items=False, user_id=user_id)
 
+
 class SelectNavigator(AuthorNavi):
     """A subclassed view designed for Text Select"""
 
-    def __init__(self, user_id: hk.Snowflake, dropdown_options: dict[str, hk.Embed], dropdown_components, first_page) -> None:
+    def __init__(
+        self,
+        user_id: hk.Snowflake,
+        dropdown_options: dict[str, hk.Embed],
+        dropdown_components,
+        first_page,
+    ) -> None:
         self.dropdown_options = dropdown_options
         self.dropdown_components = dropdown_components
-        super().__init__(timeout=60 * 60, clean_items=False, user_id=user_id, pages=dropdown_options[first_page], buttons=dropdown_components[first_page])
+        super().__init__(
+            timeout=60 * 60,
+            clean_items=False,
+            user_id=user_id,
+            pages=dropdown_options[first_page],
+            buttons=dropdown_components[first_page],
+        )
 
 
 class PreView(nav.NavigatorView):

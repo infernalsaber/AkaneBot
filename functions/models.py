@@ -1,15 +1,9 @@
 """Utility classes for everything"""
-import collections
 import os
-from datetime import datetime, timedelta
 from enum import Enum, IntEnum
 
-import aiohttp_client_cache
 import dotenv
-import hikari as hk
 import isodate
-
-from functions.utils import verbose_timedelta
 
 dotenv.load_dotenv()
 
@@ -43,16 +37,12 @@ class YTVideo:
                 f"https://youtube.googleapis.com/youtube/v3/videos?part=snippet%2Ccontent"
                 f"Details%2Cstatistics&id={self.vid_id}&regionCode=US&key={YT_KEY}"
             ),
-            timeout=3,
         )
         ytapi2 = await ytapi2.json()
         self.vid_duration = str(
             isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
         )
         if self.vid_duration.startswith("0:"):
-            # self.vid_duration = str(
-            #     isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
-            # )[2:]
             return self.vid_duration[2:]
         return self.vid_duration
 
@@ -104,4 +94,3 @@ class ColorPalette(IntEnum):
 
 ColourPalette = ColorPalette
 """Alias for :obj:`~ColorPalette`."""
-

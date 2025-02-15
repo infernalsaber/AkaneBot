@@ -91,6 +91,8 @@ async def add_prefix(ctx: lb.Context, prefixes: t.Sequence[str]) -> None:
 
         config["GUILD_PREFIX_MAP"][str(ctx.guild_id)] = list(set(curr_guild_pfxs))
 
+        ctx.bot.d.config = config
+
         file_mngr = open("config.json", "w", encoding="utf-8")
         file_mngr.write(json.dumps(config, indent=4))
 
@@ -129,6 +131,8 @@ async def set_prefix(ctx: lb.Context, prefix_: str) -> None:
 
     config["GUILD_PREFIX_MAP"][str(ctx.guild_id)] = curr_guild_pfxs
 
+    ctx.bot.d.config = config
+
     f = open("config.json", "w", encoding="utf-8")
     f.write(json.dumps(config, indent=4))
     f.close()
@@ -148,6 +152,8 @@ async def reset_prefix(ctx: lb.Context) -> None:
     f.close()
 
     config["GUILD_PREFIX_MAP"].remove([str(ctx.guild_id)])
+
+    ctx.bot.d.config = config
 
     f = open("config.json", "w", encoding="utf-8")
     f.write(json.dumps(config, indent=4))
@@ -174,6 +180,8 @@ async def remove_prefix(ctx: lb.Context, prefix_: str) -> None:
     curr_guild_pfxs.remove(prefix_)
     config["GUILD_PREFIX_MAP"][str(ctx.guild_id)] = curr_guild_pfxs
 
+    ctx.bot.d.config = config
+
     f = open("config.json", "w", encoding="utf-8")
     f.write(json.dumps(config, indent=4))
     f.close()
@@ -184,15 +192,6 @@ async def remove_prefix(ctx: lb.Context, prefix_: str) -> None:
         f"Removed the prefix: `{prefix_}`"
         f"\nCurrent prefixes: {humanized_list_join(curr_guild_pfxs, conj='and')}"
     )
-
-
-# @prefix_group.child
-# @lb.add_checks(lb.owner_only)
-# @lb.option("new_prefix", "Global prefix")
-# @lb.command("global", "Modify the global prefix", aliases=["g"], pass_options=True)
-# @lb.implements(lb.PrefixSubCommand)
-# async def change_global_prefix(ctx: lb.Context, new_prefix: str) -> None:
-#     await ctx.respond(f"Modified global prefix to: `{new_prefix}`")
 
 
 def load(bot: lb.BotApp) -> None:

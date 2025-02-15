@@ -21,7 +21,9 @@ async def main_bot_loop():
                 print("Starting bot.")
                 if not os.path.exists("logs"):
                     os.mkdir("logs")
-                os.system(f"nohup {sys.executable} -OO bot.py >> logs/output.log 2>&1 &")
+                os.system(
+                    f"nohup {sys.executable} -OO bot.py >> logs/output.log 2>&1 &"
+                )
 
             else:
                 # Bot is already up

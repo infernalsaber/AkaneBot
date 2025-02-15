@@ -106,7 +106,7 @@ async def on_starting(event: hk.StartedEvent) -> None:
                     url=update["data"]["siteUrl"],
                 )
             )
-            for channel in aniupdates.bot.d.update_channels:
+            for channel in aniupdates.bot.d.config.get("UPDATE_CHANNELS", []):
                 check = await aniupdates.bot.rest.create_message(
                     channel=channel,
                     embed=hk.Embed(

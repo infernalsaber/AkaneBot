@@ -18,9 +18,9 @@ from rapidfuzz.utils import default_process
 
 from functions import buttons as btns
 from functions import views as views
+from functions.anilist import ALCharacter
 from functions.components import CharacterSelect, SimpleTextSelect
 from functions.errors import RequestsFailedError
-from functions.anilist import ALCharacter
 from functions.models import ColorPalette as colors
 from functions.models import EmoteCollection as emotes
 from functions.utils import verbose_date, verbose_timedelta
@@ -249,16 +249,14 @@ query Query($name: String) {
         "https://graphql.anilist.co",
         json={"query": query, "variables": variables},
     )
-    
+
     if not response.ok:
         return await ctx.respond(f"https://anilist.co/user/{user}")
-    
+
     resp = (await response.json())["data"]["User"]
-    
-    # await ctx.respond(resp)
-    
-    description = resp["about"] or "No description available"
-    
+
+
+
     await ctx.respond(
         content=f"https://anilist.co/user/{resp['id']}",
         embed=hk.Embed(
@@ -266,11 +264,9 @@ query Query($name: String) {
             url=f"https://anilist.co/user/{resp['name']}",
             description=f"{resp['name']}'s Anilist profile",
             color=colors.ANILIST,
-            timestamp=datetime.now().astimezone()
-        )
-        .set_image(f"https://img.anili.st/user/{resp['id']}")
+            timestamp=datetime.now().astimezone(),
+        ).set_image(f"https://img.anili.st/user/{resp['id']}"),
     )
-        
 
 
 @al_listener.command
@@ -393,7 +389,7 @@ async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
         params = {"limit": num}
 
     async with ctx.bot.d.aio_session.get(
-        "https://api.jikan.moe/v4/top/anime", params=params, timeout=3
+        "https://api.jikan.moe/v4/top/anime", params=params
     ) as res:
         if res.ok:
             res = await res.json()
@@ -497,7 +493,7 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
     """Not gonna elaborate this one"""
 
     res = await ctx.bot.d.aio_session.get(
-        f"https://cubari.moe/read/api/nhentai/series/{code}/", timeout=3
+        f"https://cubari.moe/read/api/nhentai/series/{code}/",
     )
     if res.ok:
         res = await res.json()
@@ -513,7 +509,9 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
                 ).set_image(i)
             )
 
-        navigator = views.AuthorNavi(pages=pages, timeout=1800, user_id=ctx.author.id, buttons='default')
+        navigator = views.AuthorNavi(
+            pages=pages, timeout=1800, user_id=ctx.author.id, buttons="default"
+        )
         await navigator.send(ctx.channel_id)
 
     else:
@@ -586,26 +584,8 @@ async def game_search(ctx: lb.PrefixContext, query: str):
         query (str): The vn trait to search for
     """
 
-    # try:
-    # resp = (await (await ctx.bot.d.aio_session.get(
-    #     "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
-    #     ,
-    #     timeout=10,
-    # )).json())['applist']['apps']
-    # await ctx.respond('Got the list of games')
 
-    # resp = {v['name']: v['appid'] for v in resp}
-    # names = list(resp.keys())
-    # # await ctx.edit_last_response('revdict')
-
-    # threshold = 70
-    # name, confidence, _ = process.extractOne(query, names, processor=default_process, scorer=partial_ratio)
-    # if confidence < threshold:
-    #     await ctx.respond("No matches found")
-    #     return
-    # await ctx.edit_last_response("fuzz")
-
-    session = requests.Session(impersonate='chrome')
+    session = requests.Session(impersonate="chrome")
 
     params = {
         "term": {query},
@@ -619,7 +599,9 @@ async def game_search(ctx: lb.PrefixContext, query: str):
         "search_creators_and_tags": 1,
     }
 
-    r = session.get("https://store.steampowered.com/search/suggest", params=params, timeout=5)
+    r = session.get(
+        "https://store.steampowered.com/search/suggest", params=params, timeout=5
+    )
 
     if not r.ok:
         await ctx.respond(
@@ -632,7 +614,6 @@ async def game_search(ctx: lb.PrefixContext, query: str):
             delete_after=15,
         )
         return
-
 
     soup = BeautifulSoup(r.content, "lxml")
 
@@ -788,7 +769,6 @@ query ($id: Int, $search: String, $type: MediaType) {
 
     await view.start(choice)
     await view.wait()
-
 
 
 async def _search_anime(ctx, anime: str):
@@ -1071,7 +1051,6 @@ query ($id: Int, $search: String, $type: MediaType) {
 
             no_of_items = f"[{no_of_items}](https://comick.io/comic/{hid})"
 
-
         pages = [
             hk.Embed(
                 title=title,
@@ -1328,9 +1307,7 @@ async def _search_vn(ctx: lb.Context, query: str):
             # "sort": "title"
         }
         # try:
-        req = await ctx.bot.d.aio_session.post(
-            url, headers=headers, json=data
-        )
+        req = await ctx.bot.d.aio_session.post(url, headers=headers, json=data)
 
         if not req.ok:
             await ctx.respond(
@@ -1379,7 +1356,9 @@ async def _search_vn(ctx: lb.Context, query: str):
             for tag in sorted(
                 req["results"][0]["tags"], key=itemgetter("rating"), reverse=True
             ):
-                if tag["category"] == "cont" and tag["spoiler"] != 2: # spoiler returns an int, 0 being not a spoiler, 1 being minor spoiler, 2 being major.
+                if (
+                    tag["category"] == "cont" and tag["spoiler"] != 2
+                ):  # 0 = not a spoiler, 1 = minor spoiler, 2 - major.
                     tags.append(
                         tag["name"] if not tag["spoiler"] else f"||{tag['name']}||"
                     )
@@ -1422,7 +1401,6 @@ async def _search_vn(ctx: lb.Context, query: str):
             .add_field("Summary", description)
             .set_thumbnail(req["results"][0]["image"]["url"])
             .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg")
-            # components=view,
         )
 
         screenshots = "\n".join(
@@ -1453,10 +1431,6 @@ async def _search_vn(ctx: lb.Context, query: str):
     except Exception as e:
         await ctx.respond(e)
 
-    # if hasattr(view, "answer"):  # Check if there is an answer
-    #     pass
-    # else:
-    #     await ctx.edit_last_response(components=[])
 
 
 def replace_bbcode_with_markdown(match: re.Match) -> str:
@@ -1738,10 +1712,6 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     await view.start(choice)
     await view.wait()
 
-    # if hasattr(view, "answer"):  # Check if there is an answer
-    #     pass
-    # else:
-    #     await ctx.edit_last_response(components=[])
 
 
 @al_listener.listener(hk.StartedEvent)
