@@ -93,6 +93,44 @@ class HakushCharacter:
             for img in (images)[:max_imgs]
         ]
 
+class PrydwenCharacter:
+    # Currently only for ZZZ
+    def __init__(self, slug, name, session) -> None:
+        self.slug = slug #store slug here
+        self.name = name
+        self.session = session
+        self.cdn = "https://www.prydwen.gg/"
+
+    @classmethod
+    async def from_search(cls, query: str, service: str, session: CachedSession):
+        response = await session.get(
+            f"https://www.prydwen.gg/page-data/sq/d/2231396699.json"
+        ) 
+
+        resp_json: dict = await response.json()
+
+        chara_nodes = resp_json['data']['allContentfulZzzCharacter']['nodes']
+        name_code_mapping = {}
+
+        for node in chara_nodes:
+            name_code_mapping.update(
+                {node['name']: node['slug']}
+            )
+
+        closest_match, *_ = process.extractOne(
+            query,
+            name_code_mapping.keys(),
+            processor=default_process,
+        )
+
+        return cls(name_code_mapping[closest_match], closest_match, session)
+
+    async def get_character_info(self, service):
+        resp = await self.session.get(
+            f"https://www.prydwen.gg/page-data/zenless/characters/{self.slug}/page-data.json"
+        )
+        r_json = await resp.json()
+        return r_json
 
 class ZZZCharacter(HakushCharacter):
     def __init__(self, id, name, session) -> None:
@@ -278,15 +316,92 @@ class HSRCharacter(HakushCharacter):
             options.append(miru.SelectOption(label=key, value=key))
         
         return pages, options
-    
+
+class WuwaCharacter(HakushCharacter):
+    def __init__(self, id, name, session) -> None:
+        super().__init__(id, name, session)
+
+    @classmethod
+    async def from_search(cls, query: str, session: CachedSession):
+        return await super().from_search(query, "ww", session)
+
+    async def make_pages(self):
+        chara_info = await self.get_character_info("ww")
+        pages = collections.defaultdict(list)
+        options = []
+
+        thumbnail = f"{self.cdn}/{chara_info.get('Background').replace('/Game/Aki', 'ww').split('.')[0]}.webp"
+        rarity_map = {
+            5: "★★★★★",
+            4: "★★★★",
+            "NA": "NA",
+        }
+        pages["Story"] = [
+            hk.Embed(
+                title=chara_info.get("Name") or "NA", url=f"https://ww.hakush.in/character/{self.id}"
+            )
+            .set_image(thumbnail)
+            .add_field(
+                "Rarity",
+                rarity_map[chara_info.get("Rarity") or "NA"],
+                inline=True,
+            )
+            .add_field(
+                "Affiliation",
+                chara_info.get("CharaInfo", {}).get("Influence", "NA"), inline=True
+            )
+            .add_field("\u200b", "\u200b")
+            .add_field(
+                "Info",
+                chara_info.get("CharaInfo", {}).get("Info", "NA")[:400]
+                + "...",
+            )
+            .set_footer("Via: ww.hakush.in", icon="https://hakush.in/yangyang.png")
+        ]
+        
+
+
+        
+        character_images = await self.get_gallery_images(
+            chara_info.get("Name"),
+            self.session,
+            searchword="wuthering",
+        )
+        
+        if character_images:
+            total = len(character_images)
+            pages["Gallery"] = [
+                hk.Embed(title=f"{self.name} Image Gallery", url=img["source"])
+                .set_image(img["url"])
+                .set_author(name=img["artist"])
+                .set_footer(
+                    f"Via: Danbooru | Page {i+1}/{total}",
+                    icon="https://danbooru.donmai.us/packs/static/danbooru-logo-128x128-ea111b6658173e847734.png",
+                )
+                for i, img in enumerate(character_images)
+            ]
+        
+        
+        for key in pages.keys():
+            options.append(miru.SelectOption(label=key, value=key))
+        
+        return pages, options
+        
+
+
 async def main():
     session = CachedSession()
 
     # ccc = await ZZZCharacter.from_search("caesar", session)
-    ccc = await HSRCharacter.from_search("the herta", session)
+    # ccc = await PrydwenCharacter.from_search("qingyi", "zzz", session)
     # ci = await ccc.get_character_info('zzz')
-
+    
+    ccc = await WuwaCharacter.from_search("qingyi", session)
+    ci = await ccc.get_character_info('ww')
     pgs, opts = await ccc.make_pages()
+    
+    
+    import ipdb; ipdb.set_trace()
     await session.close()
     import ipdb
 
