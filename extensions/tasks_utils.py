@@ -22,7 +22,7 @@ from functions.utils import (
     check_if_url,
     humanized_list_join,
     poor_mans_proxy,
-    proxy_img,
+    proxy_img
 )
 from functions.views import AuthorNavi
 
@@ -211,7 +211,9 @@ async def custom_commands(event: hk.GuildMessageCreateEvent) -> None:
 )
 @lb.implements(lb.PrefixCommand)
 async def slideshow(ctx: lb.Context, content: str) -> None:
-    view = AuthorNavi(pages=content.split("\n"), user_id=ctx.author.id, buttons='default')
+    view = AuthorNavi(
+        pages=content.split("\n"), user_id=ctx.author.id, buttons="default"
+    )
     await view.send(ctx.channel_id)
 
 
@@ -234,11 +236,6 @@ async def update_and_restart(ctx: lb.Context) -> None:
     await ctx.edit_last_response("Restarting the bot...")
 
     await ctx.bot.close()
-
-    # try:
-    #     os.kill(os.getpid(), signal.SIGTERM)
-    # except Exception as e:
-    #     await ctx.respond(e)
 
 
 @task_plugin.command
@@ -271,14 +268,12 @@ def last_n_lines(filename, num_lines):
 @lb.command("proxy", "Proxy test an image", pass_options=True)
 @lb.implements(lb.PrefixCommand)
 async def proxy_img_test(ctx: lb.PrefixContext, image_url: str) -> None:
-    proxy = await ctx.bot.d.aio_session.get(proxy_img(image_url), timeout=2)
+    proxy = await ctx.bot.d.aio_session.get(proxy_img(image_url))
     await ctx.respond(
         embed=hk.Embed(title="Proxy test", description=f"Code: `{proxy.status}`")
         .set_image(await poor_mans_proxy(image_url, ctx.bot.d.aio_session))
         .set_footer(f"Requested by {ctx.author}", icon=ctx.author.avatar_url)
     )
-    # except Exception as e:
-    # await ctx.respond(e)
 
 
 @task_plugin.command
@@ -305,21 +300,20 @@ async def latest_logs(
         )
     )
     await ctx.event.message.add_reaction("✅")
-    # await ctx.respond()
 
 
-# @task_plugin.command
-# @lb.add_checks(lb.owner_only)
-# @lb.option("link", "Link to new pfp")
-# @lb.command("newpfp", "Change the bot's pfp", pass_options=True)
-# @lb.implements(lb.PrefixCommand)
-# async def new_bot_pfp(ctx: lb.PrefixContext, link: str):
-#     try:
-#         await ctx.bot.rest.edit_my_user(avatar=base64.b64encode((await poor_mans_proxy(link, ctx.bot.d.aio_session)).read()))
-#         await ctx.respond("Changed bot pfp")
-#     except Exception as e:
-#         await ctx.respond(e)
-# task_plugin.bot.rest.edit_my_user()
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("emoji", "The emoji link", str)
+@lb.option("name", "The emoji name", str)
+@lb.command("botemoji", "Add an emoji to the bot app", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def add_botemoji(ctx: lb.PrefixContext, name: str, emoji: str) -> None:
+        emote = await ctx.bot.rest.create_application_emoji(ctx.bot.get_me().id, name, emoji)
+        await ctx.respond(f"Added application emoji: {emote}")
+
+
+
 @task_plugin.command
 @lb.add_checks(trusted_user_check)
 @lb.option(
@@ -341,7 +335,7 @@ async def pingu(ctx: lb.Context, link: str) -> None:
         return
 
     try:
-        if (await ctx.bot.d.aio_session.get(link, timeout=2)).ok:
+        if (await ctx.bot.d.aio_session.get(link)).ok:
             await ctx.respond(f"The site `{link}` is up and running ✅")
         else:
             await ctx.respond(

@@ -1,10 +1,12 @@
+import collections
+from datetime import datetime, timedelta
 
 import aiohttp_client_cache
 import hikari as hk
-import collections
+
 from functions.models import ColorPalette
-from datetime import datetime, timedelta
 from functions.utils import verbose_timedelta
+
 
 class AnilistBase:
     def __init__(self, name: str, id_: int) -> None:
@@ -91,10 +93,7 @@ class ALCharacter(AnilistBase):
 
     @classmethod
     async def from_id(cls, query_: int, session: aiohttp_client_cache.CachedSession):
-        # async with session.get()
 
-        # self.session = session
-        # try:
         query = """
         query ($id: Int) { # Define which variables will be used in the query
         Character (id: $id,  sort: FAVOURITES_DESC) { # Add var. to the query
@@ -114,7 +113,6 @@ class ALCharacter(AnilistBase):
         resp = await session.post(
             "https://graphql.anilist.co",
             json={"query": query, "variables": variables},
-            timeout=3,
         )
         if not resp.ok:
             return await resp.json()
@@ -155,7 +153,6 @@ class ALCharacter(AnilistBase):
         resp = await session.post(
             "https://graphql.anilist.co",
             json={"query": query, "variables": variables},
-            timeout=3,
         )
         if not resp.ok:
             return await resp.json()
@@ -214,11 +211,9 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
 
             variables["id"] = self.id
 
-
             resp = await self.session.post(
                 "https://graphql.anilist.co",
                 json={"query": query, "variables": variables},
-                timeout=3,
             )
             if not resp.ok:
                 return hk.Embed(
@@ -326,7 +321,6 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             resp = await self.session.post(
                 "https://graphql.anilist.co",
                 json={"query": query, "variables": variables},
-                timeout=3,
             )
 
             if not resp.ok:
@@ -467,7 +461,6 @@ query ($id: Int, $type: MediaType) {
         response = await self.session.post(
             "https://graphql.anilist.co",
             json={"query": query, "variables": variables},
-            timeout=3,
         )
 
         if not response.ok:
@@ -554,7 +547,7 @@ query ($id: Int, $type: MediaType) {
 #         resp = await session.post(
 #             "https://graphql.anilist.co",
 #             json={"query": query, "variables": variables},
-#             timeout=3,
+#
 #         )
 #         if not resp.ok:
 #             return await resp.json()
@@ -592,7 +585,7 @@ query ($id: Int, $type: MediaType) {
 #         response = await session.post(
 #             "https://graphql.anilist.co",
 #             json={"query": query, "variables": variables},
-#             timeout=3,
+#
 #         )
 #         if not response.ok:
 #             return await response.json()
@@ -665,7 +658,7 @@ query ($id: Int, $type: MediaType) {
 #             resp = await self.session.post(
 #                 "https://graphql.anilist.co",
 #                 json={"query": query, "variables": variables},
-#                 timeout=3,
+#
 #             )
 #             if not resp.ok:
 #                 return hk.Embed(
@@ -776,7 +769,7 @@ query ($id: Int, $type: MediaType) {
 #             resp = await self.session.post(
 #                 "https://graphql.anilist.co",
 #                 json={"query": query, "variables": variables},
-#                 timeout=3,
+#
 #             )
 
 #             if not resp.ok:

@@ -40,4 +40,4 @@ jobs:
           git add .
           # Skip commit if no changes
           git diff --quiet && git diff --staged --quiet || \
-            (git commit -m "Format code [skip ci]" && git push)
+            (git commit -m "refactor: format code [skip ci]" && git push)

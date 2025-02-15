@@ -20,7 +20,7 @@ from functions.buttons import (
     CustomNextButton,
     CustomPrevButton,
     KillNavButton,
-    SwapButton,
+    SwapButton
 )
 from functions.models import ColorPalette as colors
 from functions.utils import is_image
@@ -93,7 +93,6 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
                 await ctx.respond("No matching roles found")
                 return
 
-    # if isinstance(role, hk.Role):
     try:
         d1, d2 = "", ""
 
@@ -142,11 +141,7 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
             await ctx.respond(pages[0])
             return
 
-        view = AuthorNavi(
-            pages=pages,
-            user_id=ctx.author.id,
-            buttons='default'
-        )
+        view = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons="default")
 
         await view.send(ctx.channel_id)
         return
@@ -255,11 +250,7 @@ async def inevent_cmd(ctx: lb.Context, event: str):
                 await ctx.respond(pages[0])
                 return
 
-            view = AuthorNavi(
-                pages=pages,
-                user_id=ctx.author.id,
-                buttons='default'
-            )
+            view = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons="default")
             await view.send(ctx.channel_id)
 
         else:
@@ -441,7 +432,7 @@ async def add_emote(
 
         elif image_type == 1:
             try:
-                async with ctx.bot.d.aio_session.get(emote, timeout=3) as resp:
+                async with ctx.bot.d.aio_session.get(emote) as resp:
                     img_bytes = await resp.read()
 
                     ratio = len(img_bytes) / (1024 * 256)
@@ -797,7 +788,7 @@ async def sticker_removal(ctx: lb.MessageContext):
     try:
         sticker = await ctx.bot.rest.fetch_sticker(sticker_partial.id)
 
-        sticker_image = await ctx.bot.d.aio_session.get(sticker.image_url, timeout=2)
+        sticker_image = await ctx.bot.d.aio_session.get(sticker.image_url)
 
         ext = sticker.image_url.split(".")[-1]
         await ctx.author.send(

@@ -13,3 +13,4 @@ config.json
 extensions/x.py
 key value pair.pem
 db_ops.py
+config.json
