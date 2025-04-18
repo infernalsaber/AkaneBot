@@ -827,10 +827,9 @@ query ($id: Int, $search: String, $type: MediaType) {
     )
 
     if not response.ok:
-        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
-        return
+        return await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
     if not len((await response.json())["data"]["Page"]["media"]):
-        await ctx.respond("Your query doesn't match any results 😵")
+        return await ctx.respond("Your query doesn't match any results 😵")
 
     view = views.AuthorView(user_id=ctx.author.id)
     if not len((await response.json())["data"]["Page"]["media"]) == 1:

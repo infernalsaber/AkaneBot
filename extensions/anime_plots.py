@@ -41,7 +41,7 @@ plot_plugin.d.help_emoji = "📈"
     "`[p]plot bocchi vs kaguya --autoscale` \n\n"
     "Note: You should type out the full name of the series to avoid false matches"
 )
-@lb.add_cooldown(300, 1, lb.GlobalBucket)
+@lb.add_cooldown(30, 1, lb.GlobalBucket)
 @lb.option(
     "query",
     "The names of the series(') to plot",

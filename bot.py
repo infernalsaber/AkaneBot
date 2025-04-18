@@ -99,7 +99,6 @@ async def on_starting(event: hk.StartingEvent) -> None:
         bot.d.config = json.load(f)
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
-    bot.d.update_channels = ["1127609035374461070"]
     bot.d.con = sqlite3.connect("akane_db.db")
     os.makedirs("pictures", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
