@@ -361,6 +361,24 @@ async def swipe_emotes(
         await ctx.respond(f"Error: {e}")
 
 
+def check_if_known_emoji_provider(link: str):
+    known_providers = [
+        ".discordapp.net",
+        "cdn.7tv.app",
+        "cdn.donmai.us",
+        "i.imgur.com",
+        "phixiv.net",
+        "cdn.discordapp.com",
+        "emoji.gg"
+    ]
+    
+    for provider in known_providers:
+        if provider in link:
+            return True
+    return False
+
+
+
 @info_plugin.command
 @lb.add_checks(
     lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS), lb.guild_only
@@ -399,11 +417,15 @@ async def add_emote(
                 emoji = await ctx.bot.rest.create_emoji(
                     ctx.guild_id, name=name, image=possible_emote
                 )
-                await ctx.respond(f"Added emote: {emoji.mention}")
+                await ctx.edit_last_response(f"Added emote: {emoji.mention}")
             except Exception as e:
                 await ctx.respond(f"Error: {e}")
 
             return
+
+        if not check_if_known_emoji_provider(emote):
+            return await ctx.respond("Unknown Emote Provider ⚠")
+
 
         image_type = await is_image(
             emote, ctx.bot.d.aio_session
