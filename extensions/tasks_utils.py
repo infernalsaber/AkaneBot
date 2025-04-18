@@ -263,7 +263,7 @@ def last_n_lines(filename, num_lines):
 
 
 @task_plugin.command
-@lb.add_checks(trusted_user_check)
+@lb.add_checks(lb.owner_only)
 @lb.option("image_url", "The image to proxy")
 @lb.command("proxy", "Proxy test an image", pass_options=True)
 @lb.implements(lb.PrefixCommand)
@@ -315,7 +315,7 @@ async def add_botemoji(ctx: lb.PrefixContext, name: str, emoji: str) -> None:
 
 
 @task_plugin.command
-@lb.add_checks(trusted_user_check)
+@lb.add_checks(lb.owner_only)
 @lb.option(
     "link",
     "The link to check",
