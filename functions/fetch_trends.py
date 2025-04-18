@@ -9,7 +9,7 @@ async def search_it(search_query: str, session) -> dict | int:
     # Here we define our query as a multi-line string
     query = """
 query ($id: Int, $search: String) { 
-    Media (id: $id, search: $search, type: ANIME, sort: POPULARITY_DESC) { 
+    Media (id: $id, search: $search, type: ANIME) { 
         id
         title {
             english
