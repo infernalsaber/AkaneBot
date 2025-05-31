@@ -245,5 +245,7 @@ def get_random_quote() -> str:
             "Now this is what I call 'a moment of solitude'.",
             "Come on, let's get moving. We're not frozen in place, after all.",
             "The case before us... is a strange and unprecedented one indeed.",
+            "Only once you know and respect death can you truly understand the value of life",
+            "The world is full of lost ballads, waiting to be rediscovered.",
         ]
     )
