@@ -1,5 +1,6 @@
 """Get information about a role, server, user, bot etc."""
 import io
+import json
 import typing as t
 from datetime import datetime
 from math import floor
@@ -20,7 +21,7 @@ from functions.buttons import (
     CustomNextButton,
     CustomPrevButton,
     KillNavButton,
-    SwapButton
+    SwapButton,
 )
 from functions.models import ColorPalette as colors
 from functions.utils import is_image
@@ -30,6 +31,85 @@ info_plugin = lb.Plugin("Utility", "Utility and info commands", include_datastor
 info_plugin.d.help = True
 info_plugin.d.help_emoji = "⚙️"
 info_plugin.d.help_image = "https://i.imgur.com/nsg3lZJ.png"
+
+
+def search_sneedex(search_str, threshold=80):
+    # Read the table
+    df = pd.read_html("https://static.sneedex.moe/")[0]
+
+    # Get matches from title column
+    title_matches = process.extract(
+        search_str,
+        df["Title"],
+        limit=1,
+        score_cutoff=threshold,
+        processor=lambda x: x.lower(),
+    )
+
+    # Get matches from alias column
+    alias_matches = process.extract(
+        search_str,
+        df["Alias"],
+        limit=1,
+        score_cutoff=threshold,
+        processor=lambda x: x.lower(),
+    )
+
+    # Combine matches and get the best one
+    all_matches = title_matches + alias_matches
+    if not all_matches:
+        return json.dumps({"error": "No matches found above threshold"})
+
+    best_match = max(all_matches, key=lambda x: x[1])
+    match_idx = (
+        df[df["Title"] == best_match[0]].index[0]
+        if best_match[0] in df["Title"].values
+        else df[df["Alias"] == best_match[0]].index[0]
+    )
+
+    # Return relevant columns as JSON
+    result = {
+        "title": df.iloc[match_idx]["Title"],
+        "best": df.iloc[match_idx]["Best"],
+        "alt": df.iloc[match_idx]["Alt"],
+        "notes": df.iloc[match_idx]["Notes"],
+        "comps": df.iloc[match_idx]["Comps"],
+        "updated": df.iloc[match_idx]["Updated"],
+    }
+
+    return result
+
+
+@info_plugin.command
+@lb.add_checks(lb.guild_only)
+@lb.option(
+    "series", "The series to search for", modifier=lb.OptionModifier.CONSUME_REST
+)
+@lb.command(
+    "sneedex",
+    "Search for a series' releases on sneedex",
+    aliases=["sd", "release"],
+    pass_options=True,
+)
+@lb.implements(lb.PrefixCommand)
+async def sneedex_cmd(ctx: lb.Context, series: str) -> None:
+    """Search for a series' releases on sneedex
+
+    Args:
+        ctx (lb.Context): Context for the command
+        series (str): The series to search for
+    """
+
+    try:
+        series_data = search_sneedex(series)
+        await ctx.respond(
+            hk.Embed(title=series_data["title"], color=0x0991CF)
+            .add_field("Best Release", series_data["best"])
+            .add_field("Alt", series_data["alt"])
+            .set_footer("Via: sneedex.moe")
+        )
+    except Exception as e:
+        await ctx.respond(f"Can't fetch the release for `{series}` right now {e}")
 
 
 @info_plugin.command
@@ -369,14 +449,13 @@ def check_if_known_emoji_provider(link: str):
         "i.imgur.com",
         "phixiv.net",
         "cdn.discordapp.com",
-        "emoji.gg"
+        "emoji.gg",
     ]
-    
+
     for provider in known_providers:
         if provider in link:
             return True
     return False
-
 
 
 @info_plugin.command
@@ -425,7 +504,6 @@ async def add_emote(
 
         if not check_if_known_emoji_provider(emote):
             return await ctx.respond("Unknown Emote Provider ⚠")
-
 
         image_type = await is_image(
             emote, ctx.bot.d.aio_session
