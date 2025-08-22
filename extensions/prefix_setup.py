@@ -11,6 +11,8 @@ from functions.utils import humanized_list_join
 
 prefix_manager = lb.Plugin("Prefix", "manager", include_datastore=True)
 prefix_manager.d.help = True
+prefix_manager.d.help_emoji = "📕"
+
 
 
 def validate_guild_prefix(pfx: str) -> bool:

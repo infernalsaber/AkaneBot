@@ -5,6 +5,7 @@ import re
 from datetime import datetime, timedelta
 from operator import itemgetter
 from typing import Optional
+from functions.utils import dlogger
 
 import hikari as hk
 import lightbulb as lb
@@ -1428,8 +1429,9 @@ async def _search_vn(ctx: lb.Context, query: str):
         await view.wait()
 
     except Exception as e:
+        import traceback
         await dlogger(
-            ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
+            ctx.bot, f"VNDB search failed: ```{traceback.format_exc()}```"
         )
 
 
