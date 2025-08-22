@@ -396,7 +396,7 @@ async def main():
     # ccc = await PrydwenCharacter.from_search("qingyi", "zzz", session)
     # ci = await ccc.get_character_info('zzz')
     
-    ccc = await WuwaCharacter.from_search("qingyi", session)
+    # ccc = await WuwaCharacter.from_search("qingyi", session)
     # ci = await ccc.get_character_info('ww')
     # pgs, opts = await ccc.make_pages()
     
