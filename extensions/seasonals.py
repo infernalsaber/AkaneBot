@@ -73,6 +73,8 @@ async def _get_anime_updates() -> list:
 @aniupdates.listener(hk.StartedEvent)
 async def on_starting(event: hk.StartedEvent) -> None:
     """Event fired on start of bot"""
+    
+    return
     view = PeristentViewTest()
     await view.start()
 
