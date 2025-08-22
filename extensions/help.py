@@ -41,6 +41,9 @@ async def help_autocomplete(
         if not cmd.hidden:
             commands_and_plugins.append(cmd_name)
 
+    if option.value in ["", None]:
+        return commands_and_plugins[:24]
+
     close_matches = process.extract(
         option.value,
         commands_and_plugins,
@@ -54,7 +57,7 @@ async def help_autocomplete(
     if close_matches:
         possible_commands = [f"{i}" for i, *_ in close_matches]
 
-    return possible_commands
+    return possible_commands[:24]
 
 
 def load(bot: lb.BotApp) -> None:
