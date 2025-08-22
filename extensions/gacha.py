@@ -255,7 +255,7 @@ async def agent_autocomplete(
         )
     
     if option.value in ["", None]:
-        return name_code_mapping.keys()
+        return sorted(name_code_mapping.keys())[:24]
 
     close_matches = process.extract(
         option.value,
@@ -270,7 +270,7 @@ async def agent_autocomplete(
     if close_matches:
         possible_agents = [f"{i}" for i, *_ in close_matches]
 
-    return possible_agents
+    return possible_agents[:24]
 
 @w_engine_search.autocomplete("engine")
 async def w_engine_autocomplete(
@@ -285,7 +285,7 @@ async def w_engine_autocomplete(
     engine_names = [engine["name"] for engine in w_engine_data]
     
     if option.value in ["", None]:
-        return engine_names
+        return engine_names[:24]
     
     close_matches = process.extract(
         option.value,
@@ -300,7 +300,7 @@ async def w_engine_autocomplete(
     if close_matches:
         possible_w_engines = [f"{i}" for i, *_ in close_matches]
 
-    return possible_w_engines
+    return possible_w_engines[:24]
 
 @disc_search.autocomplete("disc")
 async def disc_autocomplete(
@@ -315,7 +315,7 @@ async def disc_autocomplete(
     
     
     if option.value in ["", None]:
-        return disk_drive_names
+        return disk_drive_names[:24]
     
     close_matches = process.extract(
         option.value,
@@ -330,7 +330,7 @@ async def disc_autocomplete(
     if close_matches:
         possible_disc_drives = [f"{i}" for i, *_ in close_matches]
     
-    return possible_disc_drives
+    return possible_disc_drives[:24]
 
 
 def parse_prydwen_description(description: str) -> str:
