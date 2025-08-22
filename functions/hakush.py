@@ -397,8 +397,8 @@ async def main():
     # ci = await ccc.get_character_info('zzz')
     
     ccc = await WuwaCharacter.from_search("qingyi", session)
-    ci = await ccc.get_character_info('ww')
-    pgs, opts = await ccc.make_pages()
+    # ci = await ccc.get_character_info('ww')
+    # pgs, opts = await ccc.make_pages()
     
     
     import ipdb; ipdb.set_trace()
