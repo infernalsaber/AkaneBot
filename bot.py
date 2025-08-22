@@ -86,6 +86,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
         urls_expire_after={
             "*.mangadex.org": 15 * 60,
             "*.steampowered.com": 1 * 60 * 60,
+            "*.hakush.in": 1 * 60 * 60,
         },
         allowed_codes=(200, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
