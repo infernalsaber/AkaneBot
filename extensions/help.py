@@ -36,7 +36,6 @@ async def help_autocomplete(
         *interaction.app.message_commands.items(),
         *interaction.app.user_commands.items(),
     ]
-    # self.app.plugins
 
     for cmd_name, cmd in all_cmds:
         if not cmd.hidden:

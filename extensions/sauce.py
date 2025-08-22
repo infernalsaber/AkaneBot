@@ -236,7 +236,7 @@ async def find_video_sacue(ctx: lb.MessageContext):
                 choice = await ctx.edit_last_response(
                     embed=embed, components=view, attachments=None
                 )
-                await ctx.respond(e)
+                # await ctx.respond(e)
                 await view.start(choice)
                 await view.wait()
         else:
@@ -347,7 +347,7 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 choice = await ctx.respond(embed=embed, components=view)
-                await ctx.respond(e)
+                # await ctx.respond(e)
                 await view.start(choice)
                 await view.wait()
         else:
