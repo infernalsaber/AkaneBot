@@ -96,4 +96,4 @@ class NavSelector(nav.NavTextSelect):
                         view.add_item(component)
                 await view.swap_pages(ctx, view.dropdown_options[self.values[0]])
             except Exception as e:
-                await ctx.respond(e)
+                pass

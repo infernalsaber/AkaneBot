@@ -1323,7 +1323,7 @@ async def _search_vn(ctx: lb.Context, query: str):
         req = await req.json()
 
         if not req["results"]:
-            await ctx.respond(
+            return await ctx.respond(
                 hk.Embed(
                     title="CAN'T FIND YOUR VN",
                     color=colors.ERROR,
@@ -1428,7 +1428,9 @@ async def _search_vn(ctx: lb.Context, query: str):
         await view.wait()
 
     except Exception as e:
-        await ctx.respond(e)
+        await dlogger(
+            ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
+        )
 
 
 
@@ -1491,7 +1493,7 @@ async def _search_vnchara(ctx: lb.Context, query: str):
     req = await req.json()
 
     if not req["results"]:
-        await ctx.respond(
+        return await ctx.respond(
             hk.Embed(
                 title="CAN'T FIND YOUR CHARACTER",
                 color=colors.ERROR,
@@ -1600,7 +1602,7 @@ async def _search_vntag(ctx: lb.Context, query: str):
     req = await req.json()
 
     if not req["results"]:
-        await ctx.respond(
+        return await ctx.respond(
             hk.Embed(
                 title="CAN'T FIND YOUR TAG",
                 color=colors.ERROR,
@@ -1675,7 +1677,7 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     req = await req.json()
 
     if not req["results"]:
-        await ctx.respond(
+        return await ctx.respond(
             hk.Embed(
                 title="CAN'T FIND YOUR TRAIT",
                 color=colors.ERROR,
