@@ -1037,13 +1037,16 @@ query ($id: Int, $search: String, $type: MediaType) {
             "t": "false",
         }
 
-        res = requests.get(
-            "https://api.comick.fun/v1.0/search/",
-            params=params,
-            headers=headers,
-            impersonate="chrome",
-        )
-        if res.ok and len(res.json()):
+        try:
+            res = requests.get(
+                "https://api.comick.fun/v1.0/search/",
+                params=params,
+                headers=headers,
+                impersonate="chrome",
+            )
+        except Exception as e:
+            res = None
+        if res and res.ok and len(res.json()):
             chapter_number = res.json()[0]["last_chapter"]
 
             no_of_items = no_of_items or chapter_number or "Nil"
