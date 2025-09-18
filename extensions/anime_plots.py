@@ -264,17 +264,19 @@ async def time_to(ctx: lb.Context, series: str) -> None:
     await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
     with requests.Session() as session:
         anime_id = int(get_anime_data(session, anime=series)["data"]["Media"]["id"])
-        series_list = format_chronological_order(session, anime_id=anime_id)
+        try:
+            series_list = format_chronological_order(session, anime_id=anime_id)
+        except Exception as e:
+            return await ctx.respond(f"An error occurred: {e}")
+        if not series_list:
+            return await ctx.respond("Could not generate watch order")
     order = " -> ".join(str(entry) for entry in series_list)
     total_time_investment = sum(
         [series.episodes * series.duration for series in series_list]
     )
-    try:
-        series_name = find_series_name(
-            [series.title.lower() for series in series_list]
-        ).title()
-    except Exception:
-        series_name = series.title()
+    series_name = find_series_name(
+        [series.title.lower() for series in series_list]
+    ).title()
 
     hours, mins = divmod(total_time_investment, 60)
     time = f"{hours} hours, {mins} minutes" if hours else f"{mins} minutes"
