@@ -1019,40 +1019,50 @@ query ($id: Int, $search: String, $type: MediaType) {
 
         if response["description"]:
             response["description"] = parse_description(response["description"])
-
         else:
             response["description"] = "NA"
 
-        # sess = requests.Session()
+        cookies = {
+            'theme': 'mdark',
+            'wd': '959x710',
+        }
+        MANGAPARK_URL = 'https://mangapark.io'
+
         headers = {
-            "accept": "application/json",
+            'accept': '*/*',
+            'cache-control': 'no-cache',
+            'content-type': 'application/json',
+            'origin': MANGAPARK_URL,
+            'pragma': 'no-cache',
+            'referer': f'{MANGAPARK_URL}/',
         }
 
-        search = title
-        params = {
-            "page": "1",
-            "limit": "15",
-            "showall": "false",
-            "q": search,
-            "t": "false",
+        json_data = {
+            'query': 'query get_searchComic($select: SearchComic_Select) {\n    get_searchComic(\n      select: $select\n    ) {\n      reqPage reqSize reqSort reqWord\n      newPage\n      paging { \n  total pages page init size skip limit prev next\n }\n      items {\n        id data {\n          id dbStatus name\n          origLang tranLang\n          urlPath urlCover600 urlCoverOri\n          genres altNames authors artists\n          is_hot is_new sfw_result\n          score_val follows reviews comments_total\n          max_chapterNode {\n            id data {\n              id dateCreate\n              dbStatus isFinal sfw_result\n              dname urlPath is_new\n              userId userNode {\n                id data {\n                  id name uniq avatarUrl urlPath\n                }\n              }\n            }\n          }\n        }\n        sser_follow\n        sser_lastReadChap {\n          date chapterNode {\n            id data {\n              id dbStatus isFinal sfw_result\n              dname urlPath is_new\n              userId userNode {\n                id data {\n                  id name uniq avatarUrl urlPath\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }',
+            'variables': {
+                'select': {
+                    'word': title,
+                    'size': 10,
+                    'page': 1,
+                    'sortby': 'field_score',
+                },
+            },
         }
+
 
         try:
-            res = requests.get(
-                "https://api.comick.fun/v1.0/search/",
-                params=params,
-                headers=headers,
-                impersonate="chrome",
-            )
+            res = requests.post(f'{MANGAPARK_URL}/apo/', cookies=cookies, headers=headers, json=json_data)
         except Exception as e:
             res = None
-        if res and res.ok and len(res.json()):
-            chapter_number = res.json()[0]["last_chapter"]
+        if res and res.ok and len(res.json()['data']['get_searchComic']['items']):
+            
+            selected_series = res.json()['data']['get_searchComic']['items'][0]
+            chapter_number = selected_series['data']['max_chapterNode']['data']['dname']
+            chapter_number = re.search(r'Ch\.(\d+)', chapter_number).group(1) if re.search(r'Ch\.(\d+)', chapter_number) else chapter_number
 
-            no_of_items = no_of_items or chapter_number or "Nil"
-            hid = res.json()[0]["hid"]
+            url = f'{MANGAPARK_URL}{selected_series["data"]["urlPath"]}'
 
-            no_of_items = f"[{no_of_items}](https://comick.io/comic/{hid})"
+            no_of_items = f"[{chapter_number}]({url})"
 
         pages = [
             hk.Embed(
