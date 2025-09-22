@@ -98,7 +98,6 @@ async def get_imp_info(chapters):
         "first": {"chapter": chapter_first, "id": id_first},
     }
 
-
 @al_listener.command
 @lb.set_help(
     "### Search something on AL/VNDB (as applicable):"
@@ -110,81 +109,93 @@ async def get_imp_info(chapters):
     "\n**vntag**: VN Tag from VNDB"
     "\n**vntrait**: VN character trait from VNDB"
 )
-@lb.option(
-    "media",
-    "The name of the media to search",
-    modifier=lb.commands.OptionModifier.CONSUME_REST,
-)
-@lb.option(
-    "type",
-    "The type of media to search for",
-    choices=[
-        "anime",
-        "manga",
-        "novel",
-        "visual novel",
-        "character",
-        "vn trait",
-        "vn tag",
-        "vn character",
-    ],
-)
 @lb.command(
     "lookup",
     "Find something on Anilist or VNDB",
-    pass_options=True,
-    aliases=["lu"],
+    # pass_options=True,
+    # aliases=["lu"],
     auto_defer=True,
 )
-@lb.implements(lb.PrefixCommand, lb.SlashCommand)
-async def al_search(ctx: lb.Context, type: str, media: str) -> None:
+@lb.implements(lb.SlashCommandGroup)
+async def al_search(ctx: lb.Context) -> None:
     """A wrapper slash command for AL/VNDB search"""
 
-    if isinstance(ctx, lb.PrefixContext):
-        await ctx.respond(
-            "Please note that the lookup prefix command is depreciated and due to be removed. "
-            f"See the updated commands using `{ctx.prefix}help Lookup`."
-            "\n(The capitalization is important)"
-        )
+    pass
 
-    if type.lower() in ["anime", "manga", "m", "a"]:
-        if type[0].lower() == "m":
-            await _search_manga(ctx, media)
-            return
-        else:
-            await _search_anime(ctx, media)
-            return
 
-    elif type.lower() in ["character", "c"]:
-        await _search_characters(ctx, media)
-        return
+@al_search.child
+@lb.option(
+    "anime",
+    "The anime to search for",
+)
+@lb.command("anime", "Search for an anime on Anilist", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def anime_search(ctx: lb.Context, anime: str) -> None:
+    """Search for an anime on AL"""
+    return await _search_anime(ctx, anime)
 
-    elif type.lower() in ["novel", "n"]:
-        await _search_novel(ctx, media)
-        return
+@al_search.child
+@lb.option(
+    "manga",
+    "The manga to search for",
+    # autocomplete=True
+)
+@lb.command("manga", "Search for a manga on Anilist and MangaPark", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def manga_search(ctx: lb.Context, manga: str) -> None:
+    """Search for a manga on AL"""
+    return await _search_manga(ctx, manga)
 
-    elif type.lower() in ["vn", "visualnovel", "visual novel"]:
-        await _search_vn(ctx, media)
-        return
+@al_search.child
+@lb.option(
+    "novel",
+    "The novel to search for",
+    # autocomplete=True
+)
+@lb.command("novel", "Search for a novel on Anilist", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def novel_search(ctx: lb.Context, novel: str) -> None:
+    """Search for a novel on AL"""
+    return await _search_novel(ctx, novel)
 
-    elif type.lower() in ["vntrait", "trait", "vn trait"]:
-        await _search_vntrait(ctx, media)
-        return
+@al_search.child
+@lb.option(
+    "visualnovel",
+    "The visual novel to search for",
+    # autocomplete=True
+)
+@lb.command("visualnovel", "Search for a visual novel on VNDB", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def vn_search(ctx: lb.Context, visual_novel: str) -> None:
+    """Search for a visual novel on AL"""
+    return await _search_vn(ctx, visual_novel)
 
-    elif type.lower() in ["vntag", "tag", "vn tag"]:
-        await _search_vntag(ctx, media)
-        return
+@al_search.child
+@lb.option(
+    "character",
+    "The character to search for",
+    # autocomplete=True
+)
+@lb.command("character", "Search for an animanga character", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def character_search(ctx: lb.Context, character: str) -> None:
+    """Search for a character on AL"""
+    return await _search_characters(ctx, character)
 
-    elif type.lower() in ["vnc", "vncharacter", "vn character"]:
-        await _search_vnchara(ctx, media)
-        return
 
-    else:
-        await ctx.respond(
-            "Invalid media type. Please use `-help lookup` to see the options"
-        )
-        return
+@al_search.child
+@lb.option(
+    "game",
+    "The game to search for"
+)
+@lb.command("game", "Search for a game on Steam", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def game_search(ctx: lb.Context, game: str) -> None:
+    """Search for a game on Steam"""
+    return await _search_game(ctx, game)
 
+
+# ============= LOOKUP SLASH COMMANDS END HERE =============
 
 @al_listener.command
 @lb.option("query", "The anime query", modifier=lb.commands.OptionModifier.CONSUME_REST)
@@ -584,8 +595,11 @@ async def game_search(ctx: lb.PrefixContext, query: str):
         ctx (lb.PrefixContext): The context
         query (str): The vn trait to search for
     """
+    
+    return await _search_game(ctx, query)
 
 
+async def _search_game(ctx: lb.Context, query: str):
     session = requests.Session(impersonate="chrome")
 
     params = {
@@ -1106,17 +1120,6 @@ query ($id: Int, $search: String, $type: MediaType) {
                 ctx.channel_id,
             )
 
-        # if data:
-        #     ctx.bot.d.chapter_info[navigator.message_id] = [
-        #         base_url,
-        #         data["first"]["id"],
-        #         title,
-        #         manga_id,
-        #         response["coverImage"]["large"],
-        #         pages,
-        #     ]
-        # else:
-        #     ctx.bot.d.chapter_info[navigator.message_id] = None
 
     except Exception as e:
         await ctx.respond(e)
