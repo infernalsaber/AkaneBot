@@ -52,19 +52,13 @@ def parse_description(description: str) -> str:
         str: The parsed description
     """
 
-    description = (
-        description.replace("<br>", "")
-        .replace("~!", "||")
-        .replace("!~", "||")
-        .replace("#", "")
-    )
-    description = (
-        description.replace("<i>", "")
-        .replace("<b>", "")
-        .replace("</b>", "")
-        .replace("</i>", "")
-        .replace("<BR>", "")
-    )
+
+    problematic_tags = ["<i>", "</i>", "<I>", "</I>", "<b>", "</b>", "<B>", "</B>", "<br>", "<BR>", "#"]
+    for tag in problematic_tags:
+        description = description.replace(tag, "")
+
+    # Adding spoiler tags
+    description = description.replace("~!", "||").replace("!~", "||")
 
     if len(description) > 400:
         description = description[0:400]
@@ -980,33 +974,35 @@ async def _search_manga(ctx, manga: str):
     """Search a manga on AL and Preview on MD"""
     query = """
 query ($id: Int, $search: String, $type: MediaType) {
-    Media (id: $id, search: $search, type: $type, 
-    sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) { 
-        id
-        idMal
-        title {
-            english
-            romaji
+    Page (perPage: 5) {
+        media (id: $id, search: $search, type: $type, 
+        sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) { 
+            id
+            idMal
+            title {
+                english
+                romaji
+            }
+            type
+            averageScore
+            format
+            meanScore
+            chapters
+            episodes
+            startDate {
+                year
+            }
+            coverImage {
+                large
+            }
+            bannerImage
+            genres
+            status
+            description (asHtml: false)
+            siteUrl
         }
-        type
-        averageScore
-        format
-        meanScore
-        chapters
-        episodes
-        startDate {
-            year
-        }
-        coverImage {
-            large
-        }
-        bannerImage
-        genres
-        status
-        description (asHtml: false)
-        siteUrl
     }
-    }
+}
 """
     try:
         variables = {"search": manga, "type": "MANGA"}
@@ -1022,7 +1018,44 @@ query ($id: Int, $search: String, $type: MediaType) {
             )
             return
 
-        response = (await response.json())["data"]["Media"]
+        options = []
+        pages = {}
+        
+        series_list = (await response.json())["data"]["Page"]["media"]
+        if not series_list:
+            await ctx.respond("No manga found")
+            return
+        
+        if len(series_list) > 1:
+        
+            for idx, series in enumerate(series_list):
+                options.append(
+                    miru.SelectOption(
+                        label=series["title"]["english"] or series["title"]["romaji"],
+                        value=idx,
+                        description=series["description"][:75] + "..." if series["description"] else "",
+                        )
+                    )
+
+            view = views.AuthorView(user_id=ctx.author.id)
+            view.add_item(SimpleTextSelect(options=options, placeholder="Select a manga"))
+            view.add_item(btns.KillButton())
+
+            resp = await ctx.respond(components=view)
+            await view.start(resp)
+
+            await view.wait_for_input(timeout=20)
+            
+            try:
+                response_idx = int(view.children[0].values[0])
+            except Exception:
+                response_idx = 0
+        
+        else:
+            response_idx = 0
+
+
+        response = (await response.json())["data"]["Page"]["media"][response_idx]
 
         if not response:
             await ctx.respond("No manga found")
@@ -1064,20 +1097,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         }
 
 
-        try:
-            res = requests.post(f'{MANGAPARK_URL}/apo/', cookies=cookies, headers=headers, json=json_data)
-        except Exception as e:
-            res = None
-        if res and res.ok and len(res.json()['data']['get_searchComic']['items']):
-            
-            selected_series = res.json()['data']['get_searchComic']['items'][0]
-            chapter_number = selected_series['data']['max_chapterNode']['data']['dname']
-            chapter_number = re.search(r'Ch\.(\d+)', chapter_number).group(1) if re.search(r'Ch\.(\d+)', chapter_number) else chapter_number
-
-            url = f'{MANGAPARK_URL}{selected_series["data"]["urlPath"]}'
-
-            no_of_items = f"[{chapter_number}]({url})"
-
+        # Create initial embed without chapter count
         pages = [
             hk.Embed(
                 title=title,
@@ -1091,7 +1111,7 @@ query ($id: Int, $search: String, $type: MediaType) {
             .add_field("Status", response.get("status", "NA"), inline=True)
             .add_field(
                 "Chapters",
-                no_of_items or "NA",
+                "Loading...",
                 inline=True,
             )
             .add_field("Summary", response.get("description", "NA"))
@@ -1103,23 +1123,58 @@ query ($id: Int, $search: String, $type: MediaType) {
             )
         ]
 
-        buttons = [btns.PreviewButton(), btns.KillNavButton()]
+        await ctx.edit_last_response(embeds=pages, components=None)
 
-        navigator = views.PreView(
-            session=ctx.bot.d.aio_session,
-            pages=pages,
-            buttons=buttons,
-            timeout=300,
-            user_id=ctx.author.id,
-        )
+        # Fetch chapter count in background and update
+        try:
+            res = requests.post(f'{MANGAPARK_URL}/apo/', cookies=cookies, headers=headers, json=json_data)
+            if res and res.ok and len(res.json()['data']['get_searchComic']['items']):
+                
+                selected_series = res.json()['data']['get_searchComic']['items'][0]
+                chapter_number = selected_series['data']['max_chapterNode']['data']['dname']
+                chapter_number = re.search(r'Ch\.(\d+)', chapter_number).group(1) if re.search(r'Ch\.(\d+)', chapter_number) else chapter_number
+                chapter_number = chapter_number.lower().replace('chapter', '').replace('vol', '').lstrip('0')
 
-        if isinstance(ctx, lb.SlashContext):
-            await navigator.send(ctx.interaction, responded=True)
-        else:
-            await navigator.send(
-                ctx.channel_id,
+                url = f'{MANGAPARK_URL}{selected_series["data"]["urlPath"]}'
+
+                updated_no_of_items = f"[{chapter_number}]({url})" if chapter_number else "NA"
+            else:
+                updated_no_of_items = "NA"
+        except Exception:
+            updated_no_of_items = "NA"
+
+        # Update the embed with the fetched chapter count
+        updated_pages = [
+            hk.Embed(
+                title=title,
+                url=response["siteUrl"],
+                description="\n\n",
+                color=colors.ANILIST,
+                timestamp=datetime.now().astimezone(),
             )
+            .add_field("Rating", response.get("meanScore", "NA"))
+            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
+            .add_field("Status", response.get("status", "NA"), inline=True)
+            .add_field(
+                "Chapters",
+                updated_no_of_items,
+                inline=True,
+            )
+            .add_field("Summary", response.get("description", "NA"))
+            .set_thumbnail(response["coverImage"]["large"])
+            .set_image(response["bannerImage"])
+            .set_footer(
+                text="Source: AniList",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+            )
+        ]
 
+
+            
+        view = views.AuthorView(user_id=ctx.author.id)
+        view.add_item(btns.KillButton())
+        
+        await ctx.edit_last_response(embeds=updated_pages, components=view)
 
     except Exception as e:
         await ctx.respond(e)
