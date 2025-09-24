@@ -1053,6 +1053,12 @@ query ($id: Int, $search: String, $type: MediaType) {
         
         else:
             response_idx = 0
+            await ctx.respond(
+                hk.Embed(
+                    description=f"Loading {emotes.LOADING.value}",
+                    color=colors.ELECTRIC_BLUE,
+                )
+            )
 
 
         response = (await response.json())["data"]["Page"]["media"][response_idx]
