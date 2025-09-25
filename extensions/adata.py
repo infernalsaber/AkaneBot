@@ -738,9 +738,8 @@ query ($id: Int, $search: String, $type: MediaType) {
     if not response:
         await ctx.respond("No novel found")
 
-    title = response["title"]["english"] or response["title"]["romaji"]
+    title = (response["title"]["english"] or response["title"]["romaji"])[:99]
 
-    no_of_items = response("volumes", "NA")
 
     if response["description"]:
         response["description"] = parse_description(response["description"])
@@ -763,7 +762,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         .add_field("Status", response["status"], inline=True)
         .add_field(
             "Volumes",
-            no_of_items,
+            response.get("volumes") or "NA",
             inline=True,
         )
         .add_field("Summary", response["description"])
