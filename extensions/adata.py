@@ -1030,7 +1030,7 @@ query ($id: Int, $search: String, $type: MediaType) {
             for idx, series in enumerate(series_list):
                 options.append(
                     miru.SelectOption(
-                        label=series["title"]["english"] or series["title"]["romaji"],
+                        label=(series["title"]["english"] or series["title"]["romaji"])[:99],
                         value=idx,
                         description=series["description"][:75] + "..." if series["description"] else "",
                         )
@@ -1065,7 +1065,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         if not response:
             await ctx.respond("No manga found")
 
-        title = response["title"]["english"] or response["title"]["romaji"]
+        title = (response["title"]["english"] or response["title"]["romaji"])[:99]
 
         no_of_items = response.get("chapters", response.get("episodes", "NA"))
 
@@ -1285,7 +1285,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 title = (
                     response["data"]["Media"]["title"]["english"]
                     or response["data"]["Media"]["title"]["romaji"]
-                )
+                )[:99]
 
                 for chara in response["data"]["Media"]["characters"]["nodes"]:
                     options.append(
