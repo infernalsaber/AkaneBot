@@ -1458,7 +1458,7 @@ async def _search_vn(ctx: lb.Context, query: str):
                 4: "Long (30-50 hours)",
                 5: "Very Long (>50 hours)",
             }
-            time = len_map.get(req["results"][0]["length_minutes"], "NA")
+            time = len_map.get(int(req["results"][0]["length"]), "NA")
 
         main_embed = (
             hk.Embed(
