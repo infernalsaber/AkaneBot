@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import aiohttp_client_cache
 import hikari as hk
 
-from functions.models import ColorPalette
+from functions.models import ColorPalette as colors
 from functions.utils import verbose_timedelta
 
 
@@ -218,7 +218,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             if not resp.ok:
                 return hk.Embed(
                     title="ERROR FETCHING DATA",
-                    color=ColorPalette.ERROR,
+                    color=colors.ERROR,
                     description=(
                         "Failed to fetch data 😵"
                         "\nTry typing the full name of the character."
@@ -250,7 +250,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                     title=self.name,
                     url=self.url,
                     description="\n\n",
-                    color=ColorPalette.ANILIST,
+                    color=colors.ANILIST,
                     timestamp=datetime.now().astimezone(),
                 )
                 .add_field("Gender", response["gender"] or "Unknown")
@@ -267,7 +267,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
         except Exception as e:
             return hk.Embed(
                 title="Failure",
-                color=ColorPalette.ERROR,
+                color=colors.ERROR,
                 description=f"We encountered an error, `{e}`",
             )
 
@@ -327,7 +327,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 return [
                     hk.Embed(
                         title="ERROR FETCHING DATA",
-                        color=ColorPalette.ERROR,
+                        color=colors.ERROR,
                         description=(
                             "Failed to fetch data 😵"
                             "\nTry typing the full name of the character."
@@ -369,7 +369,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                     title=title,
                     url=response["siteUrl"],
                     description="\n\n",
-                    color=ColorPalette.ANILIST,
+                    color=colors.ANILIST,
                     timestamp=datetime.now().astimezone(),
                 )
                 .add_field("Gender", response["gender"] or "Unknown")
@@ -384,7 +384,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                 hk.Embed(
                     title=title,
                     url=response["siteUrl"],
-                    color=ColorPalette.ANILIST,
+                    color=colors.ANILIST,
                     timestamp=datetime.now().astimezone(),
                 )
                 .set_thumbnail(response["image"]["large"])
@@ -398,7 +398,7 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
             return [
                 hk.Embed(
                     title="Failure",
-                    color=ColorPalette.ERROR,
+                    color=colors.ERROR,
                     description=f"We encountered an error, `{e}`",
                 )
             ]
@@ -492,7 +492,7 @@ query ($id: Int, $type: MediaType) {
                 title=title,
                 url=response["siteUrl"],
                 description="\n\n",
-                color=ColorPalette.ANILIST,
+                color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
             .add_field("Rating", response.get("meanScore", "NA"))
