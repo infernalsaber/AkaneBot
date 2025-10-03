@@ -50,7 +50,7 @@ class CharacterSelect(miru.TextSelect):
                 chara = await ALCharacter.from_id(
                     int(self.values[0]), self.view.session
                 )
-                await ctx.edit_response(embeds=[await chara.make_embed()])
+                await ctx.edit_response(embeds=[await chara.make_embed()], content=None)
 
         except Exception as e:
             await ctx.respond(content=f"Error: {e}", flags=hk.MessageFlag.EPHEMERAL)

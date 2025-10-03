@@ -91,7 +91,7 @@ class AuthorView(miru.View):
         if self.message:
             new_view = None
             for item in self.children:
-                if not check_if_url(item.url):
+                if not hasattr(item, "url") or not check_if_url(item.url):
                     new_view = self.remove_item(item)
 
             await self.message.edit(components=new_view)
