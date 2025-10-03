@@ -2,7 +2,8 @@ import time
 import typing
 from datetime import datetime
 from random import random
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Union
+import re
 
 from curl_cffi import requests
 
@@ -154,18 +155,13 @@ def format_watch_order(anime_id: int, include_side_stories: bool = False) -> str
     return " -> ".join(anime.title for anime in order)
 
 
-def get_all_substrings(string):
-    """Get all possible substrings of length > 2 from a string."""
-    substrings = []
-    for i in range(len(string)):
-        for j in range(i + 1, len(string) + 1):
-            substring = string[i:j]
-            if len(substring) > 2:  # Only consider substrings longer than 2 chars
-                substrings.append(substring)
-    return substrings
+from functions.algorithms import longest_common_substring
 
 
-def find_series_name(titles, threshold=0.4):
+
+
+
+def find_series_name(titles, threshold=0.6):
     """Find the most likely series name from a list of titles."""
     if not titles:
         return ""
@@ -173,31 +169,16 @@ def find_series_name(titles, threshold=0.4):
     # Clean titles first
     cleaned_titles = [clean_title(t) for t in titles]
 
-    # Get all possible substrings from all titles
-    all_substrings = {}
-    for title in cleaned_titles:
-        for substring in get_all_substrings(title):
-            if substring not in all_substrings:
-                # Count in how many titles this substring appears
-                count = sum(1 for t in cleaned_titles if substring in t)
-                frequency = count / len(cleaned_titles)
-                if frequency >= threshold:
-                    all_substrings[substring] = frequency
+    title = longest_common_substring(cleaned_titles, threshold)
 
-    if not all_substrings:
-        return ""
-
-    # Find the longest substring that meets the threshold
-    candidates = sorted(
-        all_substrings.items(), key=lambda x: (x[1], len(x[0])), reverse=True
-    )
-
-    return candidates[0][0].strip() if candidates else titles[0]
+    # title = longest_common_substring(cleaned_titles, threshold)
+    title = re.sub(r"[.,:/]+$", "", title)
+    return title
 
 
 def clean_title(title):
     """Clean title by removing common suffixes/prefixes and special characters."""
-    removals = [": The Movie", ": Episode", " Movie", " Season", " Part", ": ", " -"]
+    removals = [": The Movie", ": Episode", " Movie", " Season", " Part", " -"]
     cleaned = title
     for r in removals:
         cleaned = cleaned.replace(r, "")
@@ -241,9 +222,18 @@ def get_anime_data(session, anime_id: int = None, anime: str = None) -> dict:
     else:
         variables = {"search": anime}
 
-    response = session.post(
-        "https://graphql.anilist.co", json={"query": query, "variables": variables}
-    )
+    for _ in range(3):
+        response = session.post(
+            "https://graphql.anilist.co", json={"query": query, "variables": variables}
+        )
+        if response.ok:
+            break
+        if response.status_code == 429:
+            print(f"Rate limited")
+            # time.sleep(int(response.headers.get("Retry-After")))
+            break
+    else:
+        return {"errors": "Failed to fetch data"}
     return response.json()
 
 
@@ -294,13 +284,13 @@ def get_complete_series(
     return entries
 
 
-def format_chronological_order(session, anime_id: int) -> str:
+def format_chronological_order(session, anime_id: int) -> List[AnimeNode]:
     """Generate a chronological watch order for the complete anime series."""
     # Get all related entries
     all_entries = get_complete_series(session, anime_id)
 
     if not all_entries:
-        return "Could not generate watch order"
+        return []
 
     # Separate dated and undated entries
     dated_entries = [e for e in all_entries if e.date is not None]
