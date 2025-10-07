@@ -236,12 +236,12 @@ class PreviewButton(nav.NavButton):
 
 
         return await ctx.respond(
-                (
-                    f"This feature is deprecated for now, possibly forever"
-                    f"{hk.Emoji.parse(emotes.BOW)}"
-                ),
-                flags=hk.MessageFlag.EPHEMERAL,
-            )
+            (
+                f"This feature is deprecated for now, possibly forever"
+                f"{hk.Emoji.parse(emotes.BOW)}"
+            ),
+            flags=hk.MessageFlag.EPHEMERAL,
+        )
 
         if not hasattr(self, "spare_pages"):
             self.spare_pages = self.view.pages

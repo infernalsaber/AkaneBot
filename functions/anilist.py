@@ -165,6 +165,204 @@ class ALCharacter(AnilistBase):
 
         return cls(title, id_, session)
 
+    @classmethod
+    async def from_search_multiple(
+        cls, query_: str, session: aiohttp_client_cache.CachedSession, per_page: int = 10
+    ):
+        """Get multiple characters from search, sorted by popularity"""
+        query = """
+        query ($search: String, $perPage: Int) {
+            Page (perPage: $perPage) {
+                characters (search: $search, sort: FAVOURITES_DESC) {
+                    id
+                    name {
+                        full
+                        alternative
+                    }
+                    favourites
+                    image {
+                        large
+                    }
+                    media {
+                        nodes {
+                            title {
+                                romaji
+                                english
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+
+        variables = {
+            "search": query_,
+            "perPage": per_page
+        }
+
+        resp = await session.post(
+            "https://graphql.anilist.co",
+            json={"query": query, "variables": variables},
+        )
+        if not resp.ok:
+            return []
+        resp_json = await resp.json()
+
+        characters = resp_json["data"]["Page"]["characters"]
+        return characters
+
+    @classmethod
+    async def from_series_characters(
+        cls, series: str, session: aiohttp_client_cache.CachedSession
+    ):
+        """Get characters from a specific series, sorted by popularity"""
+        query = """
+        query ($search: String) {
+            Media (search: $search) { 
+                title {
+                    english
+                    romaji
+                }
+                characters (sort: FAVOURITES_DESC) {
+                    nodes {
+                        id
+                        name {
+                            full
+                            alternative
+                        }
+                        favourites
+                        image {
+                            large
+                        }
+                        media {
+                            nodes {
+                                title {
+                                    romaji
+                                    english
+                                }
+                            }
+                        }
+                    }
+                }        
+            }
+        }
+        """
+        
+        variables = {"search": series}
+
+        resp = await session.post(
+            "https://graphql.anilist.co",
+            json={"query": query, "variables": variables},
+        )
+        
+        if not resp.ok:
+            return None, []
+            
+        resp_json = await resp.json()
+        
+        if not resp_json.get("data", {}).get("Media"):
+            return None, []
+            
+        media = resp_json["data"]["Media"]
+        title = media["title"]["english"] or media["title"]["romaji"]
+        characters = media["characters"]["nodes"]
+        
+        return title, characters
+
+    @classmethod
+    async def get_birthday_characters(cls, session: aiohttp_client_cache.CachedSession):
+        """Get all characters whose birthday is today, sorted by popularity"""
+        query = """
+        query {
+            Page (perPage: 25) {
+                characters (isBirthday: true, sort: FAVOURITES_DESC) {
+                    id
+                    name {
+                        full
+                        alternative
+                    }
+                    favourites
+                    image {
+                        large
+                    }
+                    media {
+                        nodes {
+                            title {
+                                romaji
+                                english
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+
+        resp = await session.post(
+            "https://graphql.anilist.co",
+            json={"query": query},
+        )
+        
+        if not resp.ok:
+            return []
+            
+        resp_json = await resp.json()
+        characters = resp_json["data"]["Page"]["characters"]
+        return characters
+
+    @classmethod
+    async def get_character_media(cls, character_id: int, session: aiohttp_client_cache.CachedSession):
+        """Get all media/series information for a character"""
+        query = """
+        query ($id: Int) {
+            Character (id: $id) {
+                id
+                name {
+                    full
+                }
+                media {
+                    nodes {
+                        title {
+                            romaji
+                            english
+                        }
+                        type
+                    }
+                }
+            }
+        }
+        """
+        
+        variables = {"id": character_id}
+        
+        resp = await session.post(
+            "https://graphql.anilist.co",
+            json={"query": query, "variables": variables},
+        )
+        
+        if not resp.ok:
+            return None
+            
+        resp_json = await resp.json()
+        
+        if not resp_json.get("data", {}).get("Character"):
+            return None
+            
+        character = resp_json["data"]["Character"]
+        media_titles = []
+        
+        for media in character["media"]["nodes"]:
+            title = media["title"]["english"] or media["title"]["romaji"]
+            if title:
+                media_titles.append(title)
+        
+        return {
+            "id": character["id"],
+            "name": character["name"]["full"],
+            "media_titles": media_titles
+        }
+
     async def make_embed(self):
         query = """
 query ($id: Int, $search: String) { # Define which variables will be used in the query

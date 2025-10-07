@@ -202,7 +202,8 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
         pass
         # To move the fuzzy matching here
     else:
-        await event.context.respond("Unknown error")
+        ...
+        # await event.context.respond("Unknown error")
 
 
 if __name__ == "__main__":

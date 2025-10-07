@@ -2,6 +2,10 @@
     "DEFAULT_EMBED_COLOR": "#000000",
     "OWNER_IDS": [],
     "GUILD_PREFIX_MAP": {
+        "980479965726404670": [
+            "-",
+            ","
+        ]
     },
     "EMOTES": {
         "SIP": "\ud83e\udd64",

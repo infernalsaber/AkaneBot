@@ -6,6 +6,7 @@ import hikari as hk
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 import bs4
+import miru
 
 from functions import buttons as btns
 from functions import views as views
@@ -123,6 +124,110 @@ async def agent_search(ctx: lb.Context, character: str) -> None:
     view.add_item(NavSelector(options=options, placeholder="More Info"))
     view.add_item(btns.KillNavButton())
     await view.send(ctx.interaction, responded=True)
+
+
+
+@zzz_slash.child
+@lb.option(
+    "character",
+    "The character to search for",
+    # autocomplete=True
+)
+@lb.command("build", "Search for a character's build", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def build_search(ctx: lb.Context, character: str) -> None:
+    
+    
+    try:
+        headers = {
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'accept-language': 'en-US,en;q=0.7',
+            'cache-control': 'no-cache',
+            'pragma': 'no-cache',
+            'priority': 'u=0, i',
+            'sec-ch-ua': '"Not;A=Brand";v="99", "Brave";v="139", "Chromium";v="139"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'document',
+            'sec-fetch-mode': 'navigate',
+            'sec-fetch-site': 'same-origin',
+            'sec-fetch-user': '?1',
+            'sec-gpc': '1',
+            'upgrade-insecure-requests': '1',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+        }
+
+        base_url = "https://www.prydwen.gg"
+
+        response = await ctx.bot.d.aio_session.get(f'{base_url}/page-data/zenless/characters/trigger/page-data.json', headers=headers)
+        response = await response.json()
+        response = response["result"]["data"]["currentUnit"]["nodes"][0]
+        
+        # Page Builder
+        pages = {}
+        options = []
+        disk_drive_info = "**Drive Disks**\n ```"
+
+        for i in range(4, 7):   
+            disk_drive_info += f"({i}) {response['build'][f'main_{i}'][0]['stat']}\n"
+        disk_drive_info += "```"
+        
+        disk_drive_info += f"\n**Substats**\n ```{response['build']['substats']}```"
+
+        pages['Build'] = [
+            hk.Embed(
+                title=f"{response['fullName']}",
+                description=disk_drive_info,
+                url=f"{base_url}/zenless/characters/trigger",
+                color="#ffb20c" if response["rarity"] == "S" else "#ca46b5"
+            )
+            .set_thumbnail(f"{base_url}{response['cardImage']['localFile']['childImageSharp']['gatsbyImageData']['images']['fallback']['src']}")
+            # .set_footer(text=f"Via: Prydwen.gg", icon='https://www.prydwen.gg/static/c20213ad82f52dcc3a6670bb5006ef1e/dbb7e/prydwen_logo_min.webp')
+        ]
+        
+        w_engine_info = "**W-engine**\n ```"
+
+        pages['Build'].append(
+            hk.Embed(
+                title=f"{response['fullName']}",
+                description=w_engine_info,
+                url=f"{base_url}/zenless/characters/trigger",
+                color="#ffb20c" if response["rarity"] == "S" else "#ca46b5"
+            )
+            .set_thumbnail(f"{base_url}{response['cardImage']['localFile']['childImageSharp']['gatsbyImageData']['images']['fallback']['src']}")
+            # .set_footer(text=f"Via: Prydwen.gg", icon='https://www.prydwen.gg/static/c20213ad82f52dcc3a6670bb5006ef1e/dbb7e/prydwen_logo_min.webp')
+        )
+        
+        components = {}
+        for page_name, page_value in pages.items():
+            if len(page_value) > 1:
+                components[page_name] = [
+                    btns.CustomPrevButton(),
+                    btns.CustomNextButton(),
+                ]
+            else:
+                components[page_name] = []
+        
+        for key in pages.keys():
+            options.append(miru.SelectOption(label=key, value=key))
+        
+        view = views.SelectNavigator(
+            user_id=ctx.author.id,
+            dropdown_options=pages,
+            dropdown_components=components,
+            first_page="Build",
+        )
+        view.add_item(NavSelector(options=options, placeholder="More Info"))
+        view.add_item(btns.KillNavButton())
+        await view.send(ctx.interaction, responded=True)
+        
+    except Exception as e:
+        import ipdb; ipdb.set_trace()
+        import traceback
+        traceback.print_exc()
+        await ctx.respond(f"Error: {e}")
+        return
+    
 
 @zzz_slash.child
 @lb.option(

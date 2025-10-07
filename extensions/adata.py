@@ -166,15 +166,31 @@ async def vn_search(ctx: lb.Context, visual_novel: str) -> None:
 
 @al_search.child
 @lb.option(
+    "birthday",
+    "The birthday to search for",
+    required=False,
+    type=bool,
+    # autocomplete=True
+)
+@lb.option(
+    "series",
+    "The series to search for",
+    required=False,
+    # autocomplete=True
+)
+@lb.option(
     "character",
     "The character to search for",
+    required=False,
+    default="",
     # autocomplete=True
 )
 @lb.command("character", "Search for an animanga character", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
-async def character_search(ctx: lb.Context, character: str) -> None:
+async def character_search(ctx: lb.Context, character: Optional[str] = None, series: Optional[str] = None, birthday: Optional[bool] = False) -> None:
     """Search for a character on AL"""
-    return await _search_characters(ctx, character)
+
+    return await _search_characters(ctx, character, series, birthday)
 
 
 @al_search.child
@@ -1185,186 +1201,220 @@ query ($id: Int, $search: String, $type: MediaType) {
         await ctx.respond(e)
 
 
-async def _search_characters(ctx: lb.Context, query: str):
-    """Interlude function for character search"""
+from functions.algorithms import longest_common_substring
 
-    query = query.split(",")
-    if len(query) == 1 or query[1].strip() == "":
-        if query[0] in ["birth", "birthday", "bday"]:
-            try:
-                await ctx.respond(
-                    embed=(
-                        await (
-                            await ALCharacter.is_birthday(ctx.bot.d.aio_session)
-                        ).make_embed()
+async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] = None, birthday: Optional[bool] = False):
+    """Interlude function for character search with dropdowns sorted by popularity"""
+
+    if birthday:
+        try:
+            characters = await ALCharacter.get_birthday_characters(ctx.bot.d.aio_session)
+            
+            if not characters:
+                await ctx.respond("No characters have their birthday today 😵")
+                return
+            
+            # Create dropdown options for birthday characters
+            options = []
+            for char in characters:
+                label = char["name"]["full"]
+                if char["favourites"]:
+                    label += f" ({char['favourites']}❤)"
+                
+                options.append(
+                    miru.SelectOption(
+                        label=label[:100],
+                        value=str(char["id"]),
+                        description=f"ID: {char['id']}"
                     )
                 )
-            except Exception as e:
-                await ctx.respond(e)
-        else:
-            # await ALCharacter.from_search(query[0], ctx.bot.d.aio_session)
-
-            pages = await (
-                await ALCharacter.from_search(query[0], ctx.bot.d.aio_session)
-            ).make_pages()
-
-            if len(pages) == 1:
-                await ctx.respond(embeds=pages)
-                return
-
-            view = views.AuthorView(user_id=ctx.author.id)
-            view.add_item(
-                btns.SwapButton(
-                    emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
-                    emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
-                    original_page=pages[0],
-                    swap_page=pages[1],
-                )
-            )
-            view.add_item(btns.KillButton())
-
-            choice = await ctx.respond(
-                embed=pages[0],
-                components=view,
-            )
-            await view.start(choice)
-            await view.wait()
-
-            # if hasattr(view, "answer"):
-            #     pass
-            # else:
-            #     await ctx.edit_last_response(components=[])
-
-            # await _search_character(ctx, character=query[0])
-        return
-
-    else:
-        # Make a character picker dropdown from the series
-        query_ = """
-query ($id: Int, $search: String) { # Define which variables will be used in the query (id)
-    Media (id: $id, search: $search) { 
-        title {
-            english
-            romaji
-        }
-        characters {
-            nodes {
-                id
-                name {
-                    full
-                    alternative
-                }
-            }
-        }        
-    }
-    }
-  
-"""
-        try:
-            variables = {"search": query[1]}
-
-            response = await ctx.bot.d.aio_session.post(
-                "https://graphql.anilist.co",
-                json={"query": query_, "variables": variables},
-            )
-
-            if not response.ok:
-                await ctx.respond(
-                    f"Failed to fetch data 😵, error `code: {response.status}`"
-                )
-                return
-
-            response = await response.json()
-
+            
             view = views.AuthorView(
                 user_id=ctx.author.id, session=ctx.bot.d.aio_session
             )
+            
+            view.add_item(
+                CharacterSelect(
+                    options=options, 
+                    placeholder="Select character"
+                )
+            )
+            view.add_item(btns.KillButton())
+            
+            resp = await ctx.respond(content=f"🎂 {len(characters)} characters have their birthday today:", components=view)
+            await view.start(resp)
+            await view.wait()
+            
+        except Exception as e:
+            await ctx.respond(f"Error getting birthday characters: {e}")
+        return
+    
+    if not series:
+        # General character search - show dropdown with multiple results
+        try:
+            characters = await ALCharacter.from_search_multiple(query, ctx.bot.d.aio_session, per_page=25)
+            
+            if not characters:
+                await ctx.respond("No characters found for your search query 😵")
+                return
+            
+            # Create dropdown options sorted by popularity (already sorted by API)
+            options = []
+            for char in characters:
+                # Format label with popularity info
+                label = char["name"]["full"]
+                if char["favourites"]:
+                    label += f" ({char['favourites']}❤)"
+                
+                options.append(
+                    miru.SelectOption(
+                        label=label[:100],  # Discord limit
+                        value=str(char["id"]),
+                        description=f"ID: {char['id']}"
+                    )
+                )
+            
+            view = views.AuthorView(
+                user_id=ctx.author.id, session=ctx.bot.d.aio_session
+            )
+            
+            view.add_item(
+                CharacterSelect(
+                    options=options, 
+                    placeholder=f"Select character from '{query}' search"
+                )
+            )
+            view.add_item(btns.KillButton())
+            
+            resp = await ctx.respond(content=f"Found {len(characters)} characters for '{query}':", components=view)
+            await view.start(resp)
+            await view.wait()
+            
+        except Exception as e:
+            await ctx.respond(f"Error searching characters: {e}")
+        return
 
-            if query[0].strip() == "":
+    else:
+        # Series-specific character search
+        try:
+            title, characters = await ALCharacter.from_series_characters(series, ctx.bot.d.aio_session)
+            
+            if not title or not characters:
+                await ctx.respond(f"Couldn't find series '{series}' or no characters found 😵")
+                return
+            
+            if query.strip() == "":
+                # Show all characters from the series
                 options = []
-                title = (
-                    response["data"]["Media"]["title"]["english"]
-                    or response["data"]["Media"]["title"]["romaji"]
-                )[:99]
-
-                for chara in response["data"]["Media"]["characters"]["nodes"]:
+                for char in characters:
+                    label = char["name"]["full"]
+                    if char["favourites"]:
+                        label += f" ({char['favourites']}❤)"
+                    
                     options.append(
                         miru.SelectOption(
-                            label=chara["name"]["full"], value=chara["id"]
+                            label=label[:100],
+                            value=str(char["id"]),
+                            description=f"ID: {char['id']}"
                         )
                     )
-
+                
+                view = views.AuthorView(
+                    user_id=ctx.author.id, session=ctx.bot.d.aio_session
+                )
+                
                 view.add_item(
                     CharacterSelect(
-                        options=options, placeholder=f"Select {title} character"
+                        options=options, 
+                        placeholder=f"Select {title[:50]} character"
                     )
                 )
                 view.add_item(btns.KillButton())
-                resp = await ctx.respond(content=None, components=view)
+                
+                resp = await ctx.respond(content=f"Characters from '{title}':", components=view)
+                await view.start(resp)
+                await view.wait()
+                
+            else:
+                # Search for specific character within the series
+                chara_choices = {}
+                
+                for char in characters:
+                    chara_choices[char["name"]["full"]] = char["id"]
+                    for name in char["name"]["alternative"]:
+                        chara_choices[name] = char["id"]
+                
+                # Find all characters with similar names (not just the closest match)
+                similar_characters = []
+                query_lower = query.lower()
+                
+                for char in characters:
+                    char_name = char["name"]["full"].lower()
+                    alt_names = [name.lower() for name in char["name"]["alternative"]]
+                    
+                    # Check if query is contained in the character name or alternative names
+                    if (query_lower in char_name or 
+                        any(query_lower in alt for alt in alt_names) or
+                        any(alt.startswith(query_lower) for alt in alt_names) or
+                        char_name.startswith(query_lower)):
+                        similar_characters.append(char)
+                
+                # If no similar characters found, fall back to fuzzy matching
+                if not similar_characters:
+                    closest_match, score, *_ = process.extractOne(
+                        query,
+                        chara_choices.keys(),
+                        processor=default_process,
+                        scorer=partial_ratio,
+                    )
+                    
+                    # Only include if the match is reasonably close (score > 60)
+                    if score > 60:
+                        char_id = chara_choices[closest_match]
+                        char_data = next((c for c in characters if c["id"] == char_id), None)
+                        if char_data:
+                            similar_characters.append(char_data)
+                
+                if not similar_characters:
+                    await ctx.respond(f"No characters matching '{query}' found in '{title}' 😵")
+                    return
+                
+                # Create dropdown options for similar characters
+                options = []
+                for char in similar_characters:
+                    label = char["name"]["full"]
+                    if char["favourites"]:
+                        label += f" ({char['favourites']}❤)"
+                    
+                    options.append(
+                        miru.SelectOption(
+                            label=label[:100],
+                            value=str(char["id"]),
+                            description=f"ID: {char['id']}"
+                        )
+                    )
+                
+                view = views.AuthorView(
+                    user_id=ctx.author.id, session=ctx.bot.d.aio_session
+                )
+                
+                view.add_item(
+                    CharacterSelect(
+                        options=options, 
+                        placeholder=f"Select character from '{title[:50]}'"
+                    )
+                )
+                view.add_item(btns.KillButton())
+                
+                resp = await ctx.respond(
+                    content=f"Found {len(similar_characters)} character(s) matching '{query}' in '{title}':", 
+                    components=view
+                )
                 await view.start(resp)
                 await view.wait()
 
-            else:
-                # chara_choices = {}
-
-                # chara_choices = {
-                #     chara["name"]["full"]: chara["id"]
-                #     for chara in response["data"]["Media"]["characters"]["nodes"]
-                # }
-
-                chara_choices = collections.defaultdict(list)
-
-                for chara in response["data"]["Media"]["characters"]["nodes"]:
-                    chara_choices[chara["name"]["full"]] = chara["id"]
-                    for name in chara["name"]["alternative"]:
-                        chara_choices[name] = chara["id"]
-
-                closest_match, *_ = process.extractOne(
-                    query[0],
-                    chara_choices.keys(),
-                    processor=default_process,
-                    scorer=partial_ratio,
-                )
-
-                pages = await (
-                    await ALCharacter.from_id(
-                        chara_choices[closest_match], ctx.bot.d.aio_session
-                    )
-                ).make_pages()
-
-                if len(pages) == 1:
-                    await ctx.respond(embeds=pages)
-                    return
-
-                view = views.AuthorView(user_id=ctx.author.id)
-                view.add_item(
-                    btns.SwapButton(
-                        emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
-                        emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
-                        original_page=pages[0],
-                        swap_page=pages[1],
-                    )
-                )
-                view.add_item(btns.KillButton())
-
-                choice = await ctx.respond(
-                    embed=pages[0],
-                    components=view,
-                )
-                await view.start(choice)
-                await view.wait()
-
-                # if hasattr(view, "answer"):
-                #     pass
-                # else:
-                #     await ctx.edit_last_response(components=[])
-
-                # await ctx.respond(embeds=[await chara.makepages()])
-
-                # await _search_character(ctx, id_=chara_choices[closest_match[0]])
-
         except Exception as e:
-            await ctx.respond(f"Error {e}")
+            await ctx.respond(f"Error searching series characters: {e}")
 
 
 async def _search_vn(ctx: lb.Context, query: str):
@@ -1722,11 +1772,6 @@ async def _search_vntag(ctx: lb.Context, query: str):
     )
     await view.start(choice)
     await view.wait()
-
-    # if hasattr(view, "answer"):  # Check if there is an answer
-    #     pass
-    # else:
-    #     await ctx.edit_last_response(components=[])
 
 
 async def _search_vntrait(ctx: lb.Context, query: str):
