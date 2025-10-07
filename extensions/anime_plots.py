@@ -236,6 +236,49 @@ async def compare_trends(ctx: lb.PrefixContext, query: list[str]) -> None:
         await ctx.respond(e)
 
 
+@plot_plugin.command
+@lb.add_cooldown(30, 3, lb.GlobalBucket)
+@lb.set_max_concurrency(2, lb.GlobalBucket)
+@lb.option(
+    "series",
+    "The series to get the watch order for",
+    modifier=lb.commands.OptionModifier.CONSUME_REST,
+)
+@lb.command(
+    "watch-order",
+    "Time investment needed by a series and watch order",
+    aliases=["timeto", "watchorder", "wo"],
+    pass_options=True,
+)
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
+async def watch_order(ctx: lb.Context, series: str) -> None:
+    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
+    with requests.Session() as session:
+        anime_id = int(get_anime_data(session, anime=series)["data"]["Media"]["id"])
+        try:
+            series_list = format_chronological_order(session, anime_id=anime_id)
+        except Exception as e:
+            return await ctx.respond(f"An error occurred: {e}")
+        if not series_list:
+            return await ctx.respond("Could not generate watch order")
+    order = " -> ".join(str(entry) for entry in series_list)
+    total_time_investment = sum(
+        [series.episodes * series.duration for series in series_list]
+    )
+    series_name = find_series_name(
+        [series.title.lower() for series in series_list]
+    ).title()
+
+    hours, mins = divmod(total_time_investment, 60)
+    time = f"{hours} hours, {mins} minutes" if hours else f"{mins} minutes"
+
+    await ctx.edit_last_response(
+        f"The time investment required for the `{series_name}` series is {time}.\n\nThe suggested watch order, based on release date is as follows:\n{order}",
+        flags=hk.MessageFlag.SUPPRESS_EMBEDS,
+    )
+    
+
+
 def load(bot: lb.BotApp) -> None:
     """Load the plugin"""
     bot.add_plugin(plot_plugin)

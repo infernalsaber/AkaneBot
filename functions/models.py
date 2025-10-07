@@ -100,6 +100,9 @@ class ColorPalette(IntEnum):
     DAWN_PINK = 0xF4EAE9
     MANGADEX = 0xFF6740
     COMICK = 0x1F2937
+    IMDB = 0xF5C518
+    ZZZ_DISK = 0xCBE732
+    ZZZ_S_ENGINE = 0x000000
 
 
 ColourPalette = ColorPalette
