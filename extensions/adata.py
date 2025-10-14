@@ -42,7 +42,7 @@ anilist_pattern = re.compile(
 vndb_pattern = re.compile(r"\b(https?:\/\/)?(www.)?vndb.org\/[a-z]\/(\d+)")
 
 
-def parse_description(description: str) -> str:
+def parse_description(description: str, limit=400) -> str:
     """Parse Anilist descriptions into Discord friendly markdown
 
     Args:
@@ -52,6 +52,8 @@ def parse_description(description: str) -> str:
         str: The parsed description
     """
 
+    if not description or not len(description):
+        return "-"
 
     problematic_tags = ["<i>", "</i>", "<I>", "</I>", "<b>", "</b>", "<B>", "</B>", "<br>", "<BR>", "#"]
     for tag in problematic_tags:
@@ -60,8 +62,8 @@ def parse_description(description: str) -> str:
     # Adding spoiler tags
     description = description.replace("~!", "||").replace("!~", "||")
 
-    if len(description) > 400:
-        description = description[0:400]
+    if len(description) > limit:
+        description = description[0:limit]
 
         # If the trimmed description has a missing spoiler tag, add one
         if description.count("||") % 2:
@@ -170,20 +172,17 @@ async def vn_search(ctx: lb.Context, visual_novel: str) -> None:
     "The birthday to search for",
     required=False,
     type=bool,
-    # autocomplete=True
 )
 @lb.option(
     "series",
     "The series to search for",
     required=False,
-    # autocomplete=True
 )
 @lb.option(
     "character",
     "The character to search for",
     required=False,
     default="",
-    # autocomplete=True
 )
 @lb.command("character", "Search for an animanga character", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
@@ -331,8 +330,16 @@ async def chara_search(ctx: lb.PrefixContext, query: str):
         query (str): The character to search for
     """
 
-    await _search_characters(ctx, query)
+    if query in ['bday', 'birthday', 'birth']:
+        return await _search_characters(ctx, query, birthday=True)
 
+    query = query.split(',')
+    if len(query) > 1:
+        series = query[-1]
+        query = ",".join(query[:-1])
+        return await _search_characters(ctx, query, series)
+
+    await _search_characters(ctx, query[0])
 
 @al_listener.command
 @lb.option(
@@ -1203,6 +1210,24 @@ query ($id: Int, $search: String, $type: MediaType) {
 
 from functions.algorithms import longest_common_substring
 
+def cleanup_character_description_for_dropdown(description: str) -> str:
+    parsed_desc = parse_description(description)
+    
+    desc_lines = parsed_desc.split('\n')
+    
+    final_desc = ""
+    
+    for line in desc_lines:
+        
+        line = line.strip()
+        if line.startswith('**') or line.startswith('__') or line.startswith('||'):
+            pass
+        else:
+            final_desc += line + "\n"
+    
+    return final_desc.strip()[:50] if final_desc.strip() else "-"
+    
+
 async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] = None, birthday: Optional[bool] = False):
     """Interlude function for character search with dropdowns sorted by popularity"""
 
@@ -1221,11 +1246,15 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 if char["favourites"]:
                     label += f" ({char['favourites']}❤)"
                 
+                
+                series_titles = [node["title"]["romaji"] or node["title"]["english"] for node in char["media"]["nodes"]]
+                
                 options.append(
                     miru.SelectOption(
                         label=label[:100],
                         value=str(char["id"]),
-                        description=f"ID: {char['id']}"
+                        description=longest_common_substring(series_titles)
+                        # description=cleanup_character_description_for_dropdown(char["description"])
                     )
                 )
             
@@ -1266,11 +1295,15 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 if char["favourites"]:
                     label += f" ({char['favourites']}❤)"
                 
+                
+                series_titles = [node["title"]["romaji"] or node["title"]["english"] for node in char["media"]["nodes"]]
+                
                 options.append(
                     miru.SelectOption(
                         label=label[:100],  # Discord limit
                         value=str(char["id"]),
-                        description=f"ID: {char['id']}"
+                        description=longest_common_substring(series_titles)
+                        # description=cleanup_character_description_for_dropdown(char["description"])
                     )
                 )
             
@@ -1281,12 +1314,12 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
             view.add_item(
                 CharacterSelect(
                     options=options, 
-                    placeholder=f"Select character from '{query}' search"
+                    placeholder=f"Select character"
                 )
             )
             view.add_item(btns.KillButton())
             
-            resp = await ctx.respond(content=f"Found {len(characters)} characters for '{query}':", components=view)
+            resp = await ctx.respond(content=f"Found {len(characters)} characters for '{query}'", components=view)
             await view.start(resp)
             await view.wait()
             
@@ -1315,7 +1348,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                         miru.SelectOption(
                             label=label[:100],
                             value=str(char["id"]),
-                            description=f"ID: {char['id']}"
+                            description=cleanup_character_description_for_dropdown(char["description"])
                         )
                     )
                 
@@ -1331,7 +1364,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 )
                 view.add_item(btns.KillButton())
                 
-                resp = await ctx.respond(content=f"Characters from '{title}':", components=view)
+                resp = await ctx.respond(content=f"Found {len(characters)} characters from '{title[:50]}'", components=view)
                 await view.start(resp)
                 await view.wait()
                 
@@ -1390,7 +1423,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                         miru.SelectOption(
                             label=label[:100],
                             value=str(char["id"]),
-                            description=f"ID: {char['id']}"
+                            description=cleanup_character_description_for_dropdown(char["description"])
                         )
                     )
                 

@@ -180,6 +180,7 @@ class ALCharacter(AnilistBase):
                         alternative
                     }
                     favourites
+                    description (asHtml: false)
                     image {
                         large
                     }
@@ -232,6 +233,7 @@ class ALCharacter(AnilistBase):
                             alternative
                         }
                         favourites
+                        description (asHtml: false)
                         image {
                             large
                         }
@@ -283,6 +285,7 @@ class ALCharacter(AnilistBase):
                         alternative
                     }
                     favourites
+                    description (asHtml: false)
                     image {
                         large
                     }
