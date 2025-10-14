@@ -1,4 +1,4 @@
-"""Make cool anime visualizations"""
+"""Make cool plot charts"""
 
 import io
 from collections import Counter
@@ -6,19 +6,10 @@ from collections import Counter
 import hikari as hk
 import lightbulb as lb
 import plotly.graph_objects as go
-from curl_cffi import requests
 from plotly.subplots import make_subplots
 
-from functions import views as views
-from functions.anilist_graph import (
-    find_series_name,
-    format_chronological_order,
-    get_anime_data
-)
 from functions.fetch_trends import search_it
 from functions.models import ColorPalette as colors
-from functions.models import EmoteCollection as emotes
-from functions.utils import get_random_quote
 
 plot_plugin = lb.Plugin(
     "Plots",
@@ -41,7 +32,7 @@ plot_plugin.d.help_emoji = "📈"
     "`[p]plot bocchi vs kaguya --autoscale` \n\n"
     "Note: You should type out the full name of the series to avoid false matches"
 )
-@lb.add_cooldown(30, 1, lb.GlobalBucket)
+@lb.add_cooldown(300, 1, lb.GlobalBucket)
 @lb.option(
     "query",
     "The names of the series(') to plot",
@@ -254,13 +245,13 @@ async def compare_trends(ctx: lb.PrefixContext, query: list[str]) -> None:
     modifier=lb.commands.OptionModifier.CONSUME_REST,
 )
 @lb.command(
-    "timeto",
+    "watch-order",
     "Time investment needed by a series and watch order",
-    aliases=["watchorder", "wo"],
+    aliases=["timeto", "watchorder", "wo"],
     pass_options=True,
 )
-@lb.implements(lb.PrefixCommand)
-async def time_to(ctx: lb.Context, series: str) -> None:
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
+async def watch_order(ctx: lb.Context, series: str) -> None:
     await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
     with requests.Session() as session:
         anime_id = int(get_anime_data(session, anime=series)["data"]["Media"]["id"])

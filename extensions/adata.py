@@ -108,8 +108,6 @@ async def get_imp_info(chapters):
 @lb.command(
     "lookup",
     "Find something on Anilist or VNDB",
-    # pass_options=True,
-    # aliases=["lu"],
     auto_defer=True,
 )
 @lb.implements(lb.SlashCommandGroup)
@@ -168,28 +166,15 @@ async def vn_search(ctx: lb.Context, visual_novel: str) -> None:
 
 @al_search.child
 @lb.option(
-    "birthday",
-    "The birthday to search for",
-    required=False,
-    type=bool,
-)
-@lb.option(
-    "series",
-    "The series to search for",
-    required=False,
-)
-@lb.option(
     "character",
     "The character to search for",
-    required=False,
-    default="",
+    # autocomplete=True
 )
 @lb.command("character", "Search for an animanga character", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
-async def character_search(ctx: lb.Context, character: Optional[str] = None, series: Optional[str] = None, birthday: Optional[bool] = False) -> None:
+async def character_search(ctx: lb.Context, character: str) -> None:
     """Search for a character on AL"""
-
-    return await _search_characters(ctx, character, series, birthday)
+    return await _search_characters(ctx, character)
 
 
 @al_search.child
@@ -203,6 +188,51 @@ async def game_search(ctx: lb.Context, game: str) -> None:
     """Search for a game on Steam"""
     return await _search_game(ctx, game)
 
+
+@al_search.child
+@lb.option(
+    "movie",
+    "The movie to search for"
+)
+@lb.command("movie", "Search for a movie on IMDB", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def movie_search(ctx: lb.Context, movie: str) -> None:
+    """Search for a movie on IMDB"""
+    return await _search_movie(ctx, movie)
+
+
+@al_search.child
+@lb.option(
+    "character",
+    "The character to search for"
+)
+@lb.command("vncharacter", "Search for a character on VNDB", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def vn_character_search(ctx: lb.Context, character: str) -> None:
+    """Search for a character on VNDB"""
+    return await _search_vnchara(ctx, character)
+
+@al_search.child
+@lb.option(
+    "trait",
+    "The trait to search for"
+)
+@lb.command("vntrait", "Search for a trait on VNDB", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def vn_trait_search(ctx: lb.Context, trait: str) -> None:
+    """Search for a trait on VNDB"""
+    return await _search_vntrait(ctx, trait)
+
+@al_search.child
+@lb.option(
+    "tag",
+    "The tag to search for"
+)
+@lb.command("vntag", "Search for a tag on VNDB", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def vn_tag_search(ctx: lb.Context, tag: str) -> None:
+    """Search for a tag on VNDB"""
+    return await _search_vntag(ctx, tag)
 
 # ============= LOOKUP SLASH COMMANDS END HERE =============
 
@@ -512,6 +542,14 @@ async def vn_chara_search(ctx: lb.PrefixContext, query: str):
 
     await _search_vnchara(ctx, query)
 
+
+@al_listener.command
+@lb.option("query", "The movie to search", modifier=lb.commands.OptionModifier.CONSUME_REST)
+@lb.command("movie", "Search a movie", pass_options=True, aliases=["movies", "imdb"])
+@lb.implements(lb.PrefixCommand)
+async def movie_search(ctx: lb.PrefixContext, query: str):
+    """Search for a movie via IMDB"""
+    await _search_movie(ctx, query)
 
 @al_listener.command
 @lb.add_checks(lb.dm_only | lb.nsfw_channel_only)
@@ -1869,6 +1907,45 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     await view.start(choice)
     await view.wait()
 
+
+async def _search_movie(ctx: lb.Context, query: str):
+    """Search a movie"""
+    headers = {
+        'accept': 'application/json',
+    }
+
+    params = {
+        'query': query,
+    }
+
+    response = await ctx.bot.d.aio_session.get('https://api.imdbapi.dev/search/titles', params=params, headers=headers)
+
+    if not response.ok:
+        await ctx.respond("Couldn't find the movie you asked for.")
+        return
+
+    response = await response.json()
+    
+    movie_id = response['titles'][0]['id']
+    
+    movie_data = await ctx.bot.d.aio_session.get(f'https://api.imdbapi.dev/titles/{movie_id}', headers=headers)
+    movie_data = await movie_data.json()
+    
+
+    await ctx.respond(
+        hk.Embed(
+            title=f"{movie_data['primaryTitle']} ({movie_data['startYear']})",
+            url=f'https://www.imdb.com/title/{movie_id}',
+            color=colors.IMDB,
+            timestamp=datetime.now().astimezone(),
+        )
+        .add_field('Rating', f"{movie_data['rating']['aggregateRating']}")
+        .add_field('Genres', ", ".join(movie_data.get('genres', [])[:4]) or "-", inline=True)
+        .add_field('Runtime', verbose_timedelta(timedelta(seconds=movie_data.get('runtimeSeconds', 0))), inline=True)
+        .add_field('Summary', movie_data.get('plot', '-')[:200])
+        .set_thumbnail(movie_data['primaryImage']['url'])
+        .set_footer(text='Source: IMDB', icon='https://www.imdb.com/favicon.ico')
+    )
 
 
 @al_listener.listener(hk.StartedEvent)

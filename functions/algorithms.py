@@ -16,7 +16,7 @@ def longest_common_substring(titles, threshold=0.6):
 
     # Find the longest substring that meets the threshold
     candidates = sorted(
-        all_substrings.items(), key=lambda x: (x[1], len(x[0])), reverse=True
+        all_substrings.items(), key=lambda x: len(x[0]), reverse=True
     )
 
     return candidates[0][0].strip() if candidates else titles[0]
