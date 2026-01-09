@@ -8,8 +8,17 @@ import lightbulb as lb
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from functions.fetch_trends import search_it
-from functions.models import ColorPalette as colors
+from utils.fetch_trends import search_it
+from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
+from utils.misc import get_random_quote
+from utils.anilist_graph import (
+    find_series_name,
+    format_chronological_order,
+    get_anime_data
+)
+
+from curl_cffi import requests
 
 plot_plugin = lb.Plugin(
     "Plots",

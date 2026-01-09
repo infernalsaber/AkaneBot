@@ -5,8 +5,8 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
-import functions.buttons as btns
-from functions.anilist import ALCharacter
+import utils.buttons as btns
+from utils.anilist import ALCharacter
 
 
 class SimpleTextSelect(miru.TextSelect):

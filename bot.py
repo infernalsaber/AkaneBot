@@ -14,8 +14,8 @@ from aiohttp import ClientTimeout
 from dotenv import load_dotenv
 from lightbulb.ext import tasks
 
-from functions.help import BotHelpCommand
-from functions.utils import dlogger, verbose_timedelta
+from utils.help import BotHelpCommand
+from utils.misc import dlogger, verbose_timedelta
 
 load_dotenv()
 

@@ -7,8 +7,8 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
-from functions.buttons import CustomNextButton, CustomPrevButton, KillNavButton
-from functions.utils import check_if_url
+from utils.buttons import CustomNextButton, CustomPrevButton, KillNavButton
+from utils.misc import check_if_url
 
 
 class PeristentViewTest(miru.View):

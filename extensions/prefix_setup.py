@@ -6,8 +6,8 @@ from datetime import datetime
 import hikari as hk
 import lightbulb as lb
 
-from functions.models import ColorPalette as colors
-from functions.utils import humanized_list_join
+from utils.models import ColorPalette as colors
+from utils.misc import humanized_list_join
 
 prefix_manager = lb.Plugin("Prefix", "manager", include_datastore=True)
 prefix_manager.d.help = True

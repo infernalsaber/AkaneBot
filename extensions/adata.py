@@ -1,11 +1,12 @@
 """The animanga related plugin"""
 
 import collections
+from io import BytesIO
 import re
 from datetime import datetime, timedelta
 from operator import itemgetter
 from typing import Optional
-from functions.utils import dlogger
+from utils.misc import dlogger
 
 import hikari as hk
 import lightbulb as lb
@@ -17,14 +18,14 @@ from rapidfuzz import process
 from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
 
-from functions import buttons as btns
-from functions import views as views
-from functions.anilist import ALCharacter
-from functions.components import CharacterSelect, SimpleTextSelect
-from functions.errors import RequestsFailedError
-from functions.models import ColorPalette as colors
-from functions.models import EmoteCollection as emotes
-from functions.utils import verbose_date, verbose_timedelta
+from utils import buttons as btns
+from utils import views as views
+from utils.anilist import ALCharacter
+from utils.components import CharacterSelect, SimpleTextSelect
+from utils.errors import RequestsFailedError
+from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
+from utils.misc import verbose_date, verbose_timedelta
 
 al_listener = lb.Plugin(
     "Lookup",
@@ -191,14 +192,21 @@ async def game_search(ctx: lb.Context, game: str) -> None:
 
 @al_search.child
 @lb.option(
-    "movie",
-    "The movie to search for"
+    "filter",
+    "The filter to apply to the search",
+    choices=["tvSeries", "tvMiniSeries", "movie", "tvSpecial", "tvShort"],
+    required=False,
+)
+@lb.option(
+    "query",
+    "The movie/series to search for"
 )
 @lb.command("movie", "Search for a movie on IMDB", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
-async def movie_search(ctx: lb.Context, movie: str) -> None:
+async def movie_search(ctx: lb.SlashContext, query: str, filter: Optional[str] = None) -> None:
     """Search for a movie on IMDB"""
-    return await _search_movie(ctx, movie)
+    
+    return await _search_movie(ctx, query, filter_=filter)
 
 
 @al_search.child
@@ -208,7 +216,7 @@ async def movie_search(ctx: lb.Context, movie: str) -> None:
 )
 @lb.command("vncharacter", "Search for a character on VNDB", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
-async def vn_character_search(ctx: lb.Context, character: str) -> None:
+async def vn_character_search(ctx: lb.SlashContext, character: str) -> None:
     """Search for a character on VNDB"""
     return await _search_vnchara(ctx, character)
 
@@ -230,7 +238,7 @@ async def vn_trait_search(ctx: lb.Context, trait: str) -> None:
 )
 @lb.command("vntag", "Search for a tag on VNDB", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
-async def vn_tag_search(ctx: lb.Context, tag: str) -> None:
+async def vn_tag_search(ctx: lb.SlashContext, tag: str) -> None:
     """Search for a tag on VNDB"""
     return await _search_vntag(ctx, tag)
 
@@ -636,7 +644,32 @@ async def show_traits(ctx: lb.PrefixContext):
         f'```{pd.read_sql("SELECT * FROM traitmap", ctx.bot.d.con).to_string(index=False)}```'
     )
 
+@al_listener.command
+@lb.option(
+    "query", "The voice actor to search", modifier=lb.commands.OptionModifier.CONSUME_REST
+)
+@lb.command("voiceactor", "Search a voice actor on AniList", pass_options=True, aliases=["seiyuu", "va"])
+@lb.implements(lb.PrefixCommand)
+async def voiceactor_search(ctx: lb.PrefixContext, query: str):
+    """Search for a voice actor on AniList
+    
+    Args:
+        ctx (lb.PrefixContext): The context
+        query (str): The voice actor to search for
+    """
+    return await _search_voiceactor(ctx, query)
 
+
+@al_listener.command
+@lb.option(
+    "query", "The studio to search", modifier=lb.commands.OptionModifier.CONSUME_REST
+)
+@lb.command("studio", "Search a studio on AniList", pass_options=True, aliases=["st"])
+@lb.implements(lb.PrefixCommand)
+async def studio_search(ctx: lb.PrefixContext, query: str):
+    """Search for a studio on AniList"""
+    return await _search_studio(ctx, query)
+    
 @al_listener.command
 @lb.option(
     "query", "The game to search", modifier=lb.commands.OptionModifier.CONSUME_REST
@@ -751,6 +784,336 @@ async def _fetch_trait_map(user: str) -> str:
     cursor.execute("SELECT trait FROM traitmap WHERE user=?", (user,))
     return cursor.fetchone()
 
+async def _search_studio(ctx: lb.Context, query: str):
+
+    json_data = {
+        'query': 'query Query($search: String, $sort: [MediaSort]) {\r\n  Studio(search: $search) {\r\n    name\r\n    siteUrl\r\n    id\r\n    favourites\r\n    media(sort: $sort) {\r\n      nodes {\r\n        title {\r\n          english\r\n          romaji\r\n        }\r\n        coverImage {\r\n          large\r\n        }\r\n        averageScore\r\n      }\r\n    }\r\n  }\r\n}',
+        'variables': {
+            'search': query,
+            'sort': 'FAVOURITES_DESC',
+        },
+    }
+
+    response = await ctx.bot.d.aio_session.post('https://graphql.anilist.co', json=json_data)
+    
+    if not response.ok:
+        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
+        return
+    response = (await response.json())["data"]["Studio"]
+    
+    desc = ""
+    
+    for media in response['media']['nodes']:
+        desc += f"{media['title']['english'] or media['title']['romaji']} - {media['averageScore']}\n"
+    
+    
+    await ctx.respond(
+        hk.Embed(
+            title=response['name'],
+            url=response['siteUrl'],
+            color=colors.ANILIST,
+            timestamp=datetime.now().astimezone(),
+        )
+        .add_field("Favourites", response['favourites'])
+        # .add_field("Media", len(response['media']['nodes']))
+        .add_field("Description", desc)
+        .set_footer(
+            text="Source: AniList",
+            icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+        )
+    )
+
+
+def _parse_non_anime_roles(description: str) -> list:
+    """Parse non-anime roles from staff description"""
+    if not description:
+        return []
+    
+    non_anime_roles = []
+    
+    def parse_role(possible_role):
+        return possible_role.strip().lstrip(':').lstrip('*').lstrip('•').lstrip('-').strip()
+    
+    for section in description.split('\n\n'):
+        if 'nonanimeroles' in section.lower().replace('-', '').replace('_', '').replace(' ', ''):
+            for possible_role in section.split("\n"):
+                if 'tv series' in possible_role.lower() or 'role' in possible_role.lower():
+                    continue
+                
+                if 'vg' in possible_role.lower() or 'game' in possible_role.lower():
+                    possible_role = parse_role(possible_role)
+                    possible_role = re.sub(r"\s*\((VG|Video Game)\)\s*", "", possible_role, flags=re.IGNORECASE)
+                    
+                    match = re.match(r"\[([^\]]+)\]\(([^)]+)\)", possible_role.strip())
+                    if match:
+                        character_name = match.group(1).strip()
+                        possible_role = possible_role.replace(f"[{character_name}]({match.group(2)})", "").strip()
+                    else:
+                        character_name = possible_role.split('-')[0].strip()
+                        possible_role = possible_role.replace(character_name, "").strip()
+                    
+                    series = parse_role(possible_role)
+                    if character_name and series:
+                        non_anime_roles.append({
+                            'character': character_name,
+                            'series': series,
+                            'type': 'game',
+                        })
+                else:
+                    match = re.match(r"\[([^\]]+)\]\(([^)]+)\)", possible_role.strip())
+                    if match:
+                        character_name = match.group(1).strip()
+                        possible_role = possible_role.replace(f"[{character_name}]({match.group(2)})", "").strip()
+                    else:
+                        character_name = possible_role.split('(')[0].strip()
+                        possible_role = possible_role.replace(character_name, "").strip()
+                    
+                    series = parse_role(possible_role)
+                    if series and series.startswith('(') and series.endswith(')'):
+                        series = series[1:-1]
+                    
+                    if character_name and series:
+                        non_anime_roles.append({
+                            'character': parse_role(character_name),
+                            'series': series,
+                            'type': 'other',
+                        })
+    
+    return non_anime_roles
+
+from utils.card import card_maker
+
+
+
+def trim_va_description(description: str) -> str:
+    """Specific logic to trim the description for voice actors"""
+    
+    paragraphs = []
+    
+    skip_terms = ['height', 'agency', 'twitter', 'awards', 'instagram', 'website', 'anime roles']
+    
+    for paragraph in description.split('\n\n'):
+        if any(term in paragraph.lower() for term in skip_terms):
+            continue
+        paragraphs.append(paragraph)
+    
+    return '\n\n'.join(paragraphs)
+
+
+
+async def _search_voiceactor(ctx: lb.Context, query: str):
+    """Search for a voice actor on AniList"""
+    query_str = """
+query Staff($search: String, $sort: [MediaSort], $charactersSort: [CharacterSort], $perPage: Int) {
+  Staff(search: $search) {
+    dateOfBirth {
+      year
+      month
+      day
+    }
+    age
+    gender
+    favourites
+    description
+    image {
+      medium
+    }
+    name {
+      full
+    }
+    yearsActive
+    siteUrl
+    characters(sort: $charactersSort, perPage: $perPage) {
+      nodes {
+        favourites
+        name {
+          full
+        }
+        image {
+          medium
+        }
+        media(sort: $sort) {
+          nodes {
+            title {
+              english
+              romaji
+            }
+            type
+            favourites
+          }
+        }
+      }
+    }
+  }
+}
+"""
+    try:
+        json_data = {
+            'query': query_str,
+            'variables': {
+                'search': query,
+                'sort': 'FAVOURITES_DESC',
+                'charactersSort': 'FAVOURITES_DESC',
+                'perPage': 10,
+            },
+        }
+        
+        response = await ctx.bot.d.aio_session.post('https://graphql.anilist.co', json=json_data)
+        
+        if not response.ok:
+            await ctx.respond(
+                hk.Embed(
+                    title="ERROR FETCHING DATA",
+                    color=colors.ERROR,
+                    description=f"Failed to fetch data 😵, error `code: {response.status}`",
+                    timestamp=datetime.now().astimezone(),
+                ),
+                delete_after=15,
+            )
+            return
+        
+        response_data = await response.json()
+        
+        if not response_data.get('data', {}).get('Staff'):
+            await ctx.respond(
+                hk.Embed(
+                    title="VOICE ACTOR NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find voice actor `{query}` 😵",
+                    timestamp=datetime.now().astimezone(),
+                ),
+                delete_after=15,
+            )
+            return
+        
+        data = response_data['data']['Staff']
+        
+        # Parse date of birth
+        dob = ""
+        if data['dateOfBirth']:
+            if data['dateOfBirth'].get('day') and data['dateOfBirth'].get('month'):
+                dob = f"{data['dateOfBirth']['day']}/{data['dateOfBirth']['month']}"
+                # if data['dateOfBirth'].get('year'):
+                #     dob += f"/{data['dateOfBirth']['year']}"
+        
+        # Parse description
+        description = parse_description(trim_va_description(data.get('description', '')), limit=300) if data.get('description') else "NA"
+        
+        # Parse non-anime roles
+        non_anime_roles = _parse_non_anime_roles(data.get('description', ''))
+        
+        # Get anime roles
+        anime_roles = []
+        
+        characters = data.get('characters', {}).get('nodes', [])
+        
+        if not characters:
+            await ctx.respond(
+                hk.Embed(
+                    title="NO VA ROLES FOUND",
+                    color=colors.WARN,
+                    description=f"{data.get('name', {}).get('full', '')} has no voice acting roles. Visit {data.get('siteUrl', '')} to view info about them.",
+                    timestamp=datetime.now().astimezone(),
+                ),
+                delete_after=15,
+            )
+        
+        for character in characters:
+            
+            
+            if character.get('media', {}).get('nodes'):
+                media = character['media']['nodes'][0]
+                anime_roles.append({
+                    'title': character['name']['full'],
+                    'image': character.get('image', {}).get('medium'),
+                    # 'favourites': character.get('favourites', 0),
+                    'subtitle': media.get('title', {}).get('english') or media.get('title', {}).get('romaji'),
+                })
+        
+        if anime_roles:
+            card_image = card_maker(anime_roles)
+            image = BytesIO()
+            card_image.save(image, format='PNG')
+            image.seek(0)
+        else:
+            image = BytesIO()
+
+        
+        # await ctx.respond(image)
+        
+        # Build embed
+        embed = (
+            hk.Embed(
+                title=data['name']['full'],
+                url=data.get('siteUrl', ''),
+                # description=description,
+                color=colors.ANILIST,
+                timestamp=datetime.now().astimezone(),
+            )
+            .set_thumbnail(data.get('image', {}).get('medium'))
+            .set_image(hk.Bytes(image, 'va_card.png'))
+            .set_footer(
+                text="Source: AniList",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+            )
+        )
+        
+        # Add basic info fields
+        info_fields = []
+        # if data.get('gender'):
+        #     info_fields.append(("Gender", data['gender'], True))
+        # if dob:
+        #     info_fields.append(("Date of Birth", dob, True))
+        # if data.get('age'):
+        #     info_fields.append(("Age", str(data['age']), True))
+        if data.get('yearsActive'):
+            
+            if len(data['yearsActive']) == 1:
+                years_active = f"{data['yearsActive'][0]} - Present"
+            elif len(data['yearsActive']) == 2:
+                years_active = f"{data['yearsActive'][0]} - {data['yearsActive'][1]}"
+            else:
+                years_active = str(data['yearsActive'])
+            info_fields.append(("Years Active", years_active, True))
+        if data.get('favourites'):
+            info_fields.append(("Favourites", f"{data['favourites']}❤", True))
+        
+        for name, value, inline in info_fields:
+            embed.add_field(name, value, inline=inline)
+        
+        embed.add_field("Description", description, inline=False)
+        
+        if non_anime_roles:
+            embed.add_field("Other Roles", ",".join([f"{role['character']}"  for role in non_anime_roles[:5]]), inline=False)
+        
+        # Add top anime roles
+        # if anime_roles:
+        #     top_roles = sorted(anime_roles, key=lambda x: x.get('favourites', 0), reverse=True)[:5]
+        #     roles_text = "\n".join([
+        #         f"{role['character']} ({role['series']})"
+        #         for role in top_roles
+        #     ])
+        #     # if len(anime_roles) > 5:
+        #     #     roles_text += f"\n*...and {len(anime_roles) - 5} more*"
+        #     embed.add_field("Top Anime Roles", roles_text, inline=False)
+        
+        
+        
+        # Add non-anime roles if any
+        # if non_anime_roles:
+        #     non_anime_text = "\n".join([
+        #         f"{role['character']} ({role['series']})"
+        #         for role in non_anime_roles[:5]
+        #     ])
+        #     # if len(non_anime_roles) > 5:
+        #     #     non_anime_text += f"\n*...and {len(non_anime_roles) - 5} more*"
+        #     embed.add_field("Video Game Roles", non_anime_text, inline=False)
+        
+        await ctx.respond(embed=embed)
+        
+    except Exception as e:
+        await ctx.respond(e)
+    
 
 async def _search_novel(ctx: lb.Context, novel: str):
     """Search a novel on AL"""
@@ -1246,7 +1609,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         await ctx.respond(e)
 
 
-from functions.algorithms import longest_common_substring
+from utils.algorithms import longest_common_substring
 
 def cleanup_character_description_for_dropdown(description: str) -> str:
     parsed_desc = parse_description(description)
@@ -1486,6 +1849,9 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
 
         except Exception as e:
             await ctx.respond(f"Error searching series characters: {e}")
+
+
+
 
 
 async def _search_vn(ctx: lb.Context, query: str):
@@ -1908,7 +2274,7 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     await view.wait()
 
 
-async def _search_movie(ctx: lb.Context, query: str):
+async def _search_movie(ctx: lb.Context, query: str, filter_: Optional[str] = None):
     """Search a movie"""
     headers = {
         'accept': 'application/json',
@@ -1926,7 +2292,16 @@ async def _search_movie(ctx: lb.Context, query: str):
 
     response = await response.json()
     
-    movie_id = response['titles'][0]['id']
+    if filter_:
+        for movie in response['titles']:
+            if movie['type'] == filter_:
+                movie_id = movie['id']
+                break
+        else:
+            await ctx.respond("Couldn't find the movie you asked for.")
+            return
+    else:
+        movie_id = response['titles'][0]['id']
     
     movie_data = await ctx.bot.d.aio_session.get(f'https://api.imdbapi.dev/titles/{movie_id}', headers=headers)
     movie_data = await movie_data.json()

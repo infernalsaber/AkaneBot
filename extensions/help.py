@@ -5,7 +5,7 @@ import lightbulb as lb
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
-from functions.help import BotHelpCommand
+from utils.help import BotHelpCommand
 
 helper = lb.Plugin("Help", "Slash impl of help", include_datastore=True)
 helper.d.help = False

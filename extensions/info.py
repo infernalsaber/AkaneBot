@@ -16,16 +16,16 @@ from PIL import Image, ImageOps
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
-from functions.buttons import (
+from utils.buttons import (
     AddEmoteButton,
     CustomNextButton,
     CustomPrevButton,
     KillNavButton,
     SwapButton,
 )
-from functions.models import ColorPalette as colors
-from functions.utils import is_image
-from functions.views import AuthorNavi, AuthorView
+from utils.models import ColorPalette as colors
+from utils.misc import is_image
+from utils.views import AuthorNavi, AuthorView
 
 info_plugin = lb.Plugin("Utility", "Utility and info commands", include_datastore=True)
 info_plugin.d.help = True

@@ -7,8 +7,8 @@ import miru
 from curl_cffi import requests
 from miru.ext import nav
 
-from functions.models import ColorPalette as colors
-from functions.models import EmoteCollection as emotes
+from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
 
 
 async def preview_maker(series_id) -> t.Union[list[hk.Embed], None]:

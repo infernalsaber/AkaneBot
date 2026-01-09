@@ -15,16 +15,16 @@ from lightbulb.ext import tasks
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
-from functions.checks import trusted_user_check
-from functions.models import ColorPalette as colors
-from functions.models import EmoteCollection as emotes
-from functions.utils import (
+from utils.checks import trusted_user_check
+from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
+from utils.misc import (
     check_if_url,
     humanized_list_join,
     poor_mans_proxy,
     proxy_img
 )
-from functions.views import AuthorNavi
+from utils.views import AuthorNavi
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False

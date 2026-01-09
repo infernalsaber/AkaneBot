@@ -14,7 +14,7 @@ import lightbulb as lb
 import miru
 from miru.ext import nav
 
-from functions.buttons import (
+from utils.buttons import (
     GenericButton,
     KillButton,
     KillNavButton,
@@ -22,10 +22,10 @@ from functions.buttons import (
     SwapButton,
     SwapNaviButton
 )
-from functions.checks import trusted_user_check
-from functions.models import ColorPalette as colors
-from functions.models import EmoteCollection as emotes
-from functions.utils import (
+from utils.checks import trusted_user_check
+from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
+from utils.misc import (
     check_if_url,
     dlogger,
     get_random_quote,
@@ -34,7 +34,7 @@ from functions.utils import (
     poor_mans_proxy,
     tenor_link_from_gif
 )
-from functions.views import AuthorNavi, AuthorView
+from utils.views import AuthorNavi, AuthorView
 
 dotenv.load_dotenv()
 

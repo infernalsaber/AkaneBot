@@ -6,7 +6,7 @@ from typing import Dict, List, Set, Union
 import re
 
 from curl_cffi import requests
-
+# from session import CustomSession
 
 class AnimeNode:
     def __init__(
@@ -155,7 +155,7 @@ def format_watch_order(anime_id: int, include_side_stories: bool = False) -> str
     return " -> ".join(anime.title for anime in order)
 
 
-from functions.algorithms import longest_common_substring
+from utils.algorithms import longest_common_substring
 
 
 

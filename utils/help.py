@@ -12,10 +12,10 @@ from lightbulb.help_command import BaseHelpCommand
 from rapidfuzz import process
 from rapidfuzz.utils import default_process
 
-from functions.components import SimpleTextSelect
-from functions.models import ColorPalette as colors
-from functions.utils import humanized_list_join
-from functions.views import SelectView
+from utils.components import SimpleTextSelect
+from utils.models import ColorPalette as colors
+from utils.misc import humanized_list_join
+from utils.views import SelectView
 
 
 async def filter_commands(

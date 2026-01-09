@@ -7,11 +7,11 @@ from rapidfuzz import process
 from rapidfuzz.utils import default_process
 import bs4
 
-from functions import buttons as btns
-from functions import views as views
-from functions.components import NavSelector
-from functions.hakush import HSRCharacter, ZZZCharacter, WuwaCharacter
-from functions.models import ColorPalette as colors
+from utils import buttons as btns
+from utils import views as views
+from utils.components import NavSelector
+from utils.hakush import HSRCharacter, ZZZCharacter, WuwaCharacter
+from utils.models import ColorPalette as colors
 
 gacha = lb.Plugin("Gacha", "Misc. stuff", include_datastore=True)
 gacha.d.help = True

@@ -79,6 +79,32 @@ async def is_image(link: str, session: CachedSession) -> int:
         return 0
 
 
+from curl_cffi import requests
+import time
+
+class CustomSession(requests.Session):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+    def request(self, *args, **kwargs):
+
+        max_retries = kwargs.pop('max_retries', 3)
+        base_delay = kwargs.pop('base_delay', 1)
+        last_exception = None
+
+        for attempt in range(max_retries):
+            try:
+                return super().request(*args, **kwargs)
+            except Exception as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    time.sleep(delay)
+                else:
+                    raise
+        raise last_exception
+
+
 def rss2json(url):
     """
     rss atom to parsed json data

@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 import aiohttp_client_cache
 import hikari as hk
 
-from functions.models import ColorPalette as colors
-from functions.utils import verbose_timedelta
+from utils.models import ColorPalette as colors
+from utils.misc import verbose_timedelta
 
 
 class AnilistBase:

@@ -8,11 +8,11 @@ import lightbulb as lb
 from dateutil import parser
 from orjson import loads
 
-from functions.buttons import GenericButton, NewButton
-from functions.models import ColorPalette as colors
-from functions.models import EmoteCollection as emotes
-from functions.utils import rss2json
-from functions.views import PeristentViewTest
+from utils.buttons import GenericButton, NewButton
+from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
+from utils.misc import rss2json
+from utils.views import PeristentViewTest
 
 aniupdates = lb.Plugin(
     "Anime Updates", "Keep a track of seasonal anime", include_datastore=True

@@ -5,10 +5,10 @@ import dotenv
 import hikari as hk
 import lightbulb as lb
 
-from functions.buttons import GenericButton, KillButton
-from functions.models import EmoteCollection as emotes
-from functions.models import YTVideo
-from functions.views import AuthorView
+from utils.buttons import GenericButton, KillButton
+from utils.models import EmoteCollection as emotes
+from utils.models import YTVideo
+from utils.views import AuthorView
 
 dotenv.load_dotenv()
 
