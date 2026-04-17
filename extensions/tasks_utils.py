@@ -29,6 +29,11 @@ from utils.views import AuthorNavi
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
 
+DSC_SYNTAX_GIST = (
+    "https://gist.github.com/matthewzring"
+    "/9f7bbfd102003963f9be7dbcf7d40e51#syntax-highlighting"
+)
+
 
 @tasks.task(d=2)
 async def clear_session_cache():
@@ -385,6 +390,136 @@ async def delete_msg(ctx: lb.Context, channel: hk.GuildChannel, message: int) ->
     await ctx.bot.rest.delete_message(channel=channel.id, message=message)
     await ctx.respond("Deleted", delete_after=1)
     await ctx.event.message.delete()
+
+
+@task_plugin.command
+@lb.set_help(
+    "A function to return the output of your code. "
+    "\nUse print() to print whatever output you desire"
+)
+@lb.option(
+    "code", "The code to test", str, modifier=lb.commands.OptionModifier.CONSUME_REST
+)
+@lb.add_checks(lb.owner_only)
+@lb.command(
+    "e",
+    "Test some code and see output/errors (python)",
+    pass_options=True,
+    aliases=["py", "exec"],
+)
+@lb.implements(lb.PrefixCommand)
+async def compiler(ctx: lb.Context, code: str) -> None:
+    """A function to return the output of your code.
+    Use print() to print whatever output you desire
+
+    Args:
+        ctx (lb.Context): The message context
+        code (str): The code to execute
+    """
+
+    if not (code.startswith("```py") and code.endswith("```")):
+        await ctx.respond(
+            f"The entered code is not formatted correctly according to python."
+            f" Consider referring : {hk.URL(DSC_SYNTAX_GIST)}."
+        )
+        return
+
+    with open("ntfc.py", "w+", encoding="utf-8") as codefile:
+        codefile.write(code[5:-3])
+
+    with Popen(
+        ["python3", "ntfc.py"], stdout=PIPE, stderr=PIPE
+    ) as result:
+        output, error = result.communicate(timeout=25)
+
+        if error:
+            await ctx.respond(
+                f"Process returned with error: "
+                f"```{(str(error, 'UTF-8')).split('ntfc.py')[1][3:]}```"
+            )
+        else:
+            if not output:
+                await ctx.respond("This is the output ```        ```")
+            else:
+                await ctx.respond(
+                    f"This is the output ```ansi\n{str(output, 'UTF-8')}```"
+                )
+
+
+@task_plugin.command
+@lb.set_help("A function to make a file")
+@lb.add_checks(lb.owner_only)
+@lb.option(
+    "file_data",
+    "The data to write in the file",
+    modifier=lb.OptionModifier.CONSUME_REST,
+)
+@lb.option("directory", "The dir to write to wrt root")
+@lb.command(
+    "mkfile",
+    "Make a file, not recommended :)",
+    pass_options=True,
+    aliases=["cf"],
+)
+@lb.implements(lb.PrefixCommand)
+async def file_writer(ctx: lb.Context, directory: str, file_data: str) -> None:
+    file_data = file_data.split("```")
+    if len(file_data) != 3:
+        await ctx.respond("Invalid form of data")
+
+    with open(directory, "w+", encoding="utf-8") as writer:
+        writer.write(file_data[1])
+
+    await ctx.respond("Done")
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option(
+    "extension",
+    "The extension to reload",
+    choices=[i[13:-3].replace("/", ".") for i in glob.glob("./extensions/*.py")]
+    + ["all"],
+)
+@lb.command("reload", "Reload an extension", pass_options=True, aliases=["rl"])
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
+async def reload_plugin(ctx: lb.Context, extension: str) -> None:
+    """Reload an extension"""
+
+    if extension == "all":
+        for i in glob.glob("./extensions/*.py"):
+            i = i.replace("/", ".").replace("\\", ".")
+            ctx.bot.reload_extensions(f"{i[2:-3]}")
+        await ctx.respond("Reloaded all extensions")
+        return
+
+    ctx.bot.reload_extensions(f"extensions.{extension}")
+    await ctx.bot.sync_application_commands()
+    await ctx.respond("Extension reloaded successfully.")
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("extension", "The extension to load")
+@lb.command("load", "Load an extension", pass_options=True, aliases=["l"])
+@lb.implements(lb.PrefixCommand)
+async def load_plugin(ctx: lb.Context, extension: str) -> None:
+    """Load an extension"""
+
+    ctx.bot.load_extensions(f"extensions.{extension}")
+    await ctx.respond(f"Extension {extension} loaded successfully.")
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("extension", "The extension to unload")
+@lb.command("unload", "Unload an extension", pass_options=True, aliases=["ul"])
+@lb.implements(lb.PrefixCommand)
+async def unload_plugin(ctx: lb.Context, extension: str) -> None:
+    """Unload an extension"""
+
+    ctx.bot.unload_extensions(f"extensions.{extension}")
+    await ctx.respond("Extension unloaded successfully.")
 
 
 @task_plugin.listener(hk.StartedEvent)
