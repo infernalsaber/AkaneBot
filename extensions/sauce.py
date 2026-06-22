@@ -14,6 +14,7 @@ import lightbulb as lb
 import miru
 from miru.ext import nav
 
+from utils.anilist import ALManga
 from utils.buttons import (
     GenericButton,
     KillButton,
@@ -801,26 +802,11 @@ async def al_from_mal(
     mal_id: t.Optional[int] = None,
     type: t.Optional[str] = None,
     name: t.Optional[str] = None,
-) -> str:
+) -> t.Optional[str]:
     """Anilist URL from MAL id"""
-    query = """
-  query ($mal_id: Int, $search: String) { # Define which variables will be used (id)
-    Media (idMal: $mal_id, search: $search, type: MANGA) {
-      siteUrl
-    }
-  }
-
-  """
-
-    variables = {"mal_id": mal_id, "search": name}
-    return (
-        await (
-            await sauce_plugin.bot.d.aio_session.post(
-                "https://graphql.anilist.co",
-                json={"query": query, "variables": variables},
-            )
-        ).json()
-    )["data"]["Media"]["siteUrl"]
+    return await ALManga.al_url_from_mal(
+        sauce_plugin.bot.d.anilist, mal_id=mal_id, name=name
+    )
 
 
 async def vndb_url(text: str) -> t.Union[str, None]:

@@ -14,6 +14,7 @@ from aiohttp import ClientTimeout
 from dotenv import load_dotenv
 from lightbulb.ext import tasks
 
+from utils.anilist_client import AniListClient
 from utils.help import BotHelpCommand
 from utils.misc import dlogger, verbose_timedelta
 
@@ -36,6 +37,9 @@ def make_prefix(app, message: hk.Message) -> list:
 
 def setup_logging() -> None:
     """Set up the logging of the events to log.txt (for debugging) [Level-1]"""
+
+    if not os.path.exists("logs"):
+        os.mkdir("logs")
 
     # get root logger
     root_logger = logging.getLogger("")
@@ -96,6 +100,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
         ],  # Keep using the cached response even if this param changes
         timeout=ClientTimeout(total=10),
     )
+    bot.d.anilist = AniListClient(bot.d.aio_session)
     with open("config.json") as f:
         bot.d.config = json.load(f)
     bot.d.timeup = datetime.now().astimezone()
@@ -117,6 +122,7 @@ async def on_stopping(event: hk.StoppingEvent) -> None:
         bot,
         f"Bot closed with {verbose_timedelta(datetime.now().astimezone()-bot.d.timeup)} uptime",
     )
+    await bot.d.aio_session.close()
 
 
 @bot.command
@@ -205,6 +211,13 @@ async def on_error(event: lb.CommandErrorEvent) -> None:
         ...
         # await event.context.respond("Unknown error")
 
+
+@bot.listen(hk.StartedEvent)
+async def on_starting(event: hk.StartedEvent) -> None:
+    if os.path.exists("ded.txt"):
+        with open("ded.txt", encoding="UTF-8") as ded:
+            channel =  ded.read()
+        await bot.rest.create_message(int(channel), "Restarted")
 
 if __name__ == "__main__":
     if os.name == "nt":

@@ -163,6 +163,7 @@ async def w_engine_search(ctx: lb.Context, engine: str) -> None:
 
 
 @gacha.command
+@lb.add_checks(lb.owner_only)
 @lb.option("character", "The character to search for", modifier=lb.OptionModifier.CONSUME_REST)
 @lb.command(
     "hsr",
@@ -198,6 +199,7 @@ async def hsr_chara(ctx: lb.Context, character: str) -> None:
 
 
 @gacha.command
+@lb.add_checks(lb.owner_only)
 @lb.option("character", "The character to search for", modifier=lb.OptionModifier.CONSUME_REST)
 @lb.command(
     "wuwa",

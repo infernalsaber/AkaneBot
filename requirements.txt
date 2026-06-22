@@ -1,23 +1,22 @@
 hikari[speedups]==2.0.0
-hikari-lightbulb==2.3.3
-hikari-miru==3.2
+hikari-lightbulb==2.3.5
+hikari-miru==3.4
 
 python-dotenv>=0.21.0
 
 arrow
-plotly==5.15.0
 isodate==0.6.1
 psutil
 feedparser
-kaleido==0.2.1
 aiohttp-client-cache==0.8.1
+requests
+matplotlib
+pytz
 beautifulsoup4
 lxml
 rapidfuzz
 pandas
-seventv
 pillow
 curl_cffi
 
-# Putting this at the end coz W*ndows doesn't need it
-# uvloop
+uvloop

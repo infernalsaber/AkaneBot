@@ -10,7 +10,6 @@ import hikari as hk
 import lightbulb as lb
 import pandas as pd
 import psutil
-import seventv
 from miru.ext import nav
 from PIL import Image, ImageOps
 from rapidfuzz import process
@@ -277,42 +276,43 @@ async def inevent_cmd(ctx: lb.Context, event: str):
         await ctx.respond(f"Error: {e}")
 
 
-@info_plugin.command
-@lb.add_checks(
-    lb.guild_only, lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS)
-)
-@lb.option("query", "The emote to search for", modifier=lb.OptionModifier.CONSUME_REST)
-@lb.command(
-    "searchemote", "Search for an emote on 7tv", aliases=["se"], pass_options=True
-)
-@lb.implements(lb.PrefixCommand)
-async def search_emote(ctx: lb.Context, query: str) -> None:
-    print("Creating session")
-    mySevenTvSession = seventv.seventv()
-    print("Seventv session created")
-    emotes = await mySevenTvSession.emote_search(query, case_sensitive=True)
-    print("Emotes fetched")
-    try:
-        pages = [
-            hk.Embed(title=f"Emote: {emote.name}")
-            .set_image(f"https:{emote.host_url}/2x.webp")
-            .set_footer(text="Powered by 7tv")
-            for emote in emotes
-        ]
+# @info_plugin.command
+# @lb.add_checks(
+#     lb.guild_only, lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS)
+# )
+# @lb.option("query", "The emote to search for", modifier=lb.OptionModifier.CONSUME_REST)
+# @lb.command(
+#     "searchemote", "Search for an emote on 7tv", aliases=["se"], pass_options=True
+# )
+# @lb.implements(lb.PrefixCommand)
+# async def search_emote(ctx: lb.Context, query: str) -> None:
+#     print("Creating session")
+#     import seventv
+#     mySevenTvSession = seventv.seventv()
+#     print("Seventv session created")
+#     emotes = await mySevenTvSession.emote_search(query, case_sensitive=True)
+#     print("Emotes fetched")
+#     try:
+#         pages = [
+#             hk.Embed(title=f"Emote: {emote.name}")
+#             .set_image(f"https:{emote.host_url}/2x.webp")
+#             .set_footer(text="Powered by 7tv")
+#             for emote in emotes
+#         ]
 
-        buttons = [
-            CustomPrevButton(),
-            nav.IndicatorButton(),
-            CustomNextButton(),
-            AddEmoteButton(),
-            KillNavButton(),
-        ]
-        navigator = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons=buttons)
-    except Exception as e:
-        await ctx.respond(e)
-        return
-    await navigator.send(ctx.channel_id)
-    await mySevenTvSession.close()
+#         buttons = [
+#             CustomPrevButton(),
+#             nav.IndicatorButton(),
+#             CustomNextButton(),
+#             AddEmoteButton(),
+#             KillNavButton(),
+#         ]
+#         navigator = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons=buttons)
+#     except Exception as e:
+#         await ctx.respond(e)
+#         return
+#     await navigator.send(ctx.channel_id)
+#     await mySevenTvSession.close()
 
 
 @info_plugin.command

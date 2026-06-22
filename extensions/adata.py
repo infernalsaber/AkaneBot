@@ -16,7 +16,16 @@ from rapidfuzz.utils import default_process
 
 from utils import buttons as btns
 from utils import views as views
-from utils.anilist import ALCharacter
+from utils.anilist import (
+    ALAnime,
+    ALCharacter,
+    ALManga,
+    ALNovel,
+    ALStaff,
+    ALStudio,
+    ALUser,
+    AnilistBase,
+)
 from utils.components import CharacterSelect, SimpleTextSelect
 from utils.errors import RequestsFailedError
 from utils.models import ColorPalette as colors
@@ -24,13 +33,13 @@ from utils.models import EmoteCollection as emotes
 from utils.misc import verbose_timedelta
 
 al_listener = lb.Plugin(
-    "Lookup",
-    "Search functions for anime, manga, characters and more",
+    "Anilist",
+    "Search functions for anime, manga, characters, seiyuu and more",
     include_datastore=True,
 )
 al_listener.d.help_image = "https://i.imgur.com/2nEsM2W.png"
 al_listener.d.help = True
-al_listener.d.help_emoji = "🤔"
+al_listener.d.help_emoji = "🌸"
 
 
 anilist_pattern = re.compile(
@@ -38,36 +47,7 @@ anilist_pattern = re.compile(
 )
 
 
-def parse_description(description: str, limit=400) -> str:
-    """Parse Anilist descriptions into Discord friendly markdown
-
-    Args:
-        description (str): The description to parse
-
-    Returns:
-        str: The parsed description
-    """
-
-    if not description or not len(description):
-        return "-"
-
-    problematic_tags = ["<i>", "</i>", "<I>", "</I>", "<b>", "</b>", "<B>", "</B>", "<br>", "<BR>", "#"]
-    for tag in problematic_tags:
-        description = description.replace(tag, "")
-
-    # Adding spoiler tags
-    description = description.replace("~!", "||").replace("!~", "||")
-
-    if len(description) > limit:
-        description = description[0:limit]
-
-        # If the trimmed description has a missing spoiler tag, add one
-        if description.count("||") % 2:
-            description = description + "||"
-
-        description = description + "..."
-
-    return description
+parse_description = AnilistBase.parse_description
 
 
 async def get_imp_info(chapters):
@@ -161,16 +141,6 @@ async def character_search(ctx: lb.Context, character: str) -> None:
     return await _search_characters(ctx, character)
 
 
-@al_search.child
-@lb.option(
-    "game",
-    "The game to search for"
-)
-@lb.command("game", "Search for a game on Steam", pass_options=True, auto_defer=True)
-@lb.implements(lb.SlashSubCommand)
-async def game_search(ctx: lb.Context, game: str) -> None:
-    """Search for a game on Steam"""
-    return await _search_game(ctx, game)
 
 
 # ============= LOOKUP SLASH COMMANDS END HERE =============
@@ -220,42 +190,19 @@ async def user_al(ctx: lb.PrefixContext, user: str):
         query (str): The user
     """
 
-    query = """
-query Query($name: String) {
-  User(name: $name) {
-    id
-    name
-    about
-    avatar {
-      medium
-    }
-  }
-}
-"""
-
-    variables = {"name": user}
-
-    response = await ctx.bot.d.aio_session.post(
-        "https://graphql.anilist.co",
-        json={"query": query, "variables": variables},
-    )
-
-    if not response.ok:
+    al_user = await ALUser.from_name(user, ctx.bot.d.anilist)
+    if al_user is None:
         return await ctx.respond(f"https://anilist.co/user/{user}")
 
-    resp = (await response.json())["data"]["User"]
-
-
-
     await ctx.respond(
-        content=f"https://anilist.co/user/{resp['id']}",
+        content=f"https://anilist.co/user/{al_user.id}",
         embed=hk.Embed(
-            title=f"{resp['name']}",
-            url=f"https://anilist.co/user/{resp['name']}",
-            description=f"{resp['name']}'s Anilist profile",
+            title=al_user.name,
+            url=f"https://anilist.co/user/{al_user.name}",
+            description=f"{al_user.name}'s Anilist profile",
             color=colors.ANILIST,
             timestamp=datetime.now().astimezone(),
-        ).set_image(f"https://img.anili.st/user/{resp['id']}"),
+        ).set_image(f"https://img.anili.st/user/{al_user.id}"),
     )
 
 
@@ -309,110 +256,6 @@ async def chara_search(ctx: lb.PrefixContext, query: str):
         return await _search_characters(ctx, query, series)
 
     await _search_characters(ctx, query[0])
-
-@al_listener.command
-@lb.option(
-    "filter",
-    "Filter the type of anime to fetch",
-    choices=["airing", "upcoming", "bypopularity", "favorite"],
-    required=False,
-)
-@lb.command("top", "Find top anime on MAL", pass_options=True, auto_defer=True)
-@lb.implements(lb.PrefixCommand, lb.SlashCommand)
-async def topanime(ctx: lb.PrefixContext, filter: Optional[str] = None):
-    """Find the top anime on AL
-
-    Args:
-        ctx (lb.PrefixContext): The event context (irrelevant to the user)
-        filter (str, optional): The search filter (top, airing, bypopularity)
-
-    Raises:
-        RequestsFailedError: Raised if the API call fails
-    """
-
-    filtr = filter
-
-    num = 5
-    if filtr and filtr in ["upcoming", "bypopularity", "favorite"]:
-        params = {"limit": num, "filter": filter}
-
-    elif filtr in ["airing", "weekly", "week"]:
-        url = "https://raw.githubusercontent.com/infernalsaber/Anicharts_API/main/anime_images.json"
-        try:
-            data = await (await ctx.bot.d.aio_session.get(url)).json()
-            anitrendz = data[max(data.keys())]["anitrendz"]
-            animecorner = data[max(data.keys())]["animecorner"]
-        except Exception as e:
-            await ctx.respond(f"parsing {e}")
-            return
-        try:
-            pages = [
-                hk.Embed(
-                    title="Top 10 Anime of the Week: AniTrendz", color=colors.LILAC
-                ).set_image(anitrendz["image_url"]),
-                hk.Embed(
-                    title="Top 10 Anime of the Week: AnimeCorner",
-                    color=colors.LILAC,
-                ).set_image(animecorner["image_url"]),
-            ]
-            view = views.AuthorView(user_id=ctx.author.id)
-            view.add_item(
-                btns.SwapButton(
-                    emoji1=hk.Emoji.parse("<:next:1136984292921200650>"),
-                    emoji2=hk.Emoji.parse("<:previous:1136984315415236648>"),
-                    original_page=pages[0],
-                    swap_page=pages[1],
-                )
-            )
-            view.add_item(btns.KillButton())
-
-            choice = await ctx.respond(
-                embed=pages[0],
-                components=view,
-            )
-            await view.start(choice)
-            await view.wait()
-
-            # if hasattr(view, "answer"):
-            #     pass
-            # else:
-            #     await ctx.edit_last_response(components=[])
-
-        except Exception as e:
-            await ctx.respond(e)
-
-        return
-
-    else:
-        params = {"limit": num}
-
-    async with ctx.bot.d.aio_session.get(
-        "https://api.jikan.moe/v4/top/anime", params=params
-    ) as res:
-        if res.ok:
-            res = await res.json()
-            embed = (
-                hk.Embed(color=colors.MAL)
-                .set_author(name="Top Anime")
-                .set_footer(
-                    "Fetched via MyAnimeList.net",
-                    icon="https://cdn.myanimelist.net/img/sp/icon/apple-touch-icon-256.png",
-                )
-            )
-
-            for i, item in enumerate(res["data"]):
-                embed.add_field(
-                    f"{i+1}.",
-                    (
-                        f"```ansi\n\u001b[0;32m{item['rank'] or ''}. \u001b[0;36m{item['title']}"
-                        f" \u001b[0;33m({item['score'] or item['members']})```"
-                    ),
-                )
-
-            await ctx.respond(embed=embed)
-        else:
-            raise RequestsFailedError
-
 
 @al_listener.command
 @lb.add_checks(lb.dm_only | lb.nsfw_channel_only)
@@ -476,6 +319,7 @@ async def studio_search(ctx: lb.PrefixContext, query: str):
     return await _search_studio(ctx, query)
     
 @al_listener.command
+@lb.add_checks(lb.owner_only)
 @lb.option(
     "query", "The game to search", modifier=lb.commands.OptionModifier.CONSUME_REST
 )
@@ -584,36 +428,23 @@ async def _search_game(ctx: lb.Context, query: str):
 
 async def _search_studio(ctx: lb.Context, query: str):
 
-    json_data = {
-        'query': 'query Query($search: String, $sort: [MediaSort]) {\r\n  Studio(search: $search) {\r\n    name\r\n    siteUrl\r\n    id\r\n    favourites\r\n    media(sort: $sort) {\r\n      nodes {\r\n        title {\r\n          english\r\n          romaji\r\n        }\r\n        coverImage {\r\n          large\r\n        }\r\n        averageScore\r\n      }\r\n    }\r\n  }\r\n}',
-        'variables': {
-            'search': query,
-            'sort': 'FAVOURITES_DESC',
-        },
-    }
-
-    response = await ctx.bot.d.aio_session.post('https://graphql.anilist.co', json=json_data)
-    
-    if not response.ok:
-        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
+    studio = await ALStudio.from_search(query, ctx.bot.d.anilist)
+    if not studio:
+        await ctx.respond(f"Couldn't find studio `{query}` on AniList")
         return
-    response = (await response.json())["data"]["Studio"]
-    
+
     desc = ""
-    
-    for media in response['media']['nodes']:
+    for media in studio['media']['nodes'][:5]:
         desc += f"{media['title']['english'] or media['title']['romaji']} - {media['averageScore']}\n"
-    
-    
+
     await ctx.respond(
         hk.Embed(
-            title=response['name'],
-            url=response['siteUrl'],
+            title=studio['name'],
+            url=studio['siteUrl'],
             color=colors.ANILIST,
             timestamp=datetime.now().astimezone(),
         )
-        .add_field("Favourites", response['favourites'])
-        # .add_field("Media", len(response['media']['nodes']))
+        .add_field("Favourites", studio['favourites'])
         .add_field("Description", desc)
         .set_footer(
             text="Source: AniList",
@@ -701,78 +532,10 @@ def trim_va_description(description: str) -> str:
 
 async def _search_voiceactor(ctx: lb.Context, query: str):
     """Search for a voice actor on AniList"""
-    query_str = """
-query Staff($search: String, $sort: [MediaSort], $charactersSort: [CharacterSort], $perPage: Int) {
-  Staff(search: $search) {
-    dateOfBirth {
-      year
-      month
-      day
-    }
-    age
-    gender
-    favourites
-    description
-    image {
-      medium
-    }
-    name {
-      full
-    }
-    yearsActive
-    siteUrl
-    characters(sort: $charactersSort, perPage: $perPage) {
-      nodes {
-        favourites
-        name {
-          full
-        }
-        image {
-          medium
-        }
-        media(sort: $sort) {
-          nodes {
-            title {
-              english
-              romaji
-            }
-            type
-            favourites
-          }
-        }
-      }
-    }
-  }
-}
-"""
     try:
-        json_data = {
-            'query': query_str,
-            'variables': {
-                'search': query,
-                'sort': 'FAVOURITES_DESC',
-                'charactersSort': 'FAVOURITES_DESC',
-                'perPage': 10,
-            },
-        }
-        
-        response = await ctx.bot.d.aio_session.post('https://graphql.anilist.co', json=json_data)
-        
-        if not response.ok:
-            await ctx.respond(
-                hk.Embed(
-                    title="ERROR FETCHING DATA",
-                    color=colors.ERROR,
-                    description=f"Failed to fetch data 😵, error `code: {response.status}`",
-                    timestamp=datetime.now().astimezone(),
-                ),
-                delete_after=15,
-            )
-            return
-        
-        response_data = await response.json()
-        
-        if not response_data.get('data', {}).get('Staff'):
+        data = await ALStaff.from_search(query, ctx.bot.d.anilist)
+
+        if not data:
             await ctx.respond(
                 hk.Embed(
                     title="VOICE ACTOR NOT FOUND",
@@ -783,8 +546,6 @@ query Staff($search: String, $sort: [MediaSort], $charactersSort: [CharacterSort
                 delete_after=15,
             )
             return
-        
-        data = response_data['data']['Staff']
         
         # Parse date of birth
         dob = ""
@@ -915,50 +676,11 @@ query Staff($search: String, $sort: [MediaSort], $charactersSort: [CharacterSort
 
 async def _search_novel(ctx: lb.Context, novel: str):
     """Search a novel on AL"""
-    query = """
-query ($id: Int, $search: String, $type: MediaType) { 
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC, format_in: [NOVEL]) {
-    id
-    idMal
-    title {
-        english
-        romaji
-    }
-    type
-    averageScore
-    format
-    meanScore
-    volumes
-    startDate {
-        year
-    }
-    coverImage {
-        large
-    }
-    bannerImage
-    genres
-    status
-    description (asHtml: false)
-    siteUrl
-  }
-}
-
-"""
-
-    variables = {"search": novel, "type": "MANGA"}
-
-    response = await ctx.bot.d.aio_session.post(
-        "https://graphql.anilist.co",
-        json={"query": query, "variables": variables},
-    )
-
-    if not response.ok:
-        await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
-        return
-    response = (await response.json())["data"]["Media"]
+    response = await ALNovel.from_search(novel, ctx.bot.d.anilist)
 
     if not response:
         await ctx.respond("No novel found")
+        return
 
     title = (response["title"]["english"] or response["title"]["romaji"])[:99]
 
@@ -1003,73 +725,20 @@ query ($id: Int, $search: String, $type: MediaType) {
 
 async def _search_anime(ctx, anime: str):
     """Search an anime on AL"""
-    query = """
-query ($id: Int, $search: String, $type: MediaType) { 
-  Page (perPage: 5) {
-  media (id: $id, search: $search, type: $type) { # The sort param was POPULARITY_DESC
-    id
-    idMal
-    title {
-        english
-        romaji
-    }
-    duration
-    type
-    averageScore
-    format
-    meanScore
-    episodes
-    startDate {
-        year
-    }
-    coverImage {
-        large
-    }
-    studios (isMain: true) {
-        nodes {
-            name
-            siteUrl
-        }
-    }
-    bannerImage
-    genres
-    status
-    description (asHtml: false)
-    siteUrl
-    nextAiringEpisode {
-        episode
-    }
-    trailer {
-        id
-        site
-        thumbnail
-    }
-  }
-  }
-}
+    media_list = await ALAnime.from_search_multiple(anime, ctx.bot.d.anilist)
 
-"""
-    variables = {"search": anime, "type": "ANIME"}
-
-    response = await ctx.bot.d.aio_session.post(
-        "https://graphql.anilist.co",
-        json={"query": query, "variables": variables},
-    )
-
-    if not response.ok:
-        return await ctx.respond(f"Failed to fetch data 😵, error `code: {response.status}`")
-    if not len((await response.json())["data"]["Page"]["media"]):
+    if not media_list:
         return await ctx.respond("Your query doesn't match any results 😵")
 
     view = views.AuthorView(user_id=ctx.author.id)
-    if not len((await response.json())["data"]["Page"]["media"]) == 1:
+    if len(media_list) != 1:
         embed = hk.Embed(
             title="Choose the desired anime",
             color=0x43408A,
             timestamp=datetime.now().astimezone(),
         )
 
-        for count, item in enumerate((await response.json())["data"]["Page"]["media"]):
+        for count, item in enumerate(media_list):
             embed.add_field(
                 count + 1, item["title"]["english"] or item["title"]["romaji"]
             )
@@ -1084,14 +753,11 @@ query ($id: Int, $search: String, $type: MediaType) {
         await view.start(choice)
         await view.wait()
 
-        if hasattr(view, "answer"):  # Check if there is an answer
-            num = f"{view.answer}"
-
+        if hasattr(view, "answer"):
+            num = int(f"{view.answer}") - 1
         else:
             await ctx.edit_last_response(components=[])
             return
-
-        num = int(num) - 1
 
     else:
         await ctx.respond(
@@ -1102,7 +768,7 @@ query ($id: Int, $search: String, $type: MediaType) {
         )
         num = 0
 
-    response = (await response.json())["data"]["Page"]["media"][num]
+    response = media_list[num]
 
     title = response["title"]["english"] or response["title"]["romaji"]
 
@@ -1193,56 +859,11 @@ query ($id: Int, $search: String, $type: MediaType) {
 
 async def _search_manga(ctx, manga: str):
     """Search a manga on AL and Preview on MD"""
-    query = """
-query ($id: Int, $search: String, $type: MediaType) {
-    Page (perPage: 5) {
-        media (id: $id, search: $search, type: $type, 
-        sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) { 
-            id
-            idMal
-            title {
-                english
-                romaji
-            }
-            type
-            averageScore
-            format
-            meanScore
-            chapters
-            episodes
-            startDate {
-                year
-            }
-            coverImage {
-                large
-            }
-            bannerImage
-            genres
-            status
-            description (asHtml: false)
-            siteUrl
-        }
-    }
-}
-"""
     try:
-        variables = {"search": manga, "type": "MANGA"}
-
-        response = await ctx.bot.d.aio_session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-
-        if not response.ok:
-            await ctx.respond(
-                f"Failed to fetch data 😵, error `code: {response.status}`"
-            )
-            return
-
         options = []
         pages = {}
-        
-        series_list = (await response.json())["data"]["Page"]["media"]
+
+        series_list = await ALManga.from_search_multiple(manga, ctx.bot.d.anilist)
         if not series_list:
             await ctx.respond("No manga found")
             return
@@ -1282,7 +903,7 @@ query ($id: Int, $search: String, $type: MediaType) {
             )
 
 
-        response = (await response.json())["data"]["Page"]["media"][response_idx]
+        response = series_list[response_idx]
 
         if not response:
             await ctx.respond("No manga found")
@@ -1432,7 +1053,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
 
     if birthday:
         try:
-            characters = await ALCharacter.get_birthday_characters(ctx.bot.d.aio_session)
+            characters = await ALCharacter.get_birthday_characters(ctx.bot.d.anilist)
             
             if not characters:
                 await ctx.respond("No characters have their birthday today 😵")
@@ -1458,7 +1079,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 )
             
             view = views.AuthorView(
-                user_id=ctx.author.id, session=ctx.bot.d.aio_session
+                user_id=ctx.author.id, session=ctx.bot.d.anilist
             )
             
             view.add_item(
@@ -1480,7 +1101,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
     if not series:
         # General character search - show dropdown with multiple results
         try:
-            characters = await ALCharacter.from_search_multiple(query, ctx.bot.d.aio_session, per_page=25)
+            characters = await ALCharacter.from_search_multiple(query, ctx.bot.d.anilist, per_page=25)
             
             if not characters:
                 await ctx.respond("No characters found for your search query 😵")
@@ -1507,7 +1128,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 )
             
             view = views.AuthorView(
-                user_id=ctx.author.id, session=ctx.bot.d.aio_session
+                user_id=ctx.author.id, session=ctx.bot.d.anilist
             )
             
             view.add_item(
@@ -1529,7 +1150,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
     else:
         # Series-specific character search
         try:
-            title, characters = await ALCharacter.from_series_characters(series, ctx.bot.d.aio_session)
+            title, characters = await ALCharacter.from_series_characters(series, ctx.bot.d.anilist)
             
             if not title or not characters:
                 await ctx.respond(f"Couldn't find series '{series}' or no characters found 😵")
@@ -1552,7 +1173,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                     )
                 
                 view = views.AuthorView(
-                    user_id=ctx.author.id, session=ctx.bot.d.aio_session
+                    user_id=ctx.author.id, session=ctx.bot.d.anilist
                 )
                 
                 view.add_item(
@@ -1627,7 +1248,7 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                     )
                 
                 view = views.AuthorView(
-                    user_id=ctx.author.id, session=ctx.bot.d.aio_session
+                    user_id=ctx.author.id, session=ctx.bot.d.anilist
                 )
                 
                 view.add_item(
@@ -1650,142 +1271,6 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
 
 
 
-async def _search_movie(ctx: lb.Context, query: str, filter_: Optional[str] = None):
-    """Search a movie"""
-    headers = {
-        'accept': 'application/json',
-    }
-
-    params = {
-        'query': query,
-    }
-
-    response = await ctx.bot.d.aio_session.get('https://api.imdbapi.dev/search/titles', params=params, headers=headers)
-
-    if not response.ok:
-        await ctx.respond("Couldn't find the movie you asked for.")
-        return
-
-    response = await response.json()
-    
-    if filter_:
-        for movie in response['titles']:
-            if movie['type'] == filter_:
-                movie_id = movie['id']
-                break
-        else:
-            await ctx.respond("Couldn't find the movie you asked for.")
-            return
-    else:
-        movie_id = response['titles'][0]['id']
-    
-    movie_data = await ctx.bot.d.aio_session.get(f'https://api.imdbapi.dev/titles/{movie_id}', headers=headers)
-    movie_data = await movie_data.json()
-    
-
-    await ctx.respond(
-        hk.Embed(
-            title=f"{movie_data['primaryTitle']} ({movie_data['startYear']})",
-            url=f'https://www.imdb.com/title/{movie_id}',
-            color=colors.IMDB,
-            timestamp=datetime.now().astimezone(),
-        )
-        .add_field('Rating', f"{movie_data['rating']['aggregateRating']}")
-        .add_field('Genres', ", ".join(movie_data.get('genres', [])[:4]) or "-", inline=True)
-        .add_field('Runtime', verbose_timedelta(timedelta(seconds=movie_data.get('runtimeSeconds', 0))), inline=True)
-        .add_field('Summary', movie_data.get('plot', '-')[:200])
-        .set_thumbnail(movie_data['primaryImage']['url'])
-        .set_footer(text='Source: IMDB', icon='https://www.imdb.com/favicon.ico')
-    )
-
-
-@al_listener.listener(hk.GuildReactionAddEvent)
-async def al_link_finder(event: hk.GuildReactionAddEvent) -> None:
-    """Check if a message contains an animanga link and display it's info"""
-
-    message = await al_listener.bot.rest.fetch_message(
-        event.channel_id, event.message_id
-    )
-
-    if not (event.is_for_emoji("🔍") or event.is_for_emoji("🔎")) or message.content:
-        return
-    list_of_series = anilist_pattern.findall(message.content) or []
-
-    if len(list_of_series) != 0:
-        for series in list_of_series:
-            query = """
-query ($id: Int, $search: String, $type: MediaType) { )
-  Media (id: $id, search: $search, type: $type, sort: POPULARITY_DESC) { 
-    id
-    idMal
-    title {
-        english
-        romaji
-    }
-    type
-    averageScore
-    format
-    meanScore
-    chapters
-    episodes
-    startDate {
-        year
-    }
-    coverImage {
-        large
-    }
-    bannerImage
-    genres
-    status
-    description (asHtml: false)
-    siteUrl
-  }
-}
-
-"""
-
-            variables = {"id": series[3], "type": series[2].upper()}
-
-            response = await al_listener.bot.d.aio_session.post(
-                "https://graphql.anilist.co",
-                json={"query": query, "variables": variables},
-            )
-            if not response.ok:
-                return
-
-            response = (await response.json())["data"]["Media"]
-
-            title = response["title"]["english"] or response["title"]["romaji"]
-
-            no_of_items = response["chapters"] or response["episodes"] or "NA"
-
-            await event.member.send(
-                content=(
-                    "Here are the details for the series"
-                    f"requested here: {message.make_link(message.guild_id)}"
-                ),
-                embed=hk.Embed(
-                    description="\n\n",
-                    color=colors.ANILIST,
-                    timestamp=datetime.now().astimezone(),
-                )
-                .add_field("Rating", response["averageScore"])
-                .add_field("Genres", ",".join(response["genres"]))
-                .add_field("Status", response["status"], inline=True)
-                .add_field(
-                    "Chapters" if response["type"] == "MANGA" else "ANIME",
-                    no_of_items,
-                    inline=True,
-                )
-                .add_field("Summary", parse_description(response["description"]))
-                .set_thumbnail(response["coverImage"]["large"])
-                .set_image(response["bannerImage"])
-                .set_author(url=response["siteUrl"], name=title)
-                .set_footer(
-                    text="Source: AniList",
-                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-                ),
-            )
 
 
 def load(bot: lb.BotApp) -> None:

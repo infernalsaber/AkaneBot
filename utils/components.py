@@ -50,6 +50,11 @@ class CharacterSelect(miru.TextSelect):
                 chara = await ALCharacter.from_id(
                     int(self.values[0]), self.view.session
                 )
+                if chara is None:
+                    await ctx.respond(
+                        content="Character lookup failed", flags=hk.MessageFlag.EPHEMERAL
+                    )
+                    return
                 await ctx.edit_response(embeds=[await chara.make_embed()], content=None)
 
         except Exception as e:

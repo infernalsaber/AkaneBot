@@ -1,11 +1,21 @@
-import collections
-from datetime import datetime, timedelta
+"""Domain classes wrapping AniList GraphQL responses.
 
-import aiohttp_client_cache
+Each class takes an AniListClient and returns typed objects from `from_*`
+classmethods, or `None` / `[]` on a miss (never a raw error dict). Embed
+construction lives alongside each class via `make_embed` / `make_pages`.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from operator import itemgetter
+from typing import List, Optional, Set, Tuple
+
 import hikari as hk
 
-from utils.models import ColorPalette as colors
+from utils.anilist_client import AniListClient, end_of_day_utc_ttl
+from utils.errors import AniListError
 from utils.misc import verbose_timedelta
+from utils.models import ColorPalette as colors
 
 
 class AnilistBase:
@@ -14,410 +24,303 @@ class AnilistBase:
         self.id = id_
 
     @staticmethod
-    def parse_description(description: str) -> str:
-        """Parse Anilist descriptions into Discord friendly markdown
+    def parse_description(description: str, limit: int = 400) -> str:
+        """Parse an AniList description into Discord-friendly markdown."""
+        if not description:
+            return "-"
 
-        Args:
-            description (str): The description to parse
+        problematic_tags = [
+            "<i>", "</i>", "<I>", "</I>",
+            "<b>", "</b>", "<B>", "</B>",
+            "<br>", "<BR>", "#",
+        ]
+        for tag in problematic_tags:
+            description = description.replace(tag, "")
 
-        Returns:
-            str: The parsed description
-        """
+        description = description.replace("~!", "||").replace("!~", "||")
 
-        description = (
-            description.replace("<br>", "")
-            .replace("~!", "||")
-            .replace("!~", "||")
-            .replace("#", "")
-            .replace("<i>", "")
-            .replace("<b>", "")
-            .replace("</b>", "")
-            .replace("</i>", "")
-            .replace("<BR>", "")
-        )
-
-        if len(description) > 400:
-            description = description[0:400]
-
-            # If the trimmed description has a missing spoiler tag, add one
+        if len(description) > limit:
+            description = description[:limit]
             if description.count("||") % 2:
-                description = description + "||"
-
-            description = description + "..."
+                description += "||"
+            description += "..."
 
         return description
 
 
 class ALCharacter(AnilistBase):
-    def __init__(
-        self, name: str, id_: int, session: aiohttp_client_cache.CachedSession
-    ) -> None:
+    _FROM_SEARCH_QUERY = """
+    query ($search: String) {
+        Character (search: $search, sort: FAVOURITES_DESC) {
+            id
+            name { full }
+        }
+    }
+    """
+
+    _FROM_ID_QUERY = """
+    query ($id: Int) {
+        Character (id: $id, sort: FAVOURITES_DESC) {
+            id
+            name { full }
+        }
+    }
+    """
+
+    _IS_BIRTHDAY_SINGLE_QUERY = """
+    query ($var: Boolean) {
+        Character (isBirthday: $var, sort: FAVOURITES_DESC) {
+            id
+            name { full }
+        }
+    }
+    """
+
+    _SEARCH_MULTIPLE_QUERY = """
+    query ($search: String, $perPage: Int) {
+        Page (perPage: $perPage) {
+            characters (search: $search, sort: FAVOURITES_DESC) {
+                id
+                name { full alternative }
+                favourites
+                description (asHtml: false)
+                image { large }
+                media { nodes { title { romaji english } } }
+            }
+        }
+    }
+    """
+
+    _SERIES_CHARACTERS_QUERY = """
+    query ($search: String) {
+        Media (search: $search) {
+            title { english romaji }
+            characters (sort: FAVOURITES_DESC) {
+                nodes {
+                    id
+                    name { full alternative }
+                    favourites
+                    description (asHtml: false)
+                    image { large }
+                    media { nodes { title { romaji english } } }
+                }
+            }
+        }
+    }
+    """
+
+    _BIRTHDAY_CHARACTERS_QUERY = """
+    query {
+        Page (perPage: 25) {
+            characters (isBirthday: true, sort: FAVOURITES_DESC) {
+                id
+                name { full alternative }
+                favourites
+                description (asHtml: false)
+                image { large }
+                media { nodes { title { romaji english } } }
+            }
+        }
+    }
+    """
+
+    _CHARACTER_MEDIA_QUERY = """
+    query ($id: Int) {
+        Character (id: $id) {
+            id
+            name { full }
+            media { nodes { title { romaji english } type } }
+        }
+    }
+    """
+
+    _CHARACTER_DETAIL_QUERY = """
+    query ($id: Int) {
+        Character (id: $id, sort: FAVOURITES_DESC) {
+            id
+            name { full }
+            image { large }
+            gender
+            dateOfBirth { year month day }
+            description (asHtml: false)
+            media (sort: TRENDING_DESC, perPage: 3) {
+                nodes {
+                    title { romaji }
+                    season
+                    seasonYear
+                    meanScore
+                    seasonInt
+                    episodes
+                    chapters
+                    source
+                    popularity
+                    tags { name }
+                }
+            }
+            favourites
+            siteUrl
+        }
+    }
+    """
+
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
         self.url = f"https://anilist.co/character/{id_}"
-        self.session = session
+        self.client = client
         super().__init__(name, id_)
 
     @classmethod
-    async def from_search(
-        cls, query_: str, session: aiohttp_client_cache.CachedSession
-    ):
-        query = """
-        query ($search: String) { # Define which variables will be used in the query
-        Character (search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-            id
-            name {
-            full
-            }
-        }
-        }
-        """
-
-        variables = {
-            "search": query_
-            # ,"sort": FAVOURITES_DESC
-        }
-
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-        if not resp.ok:
-            return await resp.json()
-        resp_json = await resp.json()
-
-        response = resp_json["data"]["Character"]
-
-        title = response["name"]["full"]
-        id_ = response["id"]
-
-        return cls(title, id_, session)
+    async def from_search(cls, query_: str, client: AniListClient) -> Optional["ALCharacter"]:
+        try:
+            data = await client.query(cls._FROM_SEARCH_QUERY, {"search": query_})
+        except AniListError:
+            return None
+        character = data.get("Character")
+        if not character:
+            return None
+        return cls(character["name"]["full"], character["id"], client)
 
     @classmethod
-    async def from_id(cls, query_: int, session: aiohttp_client_cache.CachedSession):
-
-        query = """
-        query ($id: Int) { # Define which variables will be used in the query
-        Character (id: $id,  sort: FAVOURITES_DESC) { # Add var. to the query
-            id
-            name {
-            full
-            }
-        }
-        }
-        """
-
-        variables = {
-            "id": query_
-            # ,"sort": FAVOURITES_DESC
-        }
-
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-        if not resp.ok:
-            return await resp.json()
-        resp_json = await resp.json()
-
-        response = resp_json["data"]["Character"]
-
-        title = response["name"]["full"]
-        id_ = response["id"]
-
-        return cls(title, id_, session)
-
-        # except Exception as e:
-        # return e
+    async def from_id(cls, id_: int, client: AniListClient) -> Optional["ALCharacter"]:
+        try:
+            data = await client.query(cls._FROM_ID_QUERY, {"id": id_})
+        except AniListError:
+            return None
+        character = data.get("Character")
+        if not character:
+            return None
+        return cls(character["name"]["full"], character["id"], client)
 
     @classmethod
-    async def is_birthday(cls, session: aiohttp_client_cache.CachedSession):
-        # async with session.get()
-
-        # self.session = session
-        # try:
-        query = """
-        query ($var: Boolean) { # Define which variables will be used in the query
-        Character (isBirthday: $var, sort: FAVOURITES_DESC) { # Add var. to the query
-            id
-            name {
-            full
-            }
-        }
-        }
-        """
-
-        variables = {
-            "var": True
-            # ,"sort": FAVOURITES_DESC
-        }
-
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-        if not resp.ok:
-            return await resp.json()
-        resp_json = await resp.json()
-
-        response = resp_json["data"]["Character"]
-
-        title = response["name"]["full"]
-        id_ = response["id"]
-
-        return cls(title, id_, session)
+    async def is_birthday(cls, client: AniListClient) -> Optional["ALCharacter"]:
+        try:
+            data = await client.query(
+                cls._IS_BIRTHDAY_SINGLE_QUERY,
+                {"var": True},
+                cache_ttl=end_of_day_utc_ttl(),
+            )
+        except AniListError:
+            return None
+        character = data.get("Character")
+        if not character:
+            return None
+        return cls(character["name"]["full"], character["id"], client)
 
     @classmethod
     async def from_search_multiple(
-        cls, query_: str, session: aiohttp_client_cache.CachedSession, per_page: int = 10
-    ):
-        """Get multiple characters from search, sorted by popularity"""
-        query = """
-        query ($search: String, $perPage: Int) {
-            Page (perPage: $perPage) {
-                characters (search: $search, sort: FAVOURITES_DESC) {
-                    id
-                    name {
-                        full
-                        alternative
-                    }
-                    favourites
-                    description (asHtml: false)
-                    image {
-                        large
-                    }
-                    media {
-                        nodes {
-                            title {
-                                romaji
-                                english
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        """
-
-        variables = {
-            "search": query_,
-            "perPage": per_page
-        }
-
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-        if not resp.ok:
+        cls, query_: str, client: AniListClient, per_page: int = 10
+    ) -> list:
+        try:
+            data = await client.query(
+                cls._SEARCH_MULTIPLE_QUERY,
+                {"search": query_, "perPage": per_page},
+            )
+        except AniListError:
             return []
-        resp_json = await resp.json()
-
-        characters = resp_json["data"]["Page"]["characters"]
-        return characters
+        return data.get("Page", {}).get("characters", []) or []
 
     @classmethod
     async def from_series_characters(
-        cls, series: str, session: aiohttp_client_cache.CachedSession
-    ):
-        """Get characters from a specific series, sorted by popularity"""
-        query = """
-        query ($search: String) {
-            Media (search: $search) { 
-                title {
-                    english
-                    romaji
-                }
-                characters (sort: FAVOURITES_DESC) {
-                    nodes {
-                        id
-                        name {
-                            full
-                            alternative
-                        }
-                        favourites
-                        description (asHtml: false)
-                        image {
-                            large
-                        }
-                        media {
-                            nodes {
-                                title {
-                                    romaji
-                                    english
-                                }
-                            }
-                        }
-                    }
-                }        
-            }
-        }
-        """
-        
-        variables = {"search": series}
-
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-        
-        if not resp.ok:
+        cls, series: str, client: AniListClient
+    ) -> Tuple[Optional[str], list]:
+        try:
+            data = await client.query(cls._SERIES_CHARACTERS_QUERY, {"search": series})
+        except AniListError:
             return None, []
-            
-        resp_json = await resp.json()
-        
-        if not resp_json.get("data", {}).get("Media"):
+        media = data.get("Media")
+        if not media:
             return None, []
-            
-        media = resp_json["data"]["Media"]
         title = media["title"]["english"] or media["title"]["romaji"]
-        characters = media["characters"]["nodes"]
-        
-        return title, characters
+        return title, media["characters"]["nodes"]
 
     @classmethod
-    async def get_birthday_characters(cls, session: aiohttp_client_cache.CachedSession):
-        """Get all characters whose birthday is today, sorted by popularity"""
-        query = """
-        query {
-            Page (perPage: 25) {
-                characters (isBirthday: true, sort: FAVOURITES_DESC) {
-                    id
-                    name {
-                        full
-                        alternative
-                    }
-                    favourites
-                    description (asHtml: false)
-                    image {
-                        large
-                    }
-                    media {
-                        nodes {
-                            title {
-                                romaji
-                                english
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        """
-
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query},
-        )
-        
-        if not resp.ok:
+    async def get_birthday_characters(cls, client: AniListClient) -> list:
+        try:
+            data = await client.query(
+                cls._BIRTHDAY_CHARACTERS_QUERY,
+                cache_ttl=end_of_day_utc_ttl(),
+            )
+        except AniListError:
             return []
-            
-        resp_json = await resp.json()
-        characters = resp_json["data"]["Page"]["characters"]
-        return characters
+        return data.get("Page", {}).get("characters", []) or []
 
     @classmethod
-    async def get_character_media(cls, character_id: int, session: aiohttp_client_cache.CachedSession):
-        """Get all media/series information for a character"""
-        query = """
-        query ($id: Int) {
-            Character (id: $id) {
-                id
-                name {
-                    full
-                }
-                media {
-                    nodes {
-                        title {
-                            romaji
-                            english
-                        }
-                        type
-                    }
-                }
-            }
-        }
-        """
-        
-        variables = {"id": character_id}
-        
-        resp = await session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-        
-        if not resp.ok:
+    async def get_character_media(cls, character_id: int, client: AniListClient) -> Optional[dict]:
+        try:
+            data = await client.query(cls._CHARACTER_MEDIA_QUERY, {"id": character_id})
+        except AniListError:
             return None
-            
-        resp_json = await resp.json()
-        
-        if not resp_json.get("data", {}).get("Character"):
+        character = data.get("Character")
+        if not character:
             return None
-            
-        character = resp_json["data"]["Character"]
-        media_titles = []
-        
-        for media in character["media"]["nodes"]:
-            title = media["title"]["english"] or media["title"]["romaji"]
-            if title:
-                media_titles.append(title)
-        
+
+        media_titles = [
+            m["title"]["english"] or m["title"]["romaji"]
+            for m in character["media"]["nodes"]
+            if m["title"]["english"] or m["title"]["romaji"]
+        ]
         return {
             "id": character["id"],
             "name": character["name"]["full"],
-            "media_titles": media_titles
+            "media_titles": media_titles,
         }
 
-    async def make_embed(self):
-        query = """
-query ($id: Int, $search: String) { # Define which variables will be used in the query
-  Character (id: $id, search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-    id
-    name {
-      full
-    }
-    image {
-      large
-    }
-    gender
-    dateOfBirth {
-        year
-        month
-        day
-    }
-    description (asHtml: false)
-    media (sort: TRENDING_DESC, perPage: 3) {
-        nodes {
-            title {
-                romaji
-            }
-            season
-            seasonYear
-            meanScore
-            seasonInt
-            episodes
-            chapters
-            source
-            popularity
-            tags {
-              name
-            }
-        }
-    }
-    favourites #♥
-    siteUrl
-  }
-}
-"""
+    async def _fetch_detail(self) -> Optional[dict]:
         try:
-            variables = collections.defaultdict(list)
+            data = await self.client.query(self._CHARACTER_DETAIL_QUERY, {"id": self.id})
+        except AniListError:
+            return None
+        return data.get("Character")
 
-            variables["id"] = self.id
+    def _format_dob(self, dob: dict) -> str:
+        if dob and dob.get("month") and dob.get("day"):
+            out = f"{dob['day']}/{dob['month']}"
+            if dob.get("year"):
+                out += f"/{dob['year']}"
+            return out
+        return "NA"
 
-            resp = await self.session.post(
-                "https://graphql.anilist.co",
-                json={"query": query, "variables": variables},
+    async def make_embed(self) -> hk.Embed:
+        response = await self._fetch_detail()
+        if not response:
+            return hk.Embed(
+                title="ERROR FETCHING DATA",
+                color=colors.ERROR,
+                description=(
+                    "Failed to fetch data 😵"
+                    "\nTry typing the full name of the character."
+                ),
             )
-            if not resp.ok:
-                return hk.Embed(
+
+        dob = self._format_dob(response["dateOfBirth"])
+        description = (
+            self.parse_description(response["description"])
+            if response["description"] else "NA"
+        )
+
+        return (
+            hk.Embed(
+                title=self.name,
+                url=self.url,
+                description="\n\n",
+                color=colors.ANILIST,
+                timestamp=datetime.now().astimezone(),
+            )
+            .add_field("Gender", response["gender"] or "Unknown")
+            .add_field("DOB", dob, inline=True)
+            .add_field("Favourites", f"{response['favourites']}❤", inline=True)
+            .add_field("Character Description", description)
+            .set_thumbnail(response["image"]["large"])
+            .set_footer(
+                text="Source: AniList",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+            )
+        )
+
+    async def make_pages(self) -> List[hk.Embed]:
+        response = await self._fetch_detail()
+        if not response:
+            return [
+                hk.Embed(
                     title="ERROR FETCHING DATA",
                     color=colors.ERROR,
                     description=(
@@ -425,270 +328,28 @@ query ($id: Int, $search: String) { # Define which variables will be used in the
                         "\nTry typing the full name of the character."
                     ),
                 )
-            resp_json = await resp.json()
-
-            response = resp_json["data"]["Character"]
-
-            response["name"]["full"]
-
-            if response["dateOfBirth"]["month"] and response["dateOfBirth"]["day"]:
-                dob = f"{response['dateOfBirth']['day']}/{response['dateOfBirth']['month']}"
-                if response["dateOfBirth"]["year"]:
-                    dob += f"/{response['dateOfBirth']['year']}"
-            else:
-                dob = "NA"
-
-            if response["description"]:
-                response["description"] = self.parse_description(
-                    response["description"]
-                )
-
-            else:
-                response["description"] = "NA"
-
-            return (
-                hk.Embed(
-                    title=self.name,
-                    url=self.url,
-                    description="\n\n",
-                    color=colors.ANILIST,
-                    timestamp=datetime.now().astimezone(),
-                )
-                .add_field("Gender", response["gender"] or "Unknown")
-                .add_field("DOB", dob, inline=True)
-                .add_field("Favourites", f"{response['favourites']}❤", inline=True)
-                .add_field("Character Description", response["description"])
-                .set_thumbnail(response["image"]["large"])
-                .set_footer(
-                    text="Source: AniList",
-                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-                )
-            )
-
-        except Exception as e:
-            return hk.Embed(
-                title="Failure",
-                color=colors.ERROR,
-                description=f"We encountered an error, `{e}`",
-            )
-
-    async def make_pages(self) -> list[hk.Embed]:
-        query = """
-query ($id: Int, $search: String) { # Define which variables will be used in the query
-  Character (id: $id, search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-    id
-    name {
-      full
-    }
-    image {
-      large
-    }
-    gender
-    dateOfBirth {
-        year
-        month
-        day
-    }
-    description (asHtml: false)
-    media (sort: TRENDING_DESC, perPage: 3) {
-        nodes {
-            title {
-                romaji
-            }
-            season
-            seasonYear
-            meanScore
-            seasonInt
-            episodes
-            chapters
-            source
-            popularity
-            tags {
-              name
-            }
-        }
-    }
-    favourites #♥
-    siteUrl
-  }
-}
-"""
-
-        try:
-            variables = collections.defaultdict(list)
-
-            variables["id"] = self.id
-
-            resp = await self.session.post(
-                "https://graphql.anilist.co",
-                json={"query": query, "variables": variables},
-            )
-
-            if not resp.ok:
-                return [
-                    hk.Embed(
-                        title="ERROR FETCHING DATA",
-                        color=colors.ERROR,
-                        description=(
-                            "Failed to fetch data 😵"
-                            "\nTry typing the full name of the character."
-                        ),
-                    )
-                ]
-
-            resp_json = await resp.json()
-
-            response = resp_json["data"]["Character"]
-
-            title = response["name"]["full"]
-
-            if response["dateOfBirth"]["month"] and response["dateOfBirth"]["day"]:
-                dob = f"{response['dateOfBirth']['day']}/{response['dateOfBirth']['month']}"
-                if response["dateOfBirth"]["year"]:
-                    dob += f"/{response['dateOfBirth']['year']}"
-            else:
-                dob = "NA"
-
-            if response["description"]:
-                response["description"] = self.parse_description(
-                    response["description"]
-                )
-
-            else:
-                response["description"] = "NA"
-
-            series = ""
-
-            for i, item in enumerate(response["media"]["nodes"]):
-                series += (
-                    f"```ansi\n{i+1}. \u001b[0;35m{item['title']['romaji']}"
-                    f" \u001b[0;32m({item['meanScore']})```"
-                )
-
-            return [
-                hk.Embed(
-                    title=title,
-                    url=response["siteUrl"],
-                    description="\n\n",
-                    color=colors.ANILIST,
-                    timestamp=datetime.now().astimezone(),
-                )
-                .add_field("Gender", response["gender"] or "Unknown")
-                .add_field("DOB", dob, inline=True)
-                .add_field("Favourites", f"{response['favourites']}❤", inline=True)
-                .add_field("Character Description", response["description"])
-                .set_thumbnail(response["image"]["large"])
-                .set_footer(
-                    text="Source: AniList",
-                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-                ),
-                hk.Embed(
-                    title=title,
-                    url=response["siteUrl"],
-                    color=colors.ANILIST,
-                    timestamp=datetime.now().astimezone(),
-                )
-                .set_thumbnail(response["image"]["large"])
-                .set_footer(
-                    text="Source: AniList",
-                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-                )
-                .add_field("Appears in ", series),
-            ]
-        except Exception as e:
-            return [
-                hk.Embed(
-                    title="Failure",
-                    color=colors.ERROR,
-                    description=f"We encountered an error, `{e}`",
-                )
             ]
 
+        title = response["name"]["full"]
+        dob = self._format_dob(response["dateOfBirth"])
+        description = (
+            self.parse_description(response["description"])
+            if response["description"] else "NA"
+        )
 
-class ALAnime(AnilistBase):
-    def __init__(
-        self, name: str, id_: int, session: aiohttp_client_cache.CachedSession
-    ) -> None:
-        self.url = f"https://anilist.co/anime/{id_}"
-        self.session = session
-        super().__init__(name, id_)
+        series = ""
+        for i, item in enumerate(response["media"]["nodes"]):
+            series += (
+                f"```ansi\n{i+1}. \u001b[0;35m{item['title']['romaji']}"
+                f" \u001b[0;32m({item['meanScore']})```"
+            )
 
-    async def make_embed(self):
-        query = """
-query ($id: Int, $type: MediaType) { 
-  media (id: $id, type: $type) { # The sort param was POPULARITY_DESC
-    id
-    idMal
-    title {
-        english
-        romaji
-    }
-    duration
-    type
-    averageScore
-    format
-    meanScore
-    episodes
-    startDate {
-        year
-    }
-    coverImage {
-        large
-    }
-    studios (isMain: true) {
-        nodes {
-            name
-            siteUrl
+        footer = {
+            "text": "Source: AniList",
+            "icon": "https://anilist.co/img/icons/android-chrome-512x512.png",
         }
-    }
-    bannerImage
-    genres
-    status
-    description (asHtml: false)
-    siteUrl
-    trailer {
-        id
-        site
-        thumbnail
-    }
-  }
-  }
-}
 
-"""
-
-        variables = {"id": self.id, "type": "ANIME"}
-
-        response = await self.session.post(
-            "https://graphql.anilist.co",
-            json={"query": query, "variables": variables},
-        )
-
-        if not response.ok:
-            # await ctx.respond(
-            #     f"Failed to fetch data 😵, error `code: {response.status_code}`"
-            # )
-            return
-
-        response = (await response.json())["data"]["Media"]
-
-        title = response["title"]["english"] or response["title"]["romaji"]
-
-        no_of_items = (
-            response["episodes"]
-            if response["episodes"] != 1
-            else verbose_timedelta(timedelta(minutes=response["duration"]))
-        )
-
-        if response["description"]:
-            response["description"] = self.parse_description(response["description"])
-
-        else:
-            response["description"] = "NA"
-
-        # try:
-
-        embed = (
+        return [
             hk.Embed(
                 title=title,
                 url=response["siteUrl"],
@@ -696,423 +357,629 @@ query ($id: Int, $type: MediaType) {
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Rating", response.get("meanScore", "NA"))
-            .add_field("Genres", ", ".join(response["genres"][:4]))
-            .add_field("Status", response["status"].replace("_", " "), inline=True)
+            .add_field("Gender", response["gender"] or "Unknown")
+            .add_field("DOB", dob, inline=True)
+            .add_field("Favourites", f"{response['favourites']}❤", inline=True)
+            .add_field("Character Description", description)
+            .set_thumbnail(response["image"]["large"])
+            .set_footer(**footer),
+            hk.Embed(
+                title=title,
+                url=response["siteUrl"],
+                color=colors.ANILIST,
+                timestamp=datetime.now().astimezone(),
+            )
+            .set_thumbnail(response["image"]["large"])
+            .set_footer(**footer)
+            .add_field("Appears in ", series),
+        ]
+
+
+class ALAnime(AnilistBase):
+    _FROM_ID_QUERY = """
+    query ($id: Int, $type: MediaType) {
+        Media (id: $id, type: $type) {
+            id
+            idMal
+            title { english romaji }
+            duration
+            type
+            averageScore
+            format
+            meanScore
+            episodes
+            startDate { year }
+            coverImage { large }
+            studios (isMain: true) { nodes { name siteUrl } }
+            bannerImage
+            genres
+            status
+            description (asHtml: false)
+            siteUrl
+            trailer { id site thumbnail }
+        }
+    }
+    """
+
+    _SEARCH_QUERY = """
+    query ($search: String, $type: MediaType) {
+        Page (perPage: 5) {
+            media (search: $search, type: $type) {
+                id
+                idMal
+                title { english romaji }
+                duration
+                type
+                averageScore
+                format
+                meanScore
+                episodes
+                startDate { year }
+                coverImage { large }
+                studios (isMain: true) { nodes { name siteUrl } }
+                bannerImage
+                genres
+                status
+                description (asHtml: false)
+                siteUrl
+                nextAiringEpisode { episode }
+                trailer { id site thumbnail }
+            }
+        }
+    }
+    """
+
+    _LINK_LOOKUP_QUERY = """
+    query ($id: Int, $type: MediaType) {
+        Media (id: $id, type: $type, sort: POPULARITY_DESC) {
+            id
+            idMal
+            title { english romaji }
+            type
+            averageScore
+            format
+            meanScore
+            chapters
+            episodes
+            startDate { year }
+            coverImage { large }
+            bannerImage
+            genres
+            status
+            description (asHtml: false)
+            siteUrl
+        }
+    }
+    """
+
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
+        self.url = f"https://anilist.co/anime/{id_}"
+        self.client = client
+        super().__init__(name, id_)
+
+    @classmethod
+    async def from_search_multiple(
+        cls, query_: str, client: AniListClient
+    ) -> list:
+        try:
+            data = await client.query(
+                cls._SEARCH_QUERY,
+                {"search": query_, "type": "ANIME"},
+            )
+        except AniListError:
+            return []
+        return data.get("Page", {}).get("media", []) or []
+
+    @classmethod
+    async def from_id(cls, id_: int, client: AniListClient) -> Optional["ALAnime"]:
+        try:
+            data = await client.query(cls._FROM_ID_QUERY, {"id": id_, "type": "ANIME"})
+        except AniListError:
+            return None
+        media = data.get("Media")
+        if not media:
+            return None
+        title = media["title"]["english"] or media["title"]["romaji"]
+        obj = cls(title, media["id"], client)
+        obj._data = media
+        return obj
+
+    @classmethod
+    async def lookup_by_link(
+        cls, id_: int, type_: str, client: AniListClient
+    ) -> Optional[dict]:
+        """Returns raw media dict from the link-sharing listener path."""
+        try:
+            data = await client.query(
+                cls._LINK_LOOKUP_QUERY,
+                {"id": id_, "type": type_},
+            )
+        except AniListError:
+            return None
+        return data.get("Media")
+
+    async def make_embed(self):
+        media = getattr(self, "_data", None)
+        if media is None:
+            try:
+                data = await self.client.query(
+                    self._FROM_ID_QUERY, {"id": self.id, "type": "ANIME"}
+                )
+            except AniListError:
+                return None
+            media = data.get("Media")
+            if not media:
+                return None
+
+        title = media["title"]["english"] or media["title"]["romaji"]
+        no_of_items = (
+            media["episodes"]
+            if media["episodes"] != 1
+            else verbose_timedelta(timedelta(minutes=media["duration"]))
+        )
+        description = (
+            self.parse_description(media["description"])
+            if media["description"] else "NA"
+        )
+        studios = media["studios"]["nodes"]
+
+        embed = (
+            hk.Embed(
+                title=title,
+                url=media["siteUrl"],
+                description="\n\n",
+                color=colors.ANILIST,
+                timestamp=datetime.now().astimezone(),
+            )
+            .add_field("Rating", media.get("meanScore", "NA"))
+            .add_field("Genres", ", ".join(media["genres"][:4]))
+            .add_field("Status", media["status"].replace("_", " "), inline=True)
             .add_field(
-                "Episodes" if response["episodes"] != 1 else "Duration",
+                "Episodes" if media["episodes"] != 1 else "Duration",
                 no_of_items,
                 inline=True,
             )
-            .add_field("Studio", response["studios"]["nodes"][0]["name"], inline=True)
-            .add_field("Summary", response["description"])
-            .set_thumbnail(response["coverImage"]["large"])
-            .set_image(response["bannerImage"])
+            .add_field("Studio", studios[0]["name"] if studios else "Unknown", inline=True)
+            .add_field("Summary", description)
+            .set_thumbnail(media["coverImage"]["large"])
+            .set_image(media["bannerImage"])
             .set_footer(
                 text="Source: AniList",
                 icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             )
         )
 
-        if response["trailer"]:
-            if response["trailer"]["site"] == "youtube":
-                trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
+        trailer = None
+        if media["trailer"]:
+            site = media["trailer"]["site"]
+            vid = media["trailer"]["id"]
+            if site == "youtube":
+                trailer = f"https://{site}.com/watch?v={vid}"
             else:
-                trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
-        else:
-            trailer = None
+                trailer = f"https://{site}.com/video/{vid}"
 
         return [embed, trailer]
 
+    # ---- Watch-order (recursive relation walk) ----
 
-#     @classmethod
-#     async def from_search(
-#         cls, query_: str, session: aiohttp_client_cache.CachedSession
-#     ):
-#         query = """
-#         query ($search: String) { # Define which variables will be used in the query
-#         Character (search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-#             id
-#             name {
-#             full
-#             }
-#         }
-#         }
-#         """
+    _RELATIONS_QUERY = """
+    query ($id: Int, $search: String) {
+        Media(id: $id, search: $search, type: ANIME) {
+            id
+            title { romaji }
+            startDate { year month day }
+            duration
+            episodes
+            relations {
+                edges {
+                    relationType
+                    node { id title { romaji } type }
+                }
+            }
+        }
+    }
+    """
 
-#         variables = {
-#             "search": query_
-#             # ,"sort": FAVOURITES_DESC
-#         }
+    @classmethod
+    async def get_anime_data(
+        cls,
+        client: AniListClient,
+        *,
+        anime_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> dict:
+        """Return the raw Media dict (id/title/duration/episodes/relations)."""
+        variables = {"id": anime_id} if anime_id else {"search": search}
+        return await client.query(cls._RELATIONS_QUERY, variables)
 
-#         resp = await session.post(
-#             "https://graphql.anilist.co",
-#             json={"query": query, "variables": variables},
-#
-#         )
-#         if not resp.ok:
-#             return await resp.json()
-#         resp_json = await resp.json()
+    @classmethod
+    async def get_complete_series(
+        cls,
+        client: AniListClient,
+        anime_id: int,
+        visited: Optional[Set[int]] = None,
+    ) -> list:
+        """Recursively gather all anime related by PREQUEL/SEQUEL/SIDE_STORY."""
+        from utils.anilist_graph import AnimeNode
 
-#         response = resp_json["data"]["Character"]
+        if visited is None:
+            visited = set()
+        if anime_id in visited:
+            return []
+        visited.add(anime_id)
 
-#         title = response["name"]["full"]
-#         id_ = response["id"]
+        try:
+            data = await cls.get_anime_data(client, anime_id=anime_id)
+        except AniListError:
+            return []
 
-#         return cls(title, id_, session)
+        media = data.get("Media")
+        if not media:
+            return []
 
-#     @classmethod
-#     async def from_id(cls, query_: int, session: aiohttp_client_cache.CachedSession):
-#         # async with session.get()
+        entries = [
+            AnimeNode(
+                media["id"],
+                media["title"]["romaji"],
+                media["startDate"],
+                media.get("duration", 0),
+                media.get("episodes", 1),
+            )
+        ]
 
-#         # self.session = session
-#         # try:
-#         query = """
-#         query ($id: Int) { # Define which variables will be used in the query
-#         Character (id: $id,  sort: FAVOURITES_DESC) { # Add var. to the query
-#             id
-#             name {
-#             full
-#             }
-#         }
-#         }
-#         """
+        for edge in (media.get("relations") or {}).get("edges", []):
+            node = edge["node"]
+            if node["type"] == "ANIME" and edge["relationType"] in (
+                "PREQUEL",
+                "SEQUEL",
+                "SIDE_STORY",
+            ):
+                entries.extend(
+                    await cls.get_complete_series(client, node["id"], visited)
+                )
 
-#         variables = {
-#             "id": query_
-#             # ,"sort": FAVOURITES_DESC
-#         }
+        return entries
 
-#         response = await session.post(
-#             "https://graphql.anilist.co",
-#             json={"query": query, "variables": variables},
-#
-#         )
-#         if not response.ok:
-#             return await response.json()
-#         response = await response.json()
+    @classmethod
+    async def format_chronological_order(
+        cls, client: AniListClient, anime_id: int
+    ) -> list:
+        """Watch order by release date; undated entries appended at the end."""
+        entries = await cls.get_complete_series(client, anime_id)
+        if not entries:
+            return []
+        dated = [e for e in entries if e.date is not None]
+        undated = [e for e in entries if e.date is None]
+        dated.sort(key=lambda x: x.date)
+        return dated + undated
 
-#         response = response["data"]["Character"]
+    # ---- Airtime trend plot ----
 
-#         title = response["name"]["full"]
-#         id_ = response["id"]
+    _TRENDS_MEDIA_QUERY = """
+    query ($search: String) {
+        Media (search: $search, type: ANIME) {
+            id
+            title { english romaji }
+            averageScore
+            startDate { year month day }
+            endDate { year month day }
+            coverImage { large }
+            status
+        }
+    }
+    """
 
-#         return cls(title, id_, session)
+    _TRENDS_PAGE_QUERY = """
+    query ($id: Int, $page: Int, $perpage: Int, $date_greater: Int, $date_lesser: Int) {
+        Page (page: $page, perPage: $perpage) {
+            pageInfo { total hasNextPage }
+            mediaTrends (mediaId: $id, date_greater: $date_greater, date_lesser: $date_lesser) {
+                mediaId
+                date
+                trending
+                averageScore
+                episode
+            }
+        }
+    }
+    """
 
-#         # except Exception as e:
-#         # return e
+    @classmethod
+    async def fetch_trends(cls, client: AniListClient, search_query: str) -> dict:
+        """Return the activity / episodes / scores trend data for an anime."""
+        data = await client.query(cls._TRENDS_MEDIA_QUERY, {"search": search_query})
+        media = data.get("Media")
+        if not media:
+            raise AniListError(f"No anime found for '{search_query}'")
 
-#     async def make_embed(self):
-#         query = """
-# query ($id: Int, $search: String) { # Define which variables will be used in the query
-#   Character (id: $id, search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-#     id
-#     name {
-#       full
-#     }
-#     image {
-#       large
-#     }
-#     gender
-#     dateOfBirth {
-#         year
-#         month
-#         day
-#     }
-#     description (asHtml: false)
-#     media (sort: TRENDING_DESC, perPage: 3) {
-#         nodes {
-#             title {
-#                 romaji
-#             }
-#             season
-#             seasonYear
-#             meanScore
-#             seasonInt
-#             episodes
-#             chapters
-#             source
-#             popularity
-#             tags {
-#               name
-#             }
-#         }
-#     }
-#     favourites #♥
-#     siteUrl
-#   }
-# }
-# """
-#         # await ctx.respond("In")
-#         try:
-#             variables = collections.defaultdict(list)
+        al_id = media["id"]
+        name = media["title"]["english"] or media["title"]["romaji"]
 
-#             # if id_:
-#             variables["id"] = self.id
+        start = media["startDate"]
+        lower_limit = datetime(
+            start["year"], start["month"], start["day"], 0, 0
+        ) - timedelta(days=7)
 
-#             # elif character:
-#             # variables["search"] = character
+        end = media["endDate"]
+        if end["year"]:
+            upper_limit = datetime(end["year"], end["month"], end["day"], 0, 0) + timedelta(days=7)
+        else:
+            upper_limit = datetime.now()
 
-#             # else:
-#             # raise lb.NotEnoughArguments
+        trend_score: list[dict] = []
+        page = 1
+        while True:
+            page_data = await client.query(
+                cls._TRENDS_PAGE_QUERY,
+                {
+                    "id": al_id,
+                    "page": page,
+                    "perpage": 50,
+                    "date_greater": int(lower_limit.timestamp()),
+                    "date_lesser": int(upper_limit.timestamp()),
+                },
+            )
+            page_info = page_data["Page"]["pageInfo"]
+            trend_score.extend(page_data["Page"]["mediaTrends"])
+            if not page_info["hasNextPage"]:
+                break
+            page += 1
 
-#             resp = await self.session.post(
-#                 "https://graphql.anilist.co",
-#                 json={"query": query, "variables": variables},
-#
-#             )
-#             if not resp.ok:
-#                 return hk.Embed(
-#                     title="ERROR FETCHING DATA",
-#                     color=ColorPalette.ERROR,
-#                     description=(
-#                         "Failed to fetch data 😵"
-#                         "\nTry typing the full name of the character."
-#                     ),
-#                 )
-#                 # return
-#             resp_json = await resp.json()
+        dates: list[datetime] = []
+        trends: list[int] = []
+        scores: list[int] = []
+        episode_dates: list[datetime] = []
+        episode_trends: list[int] = []
 
-#             response = resp_json["data"]["Character"]
+        for v in sorted((e for e in trend_score if e["episode"]), key=itemgetter("date")):
+            episode_dates.append(datetime.fromtimestamp(v["date"]))
+            episode_trends.append(v["trending"])
 
-#             response["name"]["full"]
+        for v in sorted(trend_score, key=itemgetter("date")):
+            dates.append(datetime.fromtimestamp(v["date"]))
+            trends.append(v["trending"])
+            if v["averageScore"]:
+                scores.append(v["averageScore"])
 
-#             if response["dateOfBirth"]["month"] and response["dateOfBirth"]["day"]:
-#                 dob = f"{response['dateOfBirth']['day']}/{response['dateOfBirth']['month']}"
-#                 if response["dateOfBirth"]["year"]:
-#                     dob += f"/{response['dateOfBirth']['year']}"
-#             else:
-#                 dob = "NA"
-
-#             if response["description"]:
-#                 # response["description"] = parse_description(response["description"])\
-#                 response["description"] = self.parse_description(
-#                     response["description"]
-#                 )
-
-#             else:
-#                 response["description"] = "NA"
-
-#             return (
-#                 hk.Embed(
-#                     title=self.name,
-#                     url=self.url,
-#                     description="\n\n",
-#                     color=ColorPalette.ANILIST,
-#                     timestamp=datetime.now().astimezone(),
-#                 )
-#                 .add_field("Gender", response["gender"])
-#                 .add_field("DOB", dob, inline=True)
-#                 .add_field("Favourites", f"{response['favourites']}❤", inline=True)
-#                 .add_field("Character Description", response["description"])
-#                 .set_thumbnail(response["image"]["large"])
-#                 # .set_author(url=response["siteUrl"], name=title)
-#                 .set_footer(
-#                     text="Source: AniList",
-#                     icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-#                 )
-#             )
-
-#         except Exception as e:
-#             return hk.Embed(
-#                 title="Failure",
-#                 color=ColorPalette.ERROR,
-#                 description=f"We encountered an error, `{e}`",
-#             )
-
-#     async def make_pages(self) -> list[hk.Embed]:
-#         query = """
-# query ($id: Int, $search: String) { # Define which variables will be used in the query
-#   Character (id: $id, search: $search,  sort: FAVOURITES_DESC) { # Add var. to the query
-#     id
-#     name {
-#       full
-#     }
-#     image {
-#       large
-#     }
-#     gender
-#     dateOfBirth {
-#         year
-#         month
-#         day
-#     }
-#     description (asHtml: false)
-#     media (sort: TRENDING_DESC, perPage: 3) {
-#         nodes {
-#             title {
-#                 romaji
-#             }
-#             season
-#             seasonYear
-#             meanScore
-#             seasonInt
-#             episodes
-#             chapters
-#             source
-#             popularity
-#             tags {
-#               name
-#             }
-#         }
-#     }
-#     favourites #♥
-#     siteUrl
-#   }
-# }
-# """
-
-#         try:
-#             variables = collections.defaultdict(list)
-
-#             variables["id"] = self.id
-
-#             resp = await self.session.post(
-#                 "https://graphql.anilist.co",
-#                 json={"query": query, "variables": variables},
-#
-#             )
-
-#             if not resp.ok:
-#                 return [
-#                     hk.Embed(
-#                         title="ERROR FETCHING DATA",
-#                         color=ColorPalette.ERROR,
-#                         description=(
-#                             "Failed to fetch data 😵"
-#                             "\nTry typing the full name of the character."
-#                         ),
-#                     )
-#                 ]
-
-#             resp_json = await resp.json()
-
-#             response = resp_json["data"]["Character"]
-
-#             title = response["name"]["full"]
-
-#             if response["dateOfBirth"]["month"] and response["dateOfBirth"]["day"]:
-#                 dob = f"{response['dateOfBirth']['day']}/{response['dateOfBirth']['month']}"
-#                 if response["dateOfBirth"]["year"]:
-#                     dob += f"/{response['dateOfBirth']['year']}"
-#             else:
-#                 dob = "NA"
-
-#             if response["description"]:
-#                 response["description"] = self.parse_description(
-#                     response["description"]
-#                 )
-
-#             else:
-#                 response["description"] = "NA"
-
-#             series = ""
-
-#             for i, item in enumerate(response["media"]["nodes"]):
-#                 series += (
-#                     f"```ansi\n{i+1}. \u001b[0;35m{item['title']['romaji']}"
-#                     f" \u001b[0;32m({item['meanScore']})```"
-#                 )
-
-#             return [
-#                 hk.Embed(
-#                     title=title,
-#                     url=response["siteUrl"],
-#                     description="\n\n",
-#                     color=ColorPalette.ANILIST,
-#                     timestamp=datetime.now().astimezone(),
-#                 )
-#                 .add_field("Gender", response["gender"] or "Unknown")
-#                 .add_field("DOB", dob, inline=True)
-#                 .add_field("Favourites", f"{response['favourites']}❤", inline=True)
-#                 .add_field("Character Description", response["description"])
-#                 .set_thumbnail(response["image"]["large"])
-#                 .set_footer(
-#                     text="Source: AniList",
-#                     icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-#                 ),
-#                 hk.Embed(
-#                     title=title,
-#                     url=response["siteUrl"],
-#                     color=ColorPalette.ANILIST,
-#                     timestamp=datetime.now().astimezone(),
-#                 )
-#                 .set_thumbnail(response["image"]["large"])
-#                 .set_footer(
-#                     text="Source: AniList",
-#                     icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-#                 )
-#                 .add_field("Appears in ", series),
-#             ]
-#         except Exception as e:
-#             return [
-#                 hk.Embed(
-#                     title="Failure",
-#                     color=ColorPalette.ERROR,
-#                     description=f"We encountered an error, `{e}`",
-#                 )
-#             ]
+        return {
+            "name": name,
+            "data": {
+                "activity": {"dates": dates, "values": trends},
+                "episodes": {"dates": episode_dates, "values": episode_trends},
+                "scores": {"dates": dates[-len(scores):], "values": scores},
+            },
+        }
 
 
-# class VNDBBase:
-#     def __init__(self, name: str, id_: int) -> None:
-#         self.name = name
-#         self.id = id_
+class ALManga(AnilistBase):
+    _SEARCH_QUERY = """
+    query ($search: String, $type: MediaType) {
+        Page (perPage: 5) {
+            media (search: $search, type: $type,
+                   sort: POPULARITY_DESC, format_in: [MANGA, ONE_SHOT]) {
+                id
+                idMal
+                title { english romaji }
+                type
+                averageScore
+                format
+                meanScore
+                chapters
+                episodes
+                startDate { year }
+                coverImage { large }
+                bannerImage
+                genres
+                status
+                description (asHtml: false)
+                siteUrl
+            }
+        }
+    }
+    """
+
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
+        self.url = f"https://anilist.co/manga/{id_}"
+        self.client = client
+        super().__init__(name, id_)
+
+    @classmethod
+    async def from_search_multiple(cls, query_: str, client: AniListClient) -> list:
+        try:
+            data = await client.query(
+                cls._SEARCH_QUERY,
+                {"search": query_, "type": "MANGA"},
+            )
+        except AniListError:
+            return []
+        return data.get("Page", {}).get("media", []) or []
+
+    _URL_FROM_MAL_QUERY = """
+    query ($mal_id: Int, $search: String) {
+        Media (idMal: $mal_id, search: $search, type: MANGA) {
+            siteUrl
+        }
+    }
+    """
+
+    @classmethod
+    async def al_url_from_mal(
+        cls,
+        client: AniListClient,
+        *,
+        mal_id: Optional[int] = None,
+        name: Optional[str] = None,
+    ) -> Optional[str]:
+        """Resolve the AniList URL for a manga given its MAL id or a title."""
+        try:
+            data = await client.query(
+                cls._URL_FROM_MAL_QUERY,
+                {"mal_id": mal_id, "search": name},
+            )
+        except AniListError:
+            return None
+        media = data.get("Media")
+        return media["siteUrl"] if media else None
 
 
-#     @staticmethod
-#     def parse_vndb_desciption(description: str) -> str:
-#         """Parse a VNDB description into a Discord friendly Markdown"""
-#         description = (
-#             description.replace("[spoiler]", "||")
-#             .replace("[/spoiler]", "||")
-#             .replace("#", "")
-#             .replace("[i]", "")
-#             .replace("[b]", "")
-#             .replace("[/b]", "")
-#             .replace("[/i]", "")
-#         )
+class ALNovel(AnilistBase):
+    _FROM_SEARCH_QUERY = """
+    query ($search: String, $type: MediaType) {
+        Media (search: $search, type: $type,
+               sort: POPULARITY_DESC, format_in: [NOVEL]) {
+            id
+            idMal
+            title { english romaji }
+            type
+            averageScore
+            format
+            meanScore
+            volumes
+            startDate { year }
+            coverImage { large }
+            bannerImage
+            genres
+            status
+            description (asHtml: false)
+            siteUrl
+        }
+    }
+    """
 
-#         pattern = r"\[url=(.*?)\](.*?)\[/url\]"
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
+        self.url = f"https://anilist.co/manga/{id_}"
+        self.client = client
+        super().__init__(name, id_)
 
-#         # Replace BBCode links with Markdown links in the text
-#         description = re.sub(pattern, _replace_bbcode_with_markdown, description)
-
-#         if len(description) > 300:
-#             description = description[0:300]
-
-#             if description.count("||") % 2:
-#                 description = description + "||"
-
-#             description = description + "..."
-
-#         return description
-
-#     @staticmethod
-#     def _replace_bbcode_with_markdown(match: re.Match) -> str:
-#         """Make a markdown-link string from a re Match object"""
-#         url = match.group(1)
-#         link_text = match.group(2)
-#         markdown_link = f"[{link_text}]({url})"
-#         return markdown_link
-
-
-# class VNDBChara(VNDBBase):
-#     ...
-
-
-# class ALAnime:
-#     ...
+    @classmethod
+    async def from_search(cls, query_: str, client: AniListClient) -> Optional[dict]:
+        try:
+            data = await client.query(
+                cls._FROM_SEARCH_QUERY,
+                {"search": query_, "type": "MANGA"},
+            )
+        except AniListError:
+            return None
+        return data.get("Media")
 
 
-# class ALManga:
-#     ...
+class ALUser(AnilistBase):
+    _QUERY = """
+    query ($name: String) {
+        User(name: $name) {
+            id
+            name
+            about
+            avatar { medium }
+        }
+    }
+    """
+
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
+        self.url = f"https://anilist.co/user/{name}"
+        self.client = client
+        super().__init__(name, id_)
+
+    @classmethod
+    async def from_name(cls, name: str, client: AniListClient) -> Optional["ALUser"]:
+        try:
+            data = await client.query(cls._QUERY, {"name": name})
+        except AniListError:
+            return None
+        user = data.get("User")
+        if not user:
+            return None
+        obj = cls(user["name"], user["id"], client)
+        obj._data = user
+        return obj
 
 
-# class ALNovel:
-#     ...
+class ALStudio(AnilistBase):
+    _QUERY = """
+    query ($search: String, $sort: [MediaSort]) {
+        Studio(search: $search) {
+            name
+            siteUrl
+            id
+            favourites
+            media(sort: $sort) {
+                nodes {
+                    title { english romaji }
+                    coverImage { large }
+                    averageScore
+                }
+            }
+        }
+    }
+    """
+
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
+        self.url = f"https://anilist.co/studio/{id_}"
+        self.client = client
+        super().__init__(name, id_)
+
+    @classmethod
+    async def from_search(cls, query_: str, client: AniListClient) -> Optional[dict]:
+        try:
+            data = await client.query(
+                cls._QUERY,
+                {"search": query_, "sort": "FAVOURITES_DESC"},
+            )
+        except AniListError:
+            return None
+        return data.get("Studio")
 
 
-# # class Genshin:
-# #     def __init__(self, character: str = None):
-# #         ...
+class ALStaff(AnilistBase):
+    _QUERY = """
+    query ($search: String, $sort: [MediaSort], $charactersSort: [CharacterSort], $perPage: Int) {
+        Staff(search: $search) {
+            dateOfBirth { year month day }
+            age
+            gender
+            favourites
+            description
+            image { medium }
+            name { full }
+            yearsActive
+            siteUrl
+            characters(sort: $charactersSort, perPage: $perPage) {
+                nodes {
+                    favourites
+                    name { full }
+                    image { medium }
+                    media(sort: $sort) {
+                        nodes {
+                            title { english romaji }
+                            type
+                            favourites
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """
+
+    def __init__(self, name: str, id_: int, client: AniListClient) -> None:
+        self.url = f"https://anilist.co/staff/{id_}"
+        self.client = client
+        super().__init__(name, id_)
+
+    @classmethod
+    async def from_search(
+        cls, query_: str, client: AniListClient, per_page: int = 10
+    ) -> Optional[dict]:
+        try:
+            data = await client.query(
+                cls._QUERY,
+                {
+                    "search": query_,
+                    "sort": "FAVOURITES_DESC",
+                    "charactersSort": "FAVOURITES_DESC",
+                    "perPage": per_page,
+                },
+            )
+        except AniListError:
+            return None
+        return data.get("Staff")

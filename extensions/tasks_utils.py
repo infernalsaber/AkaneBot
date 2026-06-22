@@ -373,11 +373,19 @@ async def update_code(ctx: lb.Context) -> None:
 @lb.add_checks(lb.owner_only)
 @lb.command("shutdown", "shut down", aliases=["kms"])
 @lb.implements(lb.PrefixCommand)
-async def guilds(ctx: lb.Context) -> None:
+async def shutdown(ctx: lb.Context) -> None:
     with open("ded.txt", "w+", encoding="UTF-8") as ded:
-        ded.write(".")
+        ded.write(str(ctx.channel_id))
     await ctx.respond("Shutting bot down...")
     await ctx.bot.close()
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.option("message", "The message", modifier=lb.commands.OptionModifier.CONSUME_REST)
+@lb.command("echo", "Repeat after me", pass_options=True)
+@lb.implements(lb.PrefixCommand)
+async def echo(ctx: lb.Context, message: str) -> None:
+    await ctx.respond(message)
 
 
 @task_plugin.command
@@ -549,18 +557,6 @@ async def prefix_invocation(event: hk.StartedEvent) -> None:
 
     conn.commit()
 
-
-# @task_plugin.listener(hk.InteractionCreateEvent)
-# async def global_killer(event: hk.InteractionCreateEvent) -> None:
-#     if not isinstance(event.interaction, hk.ComponentInteraction):
-#         return
-#     print("\n\n\n")
-#     # hk.ComponentInteraction.
-#     print(event.interaction.component_type)
-#     print(event.interaction.values)
-#     print("\n\n\n")
-# if isinstance():
-#     ...
 
 
 @task_plugin.listener(lb.CommandInvocationEvent)
