@@ -16,11 +16,10 @@ async def main_bot_loop():
             process = subprocess.Popen(
                 check, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
             )
-            stdout, stderr = process.communicate()
+            stdout, _ = process.communicate()
             if not int.from_bytes(stdout, byteorder="big"):
                 print("Starting bot.")
-                if not os.path.exists("logs"):
-                    os.mkdir("logs")
+
                 os.system(
                     f"nohup {sys.executable.split('/')[-1]} -OO bot.py >> logs/output.log 2>&1 &"
                 )

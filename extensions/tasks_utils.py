@@ -390,11 +390,15 @@ async def echo(ctx: lb.Context, message: str) -> None:
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)
+@lb.option("channel", "The channel where the message is", hk.GuildChannel, required=False)
 @lb.option("message", "The message id")
-@lb.option("channel", "The channel where the message is", hk.GuildChannel)
 @lb.command("del", "Delete a message", pass_options=True)
 @lb.implements(lb.PrefixCommand)
-async def delete_msg(ctx: lb.Context, channel: hk.GuildChannel, message: int) -> None:
+async def delete_msg(ctx: lb.Context, message: int, channel: hk.GuildChannel | None) -> None:
+    
+    if not channel:
+        channel = ctx.channel_id
+    
     await ctx.bot.rest.delete_message(channel=channel.id, message=message)
     await ctx.respond("Deleted", delete_after=1)
     await ctx.event.message.delete()
