@@ -396,6 +396,10 @@ class SwapButton(miru.Button):
                     await ctx.edit_response(
                         content=self.swap_page, embeds=[], components=self.view
                     )
+                elif isinstance(self.swap_page, list):
+                    await ctx.edit_response(
+                        content=None, embeds=self.swap_page, components=self.view
+                    )
                 else:
                     await ctx.edit_response(
                         content=None, embeds=[self.swap_page], components=self.view
@@ -411,6 +415,10 @@ class SwapButton(miru.Button):
             if isinstance(self.original_page, str):
                 await ctx.edit_response(
                     content=self.original_page, embeds=[], components=self.view
+                )
+            elif isinstance(self.original_page, list):
+                await ctx.edit_response(
+                    content=None, embeds=self.original_page, components=self.view
                 )
             else:
                 await ctx.edit_response(

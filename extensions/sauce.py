@@ -45,7 +45,7 @@ sauce_plugin = lb.Plugin(
     "Sauce", "Finding the source of an image", include_datastore=True
 )
 sauce_plugin.d.help_image = "https://i.imgur.com/YxvyvaF.png"
-sauce_plugin.d.help_emoji = "❓"
+sauce_plugin.d.help_emoji = "🔍"
 sauce_plugin.d.help = True
 
 

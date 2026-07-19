@@ -275,3 +275,25 @@ def get_random_quote() -> str:
             "The world is full of lost ballads, waiting to be rediscovered.",
         ]
     )
+
+
+def truncate_words(text: str, limit: int) -> str:
+    """Truncate text at word boundaries within limit and append '...' cleanly."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+
+    max_len = limit - 3
+    if max_len <= 0:
+        return "..."
+
+    truncated = text[:max_len]
+
+    if text[max_len : max_len + 1] and not text[max_len : max_len + 1].isspace():
+        last_space = truncated.rfind(" ")
+        if last_space != -1:
+            truncated = truncated[:last_space]
+
+    truncated = truncated.rstrip(" .,!?:;-")
+    return truncated + "..."
+

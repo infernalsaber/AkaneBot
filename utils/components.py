@@ -35,7 +35,9 @@ class SimpleTextSelect(miru.TextSelect):
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         if hasattr(self.view, "pages"):
-            await ctx.edit_response(embeds=[self.view.pages[self.values[0]]])
+            val = self.view.pages[self.values[0]]
+            embeds_list = val if isinstance(val, list) else [val]
+            await ctx.edit_response(embeds=embeds_list)
 
 
 class CharacterSelect(miru.TextSelect):

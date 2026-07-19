@@ -54,8 +54,13 @@ class HttpClient:
                 return resp
 
             if resp.status == 429 and attempt == 0:
-                retry_after = resp.headers.get("Retry-After", 5)
-                if retry_after is not None and retry_after <= 300:
+                retry_after_raw = resp.headers.get("Retry-After", 5)
+                try:
+                    retry_after = float(retry_after_raw)
+                except (ValueError, TypeError):
+                    retry_after = 5.0
+
+                if retry_after <= 300:
                     logger.info(f"{method} {url} -> 429; retrying after {retry_after}s")
                     await asyncio.sleep(retry_after)
                     continue

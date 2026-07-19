@@ -26,11 +26,12 @@ from utils.anilist import (
     ALUser,
     AnilistBase,
 )
+from utils.anilist_graph import find_series_name
 from utils.components import CharacterSelect, SimpleTextSelect
 from utils.errors import RequestsFailedError
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
-from utils.misc import verbose_timedelta
+from utils.misc import verbose_timedelta, truncate_words, get_random_quote
 
 al_listener = lb.Plugin(
     "Anilist",
@@ -110,7 +111,7 @@ async def anime_search(ctx: lb.Context, anime: str) -> None:
     "The manga to search for",
     # autocomplete=True
 )
-@lb.command("manga", "Search for a manga on Anilist and MangaPark", pass_options=True, auto_defer=True)
+@lb.command("manga", "Search for a manga on Anilist", pass_options=True, auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
 async def manga_search(ctx: lb.Context, manga: str) -> None:
     """Search for a manga on AL"""
@@ -146,6 +147,26 @@ async def character_search(ctx: lb.Context, character: str) -> None:
 # ============= LOOKUP SLASH COMMANDS END HERE =============
 
 @al_listener.command
+@lb.add_cooldown(30, 3, lb.GlobalBucket)
+@lb.set_max_concurrency(2, lb.GlobalBucket)
+@lb.option(
+    "series",
+    "The series to get the watch order for",
+    modifier=lb.commands.OptionModifier.CONSUME_REST,
+)
+@lb.command(
+    "watch-order",
+    "Time investment needed by a series and watch order",
+    aliases=["timeto", "watchorder", "wo"],
+    pass_options=True,
+    auto_defer=True,
+)
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
+async def time_to(ctx: lb.Context, series: str) -> None:
+    """Time investment needed by a series and watch order"""
+    return await _time_to(ctx, series)
+
+@al_listener.command
 @lb.option("query", "The anime query", modifier=lb.commands.OptionModifier.CONSUME_REST)
 @lb.command("anime", "Search a anime", pass_options=True, aliases=["ani", "a"])
 @lb.implements(lb.PrefixCommand)
@@ -165,7 +186,7 @@ async def anime_search(ctx: lb.PrefixContext, query: str):
 @lb.command("manga", "Search a manga", pass_options=True, aliases=["m"])
 @lb.implements(lb.PrefixCommand)
 async def manga_search(ctx: lb.PrefixContext, query: str):
-    """Search a manga on AL and fetch it's preview via MD
+    """Search a manga on AL
 
     Args:
         ctx (lb.PrefixContext): The context
@@ -296,7 +317,7 @@ async def nhhh(ctx: lb.PrefixContext, code: int):
 @lb.option(
     "query", "The voice actor to search", modifier=lb.commands.OptionModifier.CONSUME_REST
 )
-@lb.command("voiceactor", "Search a voice actor on AniList", pass_options=True, aliases=["seiyuu", "va"])
+@lb.command("voiceactor", "Search a voice actor on AniList", pass_options=True, aliases=["seiyuu", "va"], auto_defer=True)
 @lb.implements(lb.PrefixCommand)
 async def voiceactor_search(ctx: lb.PrefixContext, query: str):
     """Search for a voice actor on AniList
@@ -312,7 +333,7 @@ async def voiceactor_search(ctx: lb.PrefixContext, query: str):
 @lb.option(
     "query", "The studio to search", modifier=lb.commands.OptionModifier.CONSUME_REST
 )
-@lb.command("studio", "Search a studio on AniList", pass_options=True, aliases=["st"])
+@lb.command("studio", "Search a studio on AniList", pass_options=True, aliases=["st"], auto_defer=True)
 @lb.implements(lb.PrefixCommand)
 async def studio_search(ctx: lb.PrefixContext, query: str):
     """Search for a studio on AniList"""
@@ -427,30 +448,93 @@ async def _search_game(ctx: lb.Context, query: str):
 
 
 async def _search_studio(ctx: lb.Context, query: str):
+    """Search for a studio on AniList"""
+    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
+    try:
+        studio = await ALStudio.from_search(query, ctx.bot.d.anilist)
+        if not studio:
+            await ctx.edit_last_response(
+                content=None,
+                embed=hk.Embed(
+                    title="STUDIO NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find studio `{query}` on AniList 😵",
+                    timestamp=datetime.now().astimezone(),
+                ),
+                delete_after=15,
+            )
+            return
 
-    studio = await ALStudio.from_search(query, ctx.bot.d.anilist)
-    if not studio:
-        await ctx.respond(f"Couldn't find studio `{query}` on AniList")
-        return
+        media_nodes = studio.get('media_nodes') or studio.get('media', {}).get('nodes', [])
+        studio_works = []
+        seen_anime_ids = set()
 
-    desc = ""
-    for media in studio['media']['nodes'][:5]:
-        desc += f"{media['title']['english'] or media['title']['romaji']} - {media['averageScore']}\n"
+        def collect_related_anime_ids(data_obj, visited_set):
+            if isinstance(data_obj, dict):
+                if data_obj.get("type") == "ANIME" or "title" in data_obj:
+                    if "id" in data_obj:
+                        visited_set.add(data_obj["id"])
+                for v in data_obj.values():
+                    collect_related_anime_ids(v, visited_set)
+            elif isinstance(data_obj, list):
+                for item in data_obj:
+                    collect_related_anime_ids(item, visited_set)
 
-    await ctx.respond(
-        hk.Embed(
-            title=studio['name'],
-            url=studio['siteUrl'],
-            color=colors.ANILIST,
-            timestamp=datetime.now().astimezone(),
+        for media in media_nodes:
+            media_id = media.get('id')
+            if not media_id or media_id in seen_anime_ids:
+                continue
+
+            collect_related_anime_ids(media, seen_anime_ids)
+
+            title = media.get('title', {}).get('english') or media.get('title', {}).get('romaji') or "Unknown"
+            score = media.get('averageScore')
+            cover_image = media.get('coverImage', {}).get('large')
+
+            if cover_image:
+                studio_works.append({
+                    'title': title,
+                    'image': cover_image,
+                    'subtitle': f"Score: {score}" if score is not None else "Score: NA",
+                })
+
+            if len(studio_works) == 8:
+                break
+
+        if studio_works:
+            card_image = await card_maker(studio_works, ctx.bot.d.anilist)
+            image = BytesIO()
+            card_image.save(image, format='PNG')
+            image.seek(0)
+        else:
+            image = BytesIO()
+
+        embed = (
+            hk.Embed(
+                title=studio['name'],
+                url=studio['siteUrl'],
+                color=colors.ANILIST,
+                timestamp=datetime.now().astimezone(),
+            )
+            .set_image(hk.Bytes(image, 'studio_card.png'))
+            .set_footer(
+                text="Source: AniList",
+                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+            )
         )
-        .add_field("Favourites", studio['favourites'])
-        .add_field("Description", desc)
-        .set_footer(
-            text="Source: AniList",
-            icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-        )
-    )
+
+        if studio.get('favourites') is not None:
+            embed.add_field("Favourites", f"{studio['favourites']}❤", inline=True)
+
+        view = views.AuthorView(user_id=ctx.author.id)
+        view.add_item(btns.KillButton())
+
+        choice = await ctx.edit_last_response(content=None, embed=embed, components=view)
+        await view.start(choice)
+        await view.wait()
+
+    except Exception as e:
+        await ctx.edit_last_response(f"Error: {e}")
 
 
 def _parse_non_anime_roles(description: str) -> list:
@@ -482,7 +566,8 @@ def _parse_non_anime_roles(description: str) -> list:
                         possible_role = possible_role.replace(character_name, "").strip()
                     
                     series = parse_role(possible_role)
-                    if character_name and series:
+                    character_name = parse_role(character_name)
+                    if character_name and series and character_name != "~!":
                         non_anime_roles.append({
                             'character': character_name,
                             'series': series,
@@ -501,9 +586,10 @@ def _parse_non_anime_roles(description: str) -> list:
                     if series and series.startswith('(') and series.endswith(')'):
                         series = series[1:-1]
                     
-                    if character_name and series:
+                    character_name = parse_role(character_name)
+                    if character_name and series and character_name != "~!":
                         non_anime_roles.append({
-                            'character': parse_role(character_name),
+                            'character': character_name,
                             'series': series,
                             'type': 'other',
                         })
@@ -532,12 +618,14 @@ def trim_va_description(description: str) -> str:
 
 async def _search_voiceactor(ctx: lb.Context, query: str):
     """Search for a voice actor on AniList"""
+    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
     try:
-        data = await ALStaff.from_search(query, ctx.bot.d.anilist)
+        data = await ALStaff.from_search(query, ctx.bot.d.anilist, per_page=15)
 
         if not data:
-            await ctx.respond(
-                hk.Embed(
+            await ctx.edit_last_response(
+                content=None,
+                embed=hk.Embed(
                     title="VOICE ACTOR NOT FOUND",
                     color=colors.ERROR,
                     description=f"Couldn't find voice actor `{query}` 😵",
@@ -552,8 +640,6 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
         if data['dateOfBirth']:
             if data['dateOfBirth'].get('day') and data['dateOfBirth'].get('month'):
                 dob = f"{data['dateOfBirth']['day']}/{data['dateOfBirth']['month']}"
-                # if data['dateOfBirth'].get('year'):
-                #     dob += f"/{data['dateOfBirth']['year']}"
         
         # Parse description
         description = parse_description(trim_va_description(data.get('description', '')), limit=300) if data.get('description') else "NA"
@@ -567,8 +653,9 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
         characters = data.get('characters', {}).get('nodes', [])
         
         if not characters:
-            await ctx.respond(
-                hk.Embed(
+            await ctx.edit_last_response(
+                content=None,
+                embed=hk.Embed(
                     title="NO VA ROLES FOUND",
                     color=colors.WARN,
                     description=f"{data.get('name', {}).get('full', '')} has no voice acting roles. Visit {data.get('siteUrl', '')} to view info about them.",
@@ -576,151 +663,274 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
                 ),
                 delete_after=15,
             )
+            return
         
         for character in characters:
-            
-            
-            if character.get('media', {}).get('nodes'):
+            if character.get('image', {}).get('medium') and character.get('media', {}).get('nodes'):
                 media = character['media']['nodes'][0]
-                anime_roles.append({
-                    'title': character['name']['full'],
-                    'image': character.get('image', {}).get('medium'),
-                    # 'favourites': character.get('favourites', 0),
-                    'subtitle': media.get('title', {}).get('english') or media.get('title', {}).get('romaji'),
-                })
+                subtitle = media.get('title', {}).get('english') or media.get('title', {}).get('romaji')
+                if subtitle:
+                    anime_roles.append({
+                        'title': character['name']['full'],
+                        'image': character['image']['medium'],
+                        'subtitle': subtitle,
+                    })
+            if len(anime_roles) == 8:
+                break
+        
+        def build_base_embed() -> hk.Embed:
+            emb = (
+                hk.Embed(
+                    title=data['name']['full'],
+                    url=data.get('siteUrl', ''),
+                    color=colors.ANILIST,
+                    timestamp=datetime.now().astimezone(),
+                )
+                .set_thumbnail(data.get('image', {}).get('medium'))
+                .set_footer(
+                    text="Source: AniList",
+                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                )
+            )
+            
+            info_fields = []
+            if data.get('yearsActive'):
+                if len(data['yearsActive']) == 1:
+                    years_active = f"{data['yearsActive'][0]} - Present"
+                elif len(data['yearsActive']) == 2:
+                    years_active = f"{data['yearsActive'][0]} - {data['yearsActive'][1]}"
+                else:
+                    years_active = str(data['yearsActive'])
+                info_fields.append(("Years Active", years_active, True))
+            if data.get('favourites'):
+                info_fields.append(("Favourites", f"{data['favourites']}❤", True))
+            
+            for name, value, inline in info_fields:
+                emb.add_field(name, value, inline=inline)
+            
+            emb.add_field("Description", description, inline=False)
+            
+            if non_anime_roles:
+                other_roles_list = [role['character'] for role in non_anime_roles if role['character'].strip() != "~!"]
+                if other_roles_list:
+                    emb.add_field("Other Roles", ",".join([f"{role}" for role in other_roles_list[:5]]), inline=False)
+            
+            return emb
+
+        embed = build_base_embed()
         
         if anime_roles:
-            card_image = card_maker(anime_roles)
-            image = BytesIO()
-            card_image.save(image, format='PNG')
-            image.seek(0)
-        else:
-            image = BytesIO()
+            card_image_4 = await card_maker(anime_roles[:4], ctx.bot.d.anilist)
+            buf4 = BytesIO()
+            card_image_4.save(buf4, format='PNG')
+            embed.set_image(hk.Bytes(buf4.getvalue(), 'va_card_4.png'))
 
+        swap_embed = None
+        if len(anime_roles) > 4:
+            swap_embed = build_base_embed()
+            card_image_8 = await card_maker(anime_roles[:8], ctx.bot.d.anilist)
+            buf8 = BytesIO()
+            card_image_8.save(buf8, format='PNG')
+            swap_embed.set_image(hk.Bytes(buf8.getvalue(), 'va_card_8.png'))
+
+        view = views.AuthorView(user_id=ctx.author.id)
+        if swap_embed:
+            view.add_item(
+                btns.SwapButton(
+                    original_page=embed,
+                    swap_page=swap_embed,
+                    label1="See more roles",
+                    emoji1="⬇",
+                    label2="See less roles",
+                    emoji2="⬆",
+                )
+            )
+        view.add_item(btns.KillButton())
         
-        # await ctx.respond(image)
+        choice = await ctx.edit_last_response(content=None, embed=embed, components=view)
+        await view.start(choice)
+        await view.wait()
         
-        # Build embed
+    except Exception as e:
+        await ctx.edit_last_response(f"Error: {e}")
+    
+
+class AnimeSelect(miru.TextSelect):
+    """A text select for Anime search that updates embeds and trailer swap button"""
+
+    def __init__(
+        self,
+        *,
+        options: list[miru.SelectOption],
+        placeholder: str = "Select an anime",
+    ) -> None:
+        super().__init__(options=options, placeholder=placeholder)
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        selected_id = self.values[0]
+        if hasattr(self.view, "pages") and selected_id in self.view.pages:
+            new_embed = self.view.pages[selected_id]
+            trailer = getattr(self.view, "trailers", {}).get(selected_id, "Couldn't find anything.")
+
+            for child in self.view.children:
+                if isinstance(child, btns.SwapButton):
+                    child.original_page = new_embed
+                    child.swap_page = trailer
+                    child.label = child.label1
+                    child.emoji = child.emoji1
+                    break
+
+            await ctx.edit_response(content=None, embeds=[new_embed], components=self.view)
+
+
+async def _search_novel(ctx: lb.Context, novel: str):
+    """Search a novel on AL"""
+    media_list = await ALNovel.from_search_multiple(novel, ctx.bot.d.anilist)
+
+    if not media_list:
+        single_res = await ALNovel.from_search(novel, ctx.bot.d.anilist)
+        if single_res:
+            media_list = [single_res]
+
+    if not media_list:
+        await ctx.respond("No novel found")
+        return
+
+    pages = {}
+    options = []
+    first_page = None
+
+    for i, response in enumerate(media_list[:15]):
+        title = (response["title"]["english"] or response["title"]["romaji"])[:99]
+
+        if response.get("description"):
+            clean_desc = parse_description(response["description"])
+        else:
+            clean_desc = "NA"
+
+        rel_year = response.get("startDate", {}).get("year")
+        label_text = f"{title} ({rel_year})" if rel_year else title
+        label_text = truncate_words(label_text, 100)
+
+        if clean_desc != "NA":
+            short_desc = " ".join(clean_desc.split())
+            if len(response.get("description", "")) > 75 or len(short_desc) > 75:
+                short_desc = truncate_words(short_desc, 75)
+        else:
+            short_desc = "No description"
+
+        item_id_str = str(response["id"])
+
+        options.append(
+            miru.SelectOption(
+                label=label_text,
+                value=item_id_str,
+                description=short_desc,
+            )
+        )
+
         embed = (
             hk.Embed(
-                title=data['name']['full'],
-                url=data.get('siteUrl', ''),
-                # description=description,
+                title=title,
+                url=response["siteUrl"],
+                description="\n\n",
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .set_thumbnail(data.get('image', {}).get('medium'))
-            .set_image(hk.Bytes(image, 'va_card.png'))
+            .add_field("Rating", response.get("meanScore") or "NA")
+            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
+            .add_field("Status", response.get("status", "NA"), inline=True)
+            .add_field(
+                "Volumes",
+                response.get("volumes") or "NA",
+                inline=True,
+            )
+            .add_field("Summary", clean_desc)
+            .set_thumbnail(response.get("coverImage", {}).get("large"))
+            .set_image(response.get("bannerImage"))
             .set_footer(
                 text="Source: AniList",
                 icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             )
         )
-        
-        # Add basic info fields
-        info_fields = []
-        # if data.get('gender'):
-        #     info_fields.append(("Gender", data['gender'], True))
-        # if dob:
-        #     info_fields.append(("Date of Birth", dob, True))
-        # if data.get('age'):
-        #     info_fields.append(("Age", str(data['age']), True))
-        if data.get('yearsActive'):
-            
-            if len(data['yearsActive']) == 1:
-                years_active = f"{data['yearsActive'][0]} - Present"
-            elif len(data['yearsActive']) == 2:
-                years_active = f"{data['yearsActive'][0]} - {data['yearsActive'][1]}"
-            else:
-                years_active = str(data['yearsActive'])
-            info_fields.append(("Years Active", years_active, True))
-        if data.get('favourites'):
-            info_fields.append(("Favourites", f"{data['favourites']}❤", True))
-        
-        for name, value, inline in info_fields:
-            embed.add_field(name, value, inline=inline)
-        
-        embed.add_field("Description", description, inline=False)
-        
-        if non_anime_roles:
-            embed.add_field("Other Roles", ",".join([f"{role['character']}"  for role in non_anime_roles[:5]]), inline=False)
-        
-        # Add top anime roles
-        # if anime_roles:
-        #     top_roles = sorted(anime_roles, key=lambda x: x.get('favourites', 0), reverse=True)[:5]
-        #     roles_text = "\n".join([
-        #         f"{role['character']} ({role['series']})"
-        #         for role in top_roles
-        #     ])
-        #     # if len(anime_roles) > 5:
-        #     #     roles_text += f"\n*...and {len(anime_roles) - 5} more*"
-        #     embed.add_field("Top Anime Roles", roles_text, inline=False)
-        
-        
-        
-        # Add non-anime roles if any
-        # if non_anime_roles:
-        #     non_anime_text = "\n".join([
-        #         f"{role['character']} ({role['series']})"
-        #         for role in non_anime_roles[:5]
-        #     ])
-        #     # if len(non_anime_roles) > 5:
-        #     #     non_anime_text += f"\n*...and {len(non_anime_roles) - 5} more*"
-        #     embed.add_field("Video Game Roles", non_anime_text, inline=False)
-        
-        await ctx.respond(embed=embed)
-        
-    except Exception as e:
-        await ctx.respond(e)
-    
 
-async def _search_novel(ctx: lb.Context, novel: str):
-    """Search a novel on AL"""
-    response = await ALNovel.from_search(novel, ctx.bot.d.anilist)
+        if not i:
+            first_page = embed
 
-    if not response:
-        await ctx.respond("No novel found")
-        return
+        pages[item_id_str] = embed
 
-    title = (response["title"]["english"] or response["title"]["romaji"])[:99]
-
-
-    if response["description"]:
-        response["description"] = parse_description(response["description"])
-
-    else:
-        response["description"] = "NA"
-
-    view = views.AuthorView(user_id=ctx.author.id)
+    view = views.SelectView(user_id=ctx.author.id, pages=pages)
+    view.add_item(SimpleTextSelect(options=options, placeholder="Select a novel"))
     view.add_item(btns.KillButton())
-    choice = await ctx.respond(
-        embed=hk.Embed(
-            title=title,
-            url=response["siteUrl"],
-            description="\n\n",
-            color=colors.ANILIST,
-            timestamp=datetime.now().astimezone(),
-        )
-        .add_field("Rating", response["meanScore"])
-        .add_field("Genres", ", ".join(response["genres"][:4]))
-        .add_field("Status", response["status"], inline=True)
-        .add_field(
-            "Volumes",
-            response.get("volumes") or "NA",
-            inline=True,
-        )
-        .add_field("Summary", response["description"])
-        .set_thumbnail(response["coverImage"]["large"])
-        .set_image(response["bannerImage"])
-        .set_footer(
-            text="Source: AniList",
-            icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-        ),
-        components=view,
-    )
 
+    choice = await ctx.respond(embed=first_page, components=view)
     await view.start(choice)
     await view.wait()
+
+
+async def _time_to(ctx: lb.Context, series: str) -> None:
+    """Time investment needed by a series and watch order"""
+    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
+    try:
+        data = await ALAnime.get_anime_data(ctx.bot.d.anilist, search=series)
+        media = data.get("Media") if data else None
+        if not media:
+            await ctx.edit_last_response(f"Could not find any anime matching `{series}` 😵")
+            return
+
+        anime_id = int(media["id"])
+        series_list = await ALAnime.format_chronological_order(ctx.bot.d.anilist, anime_id=anime_id)
+        if not series_list:
+            await ctx.edit_last_response(f"Could not find watch order for `{series}` 😵")
+            return
+
+        order = " -> ".join(str(entry) for entry in series_list)
+        total_time_investment = sum(
+            entry.episodes * entry.duration for entry in series_list
+        )
+        try:
+            series_name = find_series_name(
+                [entry.title.lower() for entry in series_list]
+            ).title()
+        except Exception:
+            series_name = media.get("title", {}).get("english") or media.get("title", {}).get("romaji") or series.title()
+
+        if not series_name:
+            series_name = series.title()
+
+        hours, mins = divmod(total_time_investment, 60)
+        time_str = f"{hours} hours, {mins} minutes" if hours else f"{mins} minutes"
+
+        response_text = (
+            f"The time investment required for the `{series_name}` series is {time_str}.\n\n"
+            f"The suggested watch order, based on release date is as follows:\n{order}"
+        )
+
+        if len(response_text) > 2000:
+            header = f"The time investment required for the `{series_name}` series is {time_str}.\n\nThe suggested watch order, based on release date is as follows:\n"
+            await ctx.edit_last_response(header, flags=hk.MessageFlag.SUPPRESS_EMBEDS)
+
+            curr_chunk = ""
+            for entry in series_list:
+                item_str = str(entry)
+                if len(curr_chunk) + len(item_str) + 4 > 1900:
+                    await ctx.respond(curr_chunk, flags=hk.MessageFlag.SUPPRESS_EMBEDS)
+                    curr_chunk = item_str
+                else:
+                    if curr_chunk:
+                        curr_chunk += " -> " + item_str
+                    else:
+                        curr_chunk = item_str
+            if curr_chunk:
+                await ctx.respond(curr_chunk, flags=hk.MessageFlag.SUPPRESS_EMBEDS)
+        else:
+            await ctx.edit_last_response(
+                response_text,
+                flags=hk.MessageFlag.SUPPRESS_EMBEDS,
+            )
+
+    except Exception as e:
+        await ctx.edit_last_response(f"Error fetching watch order: {e}")
 
 
 async def _search_anime(ctx, anime: str):
@@ -730,72 +940,46 @@ async def _search_anime(ctx, anime: str):
     if not media_list:
         return await ctx.respond("Your query doesn't match any results 😵")
 
-    view = views.AuthorView(user_id=ctx.author.id)
-    if len(media_list) != 1:
-        embed = hk.Embed(
-            title="Choose the desired anime",
-            color=0x43408A,
-            timestamp=datetime.now().astimezone(),
-        )
+    pages = {}
+    trailers_dict = {}
+    options = []
+    first_page = None
+    first_trailer = "Couldn't find anything."
 
-        for count, item in enumerate(media_list):
-            embed.add_field(
-                count + 1, item["title"]["english"] or item["title"]["romaji"]
+    for i, response in enumerate(media_list[:15]):
+        title = response["title"]["english"] or response["title"]["romaji"]
+
+        no_of_items = response.get("episodes") if response.get("episodes") else "NA"
+
+        if isinstance(response.get("episodes"), int) and no_of_items == 1:
+            no_of_items = (
+                verbose_timedelta(timedelta(minutes=response["duration"]))
+                if response.get("duration")
+                else "NA"
             )
-            view.add_item(
-                btns.GenericButton(style=hk.ButtonStyle.PRIMARY, label=f"{count+1}")
-            )
+        elif response.get("nextAiringEpisode"):
+            if no_of_items == "NA":
+                no_of_items = f"{response['nextAiringEpisode']['episode']-1}/??"
+            else:
+                no_of_items = f"{response['nextAiringEpisode']['episode']-1}/{no_of_items}"
 
-        embed.set_image("https://i.imgur.com/FCxEHRN.png")
-
-        choice = await ctx.respond(embed=embed, components=view)
-
-        await view.start(choice)
-        await view.wait()
-
-        if hasattr(view, "answer"):
-            num = int(f"{view.answer}") - 1
+        if response.get("description"):
+            clean_desc = parse_description(response["description"])
         else:
-            await ctx.edit_last_response(components=[])
-            return
+            clean_desc = "NA"
 
-    else:
-        await ctx.respond(
-            hk.Embed(
-                description=f"Loading {emotes.LOADING.value}",
-                color=colors.ELECTRIC_BLUE,
-            )
-        )
-        num = 0
+        rel_year = response.get("startDate", {}).get("year")
+        label_text = f"{title} ({rel_year})" if rel_year else title
+        label_text = truncate_words(label_text, 100)
 
-    response = media_list[num]
-
-    title = response["title"]["english"] or response["title"]["romaji"]
-
-    no_of_items = response["episodes"] if response["episodes"] else "NA"
-
-    if isinstance(response["episodes"], int) and no_of_items == 1:
-        no_of_items = (
-            verbose_timedelta(timedelta(minutes=response["duration"]))
-            if response["duration"]
-            else "NA"
-        )
-    elif response["nextAiringEpisode"]:
-        if no_of_items == "NA":
-            no_of_items = f"{response['nextAiringEpisode']['episode']-1}/??"
+        if clean_desc != "NA":
+            short_desc = " ".join(clean_desc.split())
+            if len(response.get("description", "")) > 75 or len(short_desc) > 75:
+                short_desc = truncate_words(short_desc, 75)
         else:
-            no_of_items = f"{response['nextAiringEpisode']['episode']-1}/{no_of_items}"
+            short_desc = "No description"
 
-    if response["description"]:
-        response["description"] = parse_description(response["description"])
-
-    else:
-        response["description"] = "NA"
-
-    try:
-        trailer = "Couldn't find anything."
-
-        if response["studios"]["nodes"]:
+        if response.get("studios") and response["studios"].get("nodes"):
             studios = ", ".join([st["name"] for st in response["studios"]["nodes"]])
         else:
             studios = "Unknown"
@@ -809,220 +993,135 @@ async def _search_anime(ctx, anime: str):
                 timestamp=datetime.now().astimezone(),
             )
             .add_field(
-                "Rating", response["meanScore"] if response["meanScore"] else "NA"
+                "Rating", response.get("meanScore") or "NA"
             )
-            .add_field("Genres", ", ".join(response["genres"][:4]))
-            .add_field("Status", response["status"].replace("_", " "), inline=True)
+            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
+            .add_field("Status", response.get("status", "NA").replace("_", " "), inline=True)
             .add_field(
-                "Episodes" if response["episodes"] != 1 else "Duration",
+                "Episodes" if response.get("episodes") != 1 else "Duration",
                 no_of_items,
                 inline=True,
             )
             .add_field("Studio", studios, inline=True)
-            .add_field("Summary", response["description"])
-            .set_thumbnail(response["coverImage"]["large"])
-            .set_image(response["bannerImage"])
+            .add_field("Summary", clean_desc)
+            .set_thumbnail(response.get("coverImage", {}).get("large"))
+            .set_image(response.get("bannerImage"))
             .set_footer(
                 text="Source: AniList",
                 icon="https://anilist.co/img/icons/android-chrome-512x512.png",
             )
         )
 
-        view.clear_items()
-
-        if response["trailer"]:
+        trailer = "Couldn't find anything."
+        if response.get("trailer") and response["trailer"].get("site") and response["trailer"].get("id"):
             if response["trailer"]["site"] == "youtube":
-                trailer = f"https://{response['trailer']['site']}.com/watch?v={response['trailer']['id']}"
+                trailer = f"https://youtube.com/watch?v={response['trailer']['id']}"
             else:
                 trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
 
-            view.add_item(
-                btns.SwapButton(
-                    swap_page=trailer,
-                    original_page=embed,
-                    label1="Trailer",
-                    emoji1=hk.Emoji.parse(emotes.YOUTUBE.value),
-                    emoji2=hk.Emoji.parse("🔍"),
-                )
-            )
+        item_id_str = str(response["id"])
+        if not i:
+            first_page = embed
+            first_trailer = trailer
 
-        view.add_item(btns.KillButton())
-        choice = await ctx.edit_last_response(
-            embed=embed,
-            components=view,
+        options.append(
+            miru.SelectOption(
+                label=label_text,
+                value=item_id_str,
+                description=short_desc,
+            )
         )
-        await view.start(choice)
-        await view.wait()
-    except Exception as e:
-        print(e)
+        pages[item_id_str] = embed
+        trailers_dict[item_id_str] = trailer
+
+    view = views.SelectView(user_id=ctx.author.id, pages=pages)
+    view.trailers = trailers_dict
+    view.add_item(AnimeSelect(options=options, placeholder="Select an anime"))
+    view.add_item(
+        btns.SwapButton(
+            swap_page=first_trailer,
+            original_page=first_page,
+            label1="Trailer",
+            emoji1=hk.Emoji.parse(emotes.YOUTUBE.value),
+            emoji2=hk.Emoji.parse("🔍"),
+        )
+    )
+    view.add_item(btns.KillButton())
+
+    choice = await ctx.respond(embed=first_page, components=view)
+    await view.start(choice)
+    await view.wait()
+    # except Exception as e:
+    #     print(e)
 
 
 async def _search_manga(ctx, manga: str):
-    """Search a manga on AL and Preview on MD"""
+    """Search a manga on AL"""
     try:
-        options = []
-        pages = {}
-
         series_list = await ALManga.from_search_multiple(manga, ctx.bot.d.anilist)
         if not series_list:
             await ctx.respond("No manga found")
             return
-        
-        if len(series_list) > 1:
-        
-            for idx, series in enumerate(series_list):
-                options.append(
-                    miru.SelectOption(
-                        label=(series["title"]["english"] or series["title"]["romaji"])[:99],
-                        value=idx,
-                        description=series["description"][:75] + "..." if series["description"] else "",
-                        )
-                    )
 
-            view = views.AuthorView(user_id=ctx.author.id)
-            view.add_item(SimpleTextSelect(options=options, placeholder="Select a manga"))
-            view.add_item(btns.KillButton())
+        pages = {}
+        options = []
+        first_page = None
 
-            resp = await ctx.respond(components=view)
-            await view.start(resp)
+        for i, series in enumerate(series_list[:15]):
+            title = (series["title"]["english"] or series["title"]["romaji"])[:99]
+            no_of_items = series.get("chapters") or series.get("episodes") or "NA"
 
-            await view.wait_for_input(timeout=20)
-            
-            try:
-                response_idx = int(view.children[0].values[0])
-            except Exception:
-                response_idx = 0
-        
-        else:
-            response_idx = 0
-            await ctx.respond(
+            if series.get("description"):
+                description = parse_description(series["description"])
+            else:
+                description = "NA"
+
+            embed = (
                 hk.Embed(
-                    description=f"Loading {emotes.LOADING.value}",
-                    color=colors.ELECTRIC_BLUE,
+                    title=title,
+                    url=series["siteUrl"],
+                    description="\n\n",
+                    color=colors.ANILIST,
+                    timestamp=datetime.now().astimezone(),
+                )
+                .add_field("Rating", series.get("meanScore") or "NA")
+                .add_field("Genres", ", ".join(series.get("genres", [])[:4]) if series.get("genres") else "NA")
+                .add_field("Status", series.get("status", "NA").replace("_", " ") if series.get("status") else "NA", inline=True)
+                .add_field(
+                    "Chapters",
+                    no_of_items,
+                    inline=True,
+                )
+                .add_field("Summary", description)
+                .set_thumbnail(series["coverImage"]["large"] if series.get("coverImage") else None)
+                .set_image(series.get("bannerImage"))
+                .set_footer(
+                    text="Source: AniList",
+                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
                 )
             )
 
+            series_id_str = str(series["id"])
+            if not i:
+                first_page = embed
 
-        response = series_list[response_idx]
-
-        if not response:
-            await ctx.respond("No manga found")
-
-        title = (response["title"]["english"] or response["title"]["romaji"])[:99]
-
-        no_of_items = response.get("chapters", response.get("episodes", "NA"))
-
-        if response["description"]:
-            response["description"] = parse_description(response["description"])
-        else:
-            response["description"] = "NA"
-
-        cookies = {
-            'theme': 'mdark',
-            'wd': '959x710',
-        }
-        MANGAPARK_URL = 'https://mangapark.io'
-
-        headers = {
-            'accept': '*/*',
-            'cache-control': 'no-cache',
-            'content-type': 'application/json',
-            'origin': MANGAPARK_URL,
-            'pragma': 'no-cache',
-            'referer': f'{MANGAPARK_URL}/',
-        }
-
-        json_data = {
-            'query': 'query get_searchComic($select: SearchComic_Select) {\n    get_searchComic(\n      select: $select\n    ) {\n      reqPage reqSize reqSort reqWord\n      newPage\n      paging { \n  total pages page init size skip limit prev next\n }\n      items {\n        id data {\n          id dbStatus name\n          origLang tranLang\n          urlPath urlCover600 urlCoverOri\n          genres altNames authors artists\n          is_hot is_new sfw_result\n          score_val follows reviews comments_total\n          max_chapterNode {\n            id data {\n              id dateCreate\n              dbStatus isFinal sfw_result\n              dname urlPath is_new\n              userId userNode {\n                id data {\n                  id name uniq avatarUrl urlPath\n                }\n              }\n            }\n          }\n        }\n        sser_follow\n        sser_lastReadChap {\n          date chapterNode {\n            id data {\n              id dbStatus isFinal sfw_result\n              dname urlPath is_new\n              userId userNode {\n                id data {\n                  id name uniq avatarUrl urlPath\n                }\n              }\n            }\n          }\n        }\n      }\n    }\n  }',
-            'variables': {
-                'select': {
-                    'word': title,
-                    'size': 10,
-                    'page': 1,
-                    'sortby': 'field_score',
-                },
-            },
-        }
-
-
-        # Create initial embed without chapter count
-        pages = [
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                description="\n\n",
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
+            opt_desc = f"Rating: {series.get('meanScore') or 'NA'} | Status: {series.get('status', 'NA').replace('_', ' ') if series.get('status') else 'NA'}"
+            options.append(
+                miru.SelectOption(
+                    label=title[:100],
+                    value=series_id_str,
+                    description=opt_desc[:100],
+                )
             )
-            .add_field("Rating", response.get("meanScore", "NA"))
-            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
-            .add_field("Status", response.get("status", "NA"), inline=True)
-            .add_field(
-                "Chapters",
-                "Loading...",
-                inline=True,
-            )
-            .add_field("Summary", response.get("description", "NA"))
-            .set_thumbnail(response["coverImage"]["large"])
-            .set_image(response["bannerImage"])
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            )
-        ]
+            pages[series_id_str] = embed
 
-        await ctx.edit_last_response(embeds=pages, components=None)
-
-        # Fetch chapter count in background and update
-        try:
-            res = requests.post(f'{MANGAPARK_URL}/apo/', cookies=cookies, headers=headers, json=json_data)
-            if res and res.ok and len(res.json()['data']['get_searchComic']['items']):
-                
-                selected_series = res.json()['data']['get_searchComic']['items'][0]
-                chapter_number = selected_series['data']['max_chapterNode']['data']['dname']
-                chapter_number = re.search(r'Ch\.(\d+)', chapter_number).group(1) if re.search(r'Ch\.(\d+)', chapter_number) else chapter_number
-                chapter_number = chapter_number.lower().replace('chapter', '').replace('vol', '').lstrip('0')
-
-                url = f'{MANGAPARK_URL}{selected_series["data"]["urlPath"]}'
-
-                updated_no_of_items = f"[{chapter_number}]({url})" if chapter_number else "NA"
-            else:
-                updated_no_of_items = "NA"
-        except Exception:
-            updated_no_of_items = "NA"
-
-        # Update the embed with the fetched chapter count
-        updated_pages = [
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                description="\n\n",
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
-            )
-            .add_field("Rating", response.get("meanScore", "NA"))
-            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
-            .add_field("Status", response.get("status", "NA"), inline=True)
-            .add_field(
-                "Chapters",
-                updated_no_of_items,
-                inline=True,
-            )
-            .add_field("Summary", response.get("description", "NA"))
-            .set_thumbnail(response["coverImage"]["large"])
-            .set_image(response["bannerImage"])
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            )
-        ]
-
-
-            
-        view = views.AuthorView(user_id=ctx.author.id)
+        view = views.SelectView(user_id=ctx.author.id, pages=pages)
+        view.add_item(SimpleTextSelect(options=options, placeholder="Other manga"))
         view.add_item(btns.KillButton())
-        
-        await ctx.edit_last_response(embeds=updated_pages, components=view)
+
+        resp = await ctx.respond(content=None, embed=first_page, components=view)
+        await view.start(resp)
+        await view.wait()
 
     except Exception as e:
         await ctx.respond(e)
@@ -1090,7 +1189,10 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
             )
             view.add_item(btns.KillButton())
             
-            resp = await ctx.respond(content=f"🎂 {len(characters)} characters have their birthday today:", components=view)
+            first_chara = await ALCharacter.from_id(int(characters[0]["id"]), ctx.bot.d.anilist)
+            first_embed = await first_chara.make_embed() if first_chara else None
+
+            resp = await ctx.respond(embed=first_embed, components=view)
             await view.start(resp)
             await view.wait()
             
@@ -1139,7 +1241,10 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
             )
             view.add_item(btns.KillButton())
             
-            resp = await ctx.respond(content=f"Found {len(characters)} characters for '{query}'", components=view)
+            first_chara = await ALCharacter.from_id(int(characters[0]["id"]), ctx.bot.d.anilist)
+            first_embed = await first_chara.make_embed() if first_chara else None
+
+            resp = await ctx.respond(embed=first_embed, components=view)
             await view.start(resp)
             await view.wait()
             
@@ -1184,7 +1289,10 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 )
                 view.add_item(btns.KillButton())
                 
-                resp = await ctx.respond(content=f"Found {len(characters)} characters from '{title[:50]}'", components=view)
+                first_chara = await ALCharacter.from_id(int(characters[0]["id"]), ctx.bot.d.anilist)
+                first_embed = await first_chara.make_embed() if first_chara else None
+
+                resp = await ctx.respond(embed=first_embed, components=view)
                 await view.start(resp)
                 await view.wait()
                 
@@ -1259,10 +1367,10 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 )
                 view.add_item(btns.KillButton())
                 
-                resp = await ctx.respond(
-                    content=f"Found {len(similar_characters)} character(s) matching '{query}' in '{title}':", 
-                    components=view
-                )
+                first_chara = await ALCharacter.from_id(int(similar_characters[0]["id"]), ctx.bot.d.anilist)
+                first_embed = await first_chara.make_embed() if first_chara else None
+
+                resp = await ctx.respond(embed=first_embed, components=view)
                 await view.start(resp)
                 await view.wait()
 

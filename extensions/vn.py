@@ -226,8 +226,11 @@ def replace_bbcode_with_markdown(match: re.Match) -> str:
     return markdown_link
 
 
-def parse_vndb_desciption(description: str) -> str:
+def parse_vndb_desciption(description: str, limit: int = 300) -> str:
     """Parse a VNDB description into a Discord friendly Markdown"""
+    if not description:
+        return "NA"
+
     description = (
         description.replace("[spoiler]", "||")
         .replace("[/spoiler]", "||")
@@ -243,8 +246,17 @@ def parse_vndb_desciption(description: str) -> str:
     # Replace BBCode links with Markdown links in the text
     description = re.sub(pattern, replace_bbcode_with_markdown, description)
 
-    if len(description) > 300:
-        description = description[0:300]
+    if len(description) > limit:
+        description = description[0:limit]
+
+        # Fix incomplete markdown links cut off during truncation
+        if re.search(r"\[[^\]]+\]\([^)]*$", description):
+            if description.endswith("("):
+                description = description[:-1]
+            else:
+                description += ")"
+        elif re.search(r"\[[^\]]*$", description):
+            description = re.sub(r"\[([^\]]*)$", r"\1", description)
 
         if description.count("||") % 2:
             description = description + "||"
@@ -252,6 +264,57 @@ def parse_vndb_desciption(description: str) -> str:
         description = description + "..."
 
     return description
+
+
+
+def truncate_words(text: str, limit: int) -> str:
+    """Truncate text at word boundaries within limit and append '...' cleanly."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+
+    max_len = limit - 3
+    if max_len <= 0:
+        return "..."
+
+    truncated = text[:max_len]
+
+    if text[max_len : max_len + 1] and not text[max_len : max_len + 1].isspace():
+        last_space = truncated.rfind(" ")
+        if last_space != -1:
+            truncated = truncated[:last_space]
+
+    truncated = truncated.rstrip(" .,!?:;-")
+    return truncated + "..."
+
+
+class VNSelect(miru.TextSelect):
+    """A text select for VN search that updates embeds and screenshot swap button"""
+
+    def __init__(
+        self,
+        *,
+        options: list[miru.SelectOption],
+        placeholder: str = "Other visual novels",
+    ) -> None:
+        super().__init__(options=options, placeholder=placeholder)
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        selected_id = self.values[0]
+        if hasattr(self.view, "pages") and selected_id in self.view.pages:
+            new_embed = self.view.pages[selected_id]
+            screenshots = getattr(self.view, "screenshots", {}).get(selected_id, [])
+
+            for child in self.view.children:
+                if isinstance(child, btns.SwapButton):
+                    child.original_page = new_embed
+                    child.swap_page = screenshots
+                    child.label = child.label1
+                    child.emoji = child.emoji1
+                    break
+
+            embeds_list = new_embed if isinstance(new_embed, list) else [new_embed]
+            await ctx.edit_response(content=None, embeds=embeds_list, components=self.view)
 
 
 # ============ INTERNAL SEARCH FUNCTIONS ============
@@ -299,98 +362,153 @@ async def _search_vn(ctx: lb.Context, query: str):
                 delete_after=15,
             )
 
-        if req["results"][0]["description"]:
-            description = parse_vndb_desciption(req["results"][0]["description"])
-        else:
-            description = "NA"
+        pages = {}
+        screenshots_dict = {}
+        options = []
+        first_page = None
+        first_screenshots = []
 
-        if req["results"][0]["released"]:
-            date = req["results"][0]["released"].split("-")
-            if len(date) == 3:
-                released = verbose_date(date[2], date[1], date[0])
+        for i, vn in enumerate(req["results"][:15]):
+            if vn.get("description"):
+                description = parse_vndb_desciption(vn["description"])
             else:
-                released = "-".join(date)
+                description = "NA"
 
-        else:
-            released = "Unreleased"
+            if vn.get("released"):
+                date = vn["released"].split("-")
+                if len(date) == 3:
+                    released = verbose_date(date[2], date[1], date[0])
+                else:
+                    released = "-".join(date)
+            else:
+                released = "Unreleased"
 
-        tags = "NA"
+            tags = "NA"
+            if vn.get("tags"):
+                tags_list = []
+                for tag in sorted(
+                    vn["tags"], key=itemgetter("rating"), reverse=True
+                ):
+                    if (
+                        tag["category"] == "cont" and tag["spoiler"] != 2
+                    ):  # 0 = not a spoiler, 1 = minor spoiler, 2 - major.
+                        tags_list.append(
+                            tag["name"] if not tag["spoiler"] else f"||{tag['name']}||"
+                        )
 
-        if req["results"][0]["tags"]:
-            tags = []
-            for tag in sorted(
-                req["results"][0]["tags"], key=itemgetter("rating"), reverse=True
-            ):
-                if (
-                    tag["category"] == "cont" and tag["spoiler"] != 2
-                ):  # 0 = not a spoiler, 1 = minor spoiler, 2 - major.
-                    tags.append(
-                        tag["name"] if not tag["spoiler"] else f"||{tag['name']}||"
-                    )
+                    if len(tags_list) == 7:
+                        break
 
-                if len(tags) == 7:
-                    break
+                tags = ", ".join(tags_list if tags_list else ["NA"])
 
-            tags = ", ".join(tags if tags else ["NA"])
+            if vn.get("length_minutes"):
+                hour, mins = divmod(vn["length_minutes"], 60)
+                time = f"{hour} hours, {mins} minutes" if mins else f"{hour} hours"
+            else:
+                len_map = {
+                    1: "Very Short (<2 hours)",
+                    2: "Short (2-10 hours)",
+                    3: "Medium (10-30 hours)",
+                    4: "Long (30-50 hours)",
+                    5: "Very Long (>50 hours)",
+                }
+                time = len_map.get(int(vn["length"]), "NA") if vn.get("length") else "NA"
 
-        view = views.AuthorView(user_id=ctx.author.id)
-        view.add_item(btns.KillButton())
-
-        if req["results"][0]["length_minutes"]:
-            hour, mins = divmod(req["results"][0]["length_minutes"], 60)
-            time = f"{hour} hours, {mins} minutes" if mins else f"{hour} hours"
-        else:
-            len_map = {
-                1: "Very Short (<2 hours)",
-                2: "Short (2-10 hours)",
-                3: "Medium (10-30 hours)",
-                4: "Long (30-50 hours)",
-                5: "Very Long (>50 hours)",
-            }
-            time = len_map.get(int(req["results"][0]["length"]), "NA")
-
-        main_embed = (
-            hk.Embed(
-                title=req["results"][0]["title"],
-                url=f"https://vndb.org/{req['results'][0]['id']}",
-                color=colors.VNDB,
-                timestamp=datetime.now().astimezone(),
+            embed = (
+                hk.Embed(
+                    title=vn["title"],
+                    url=f"https://vndb.org/{vn['id']}",
+                    color=colors.VNDB,
+                    timestamp=datetime.now().astimezone(),
+                )
+                .add_field(
+                    "Rating",
+                    vn.get("rating") or "NA",
+                )
+                .add_field("Tags", tags)
+                .add_field("Released", released, inline=True)
+                .add_field("Est. Time", time, inline=True)
+                .add_field("Summary", description)
+                .set_thumbnail(vn["image"]["url"] if vn.get("image") and vn["image"].get("url") else None)
+                .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg")
             )
-            .add_field(
-                "Rating",
-                req["results"][0]["rating"] or "NA",
+
+            screenshot_urls = [
+                ss["url"]
+                for ss in vn.get("screenshots", [])[:4]
+                if not (ss.get("sexual") == 2 or ss.get("violence") == 2)
+            ]
+
+            vn_url = f"https://vndb.org/{vn['id']}"
+            if screenshot_urls:
+                ss_embeds = []
+                links_str = " • ".join(
+                    [f"[Screenshot {idx+1}]({u})" for idx, u in enumerate(screenshot_urls)]
+                )
+                for idx, ss_url in enumerate(screenshot_urls):
+                    emb = hk.Embed(
+                        title=f"Screenshots - {vn['title']}",
+                        url=vn_url,
+                        color=0x000000,
+                    ).set_image(ss_url)
+                    if idx == 0:
+                        emb.description = links_str
+                        emb.set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg")
+                    ss_embeds.append(emb)
+            else:
+                ss_embeds = [
+                    hk.Embed(
+                        title=f"Screenshots - {vn['title']}",
+                        url=vn_url,
+                        description="No screenshots available.",
+                        color=0x000000,
+                    ).set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg")
+                ]
+
+            vn_id_str = str(vn["id"])
+            if not i:
+                first_page = embed
+                first_screenshots = ss_embeds
+
+            rel_year = vn["released"].split("-")[0] if vn.get("released") else None
+            label_text = f"{vn['title']} ({rel_year})" if rel_year else vn["title"]
+            label_text = truncate_words(label_text, 100)
+
+            if vn.get("description"):
+                clean_desc = " ".join(parse_vndb_desciption(vn["description"], limit=120).split())
+                if len(vn["description"]) > 75 or len(clean_desc) > 75:
+                    short_desc = truncate_words(clean_desc, 75)
+                else:
+                    short_desc = clean_desc
+            else:
+                short_desc = "No description"
+
+            options.append(
+                miru.SelectOption(
+                    label=label_text,
+                    value=vn_id_str,
+                    description=short_desc,
+                )
             )
-            .add_field("Tags", tags)
-            .add_field("Released", released, inline=True)
-            .add_field("Est. Time", time, inline=True)
-            .add_field("Summary", description)
-            .set_thumbnail(req["results"][0]["image"]["url"])
-            .set_footer(text="Source: VNDB", icon="https://s.vndb.org/s/angel-bg.jpg")
-        )
+            pages[vn_id_str] = embed
+            screenshots_dict[vn_id_str] = ss_embeds
 
-        screenshots = "\n".join(
-            ss["url"]
-            for ss in req["results"][0]["screenshots"][:4]
-            if not (ss["sexual"] == 2 or ss["violence"] == 2)
-        )
-
-        view = views.AuthorView(user_id=ctx.author.id)
+        view = views.SelectView(user_id=ctx.author.id, pages=pages)
+        view.screenshots = screenshots_dict
+        view.add_item(VNSelect(options=options, placeholder="Other visual novels"))
         view.add_item(
             btns.SwapButton(
-                swap_page=screenshots,
-                original_page=main_embed,
+                swap_page=first_screenshots,
+                original_page=first_page,
                 label1="Screenshots",
                 emoji1=hk.Emoji.parse("📸"),
                 emoji2=hk.Emoji.parse("🔍"),
             )
         )
-
         view.add_item(btns.KillButton())
-        choice = await ctx.respond(
-            embed=main_embed,
-            components=view,
-        )
-        await view.start(choice)
+
+        resp = await ctx.respond(content=None, embed=first_page, components=view)
+        await view.start(resp)
         await view.wait()
 
     except Exception as e:

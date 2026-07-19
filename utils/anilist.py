@@ -1,4 +1,4 @@
-"""Domain classes wrapping AniList GraphQL responses.
+﻿"""Domain classes wrapping AniList GraphQL responses.
 
 Each class takes an AniListClient and returns typed objects from `from_*`
 classmethods, or `None` / `[]` on a miss (never a raw error dict). Embed
@@ -143,7 +143,29 @@ class ALCharacter(AnilistBase):
             gender
             dateOfBirth { year month day }
             description (asHtml: false)
-            media (sort: TRENDING_DESC, perPage: 3) {
+            media (sort: POPULARITY_DESC, perPage: 25) {
+                edges {
+                    characterRole
+                    node {
+                        title { romaji }
+                        season
+                        seasonYear
+                        meanScore
+                        seasonInt
+                        episodes
+                        chapters
+                        source
+                        popularity
+                        tags { name }
+                    }
+                    voiceActorRoles(language: JAPANESE) {
+                        voiceActor {
+                            id
+                            name { full }
+                            languageV2
+                        }
+                    }
+                }
                 nodes {
                     title { romaji }
                     season
@@ -279,6 +301,29 @@ class ALCharacter(AnilistBase):
             return out
         return "NA"
 
+    @staticmethod
+    def get_primary_va(response: dict) -> str:
+        """Determine primary Japanese voice actor by counting occurrences across media edges."""
+        edges = (response.get("media") or {}).get("edges", [])
+        va_counts: dict[tuple[int, str], int] = {}
+
+        for edge in edges:
+            for role in edge.get("voiceActorRoles", []) or []:
+                va = role.get("voiceActor")
+                if va and va.get("id") and va.get("name", {}).get("full"):
+                    lang = va.get("languageV2")
+                    if lang and lang.lower() != "japanese":
+                        continue
+                    key = (va["id"], va["name"]["full"])
+                    va_counts[key] = va_counts.get(key, 0) + 1
+
+        if not va_counts:
+            return "NA"
+
+        best_va, _ = max(va_counts.items(), key=lambda item: item[1])
+        va_id, va_name = best_va
+        return f"{va_name} [ext.](https://anilist.co/staff/{va_id})"
+
     async def make_embed(self) -> hk.Embed:
         response = await self._fetch_detail()
         if not response:
@@ -296,6 +341,7 @@ class ALCharacter(AnilistBase):
             self.parse_description(response["description"])
             if response["description"] else "NA"
         )
+        primary_va = self.get_primary_va(response)
 
         return (
             hk.Embed(
@@ -309,6 +355,7 @@ class ALCharacter(AnilistBase):
             .add_field("DOB", dob, inline=True)
             .add_field("Favourites", f"{response['favourites']}❤", inline=True)
             .add_field("Character Description", description)
+            .add_field("Primary Voice Actor", primary_va, inline=False)
             .set_thumbnail(response["image"]["large"])
             .set_footer(
                 text="Source: AniList",
@@ -336,9 +383,11 @@ class ALCharacter(AnilistBase):
             self.parse_description(response["description"])
             if response["description"] else "NA"
         )
+        primary_va = self.get_primary_va(response)
 
         series = ""
-        for i, item in enumerate(response["media"]["nodes"]):
+        nodes = (response.get("media") or {}).get("nodes", [])
+        for i, item in enumerate(nodes[:3]):
             series += (
                 f"```ansi\n{i+1}. \u001b[0;35m{item['title']['romaji']}"
                 f" \u001b[0;32m({item['meanScore']})```"
@@ -361,6 +410,7 @@ class ALCharacter(AnilistBase):
             .add_field("DOB", dob, inline=True)
             .add_field("Favourites", f"{response['favourites']}❤", inline=True)
             .add_field("Character Description", description)
+            .add_field("Primary Voice Actor", primary_va, inline=False)
             .set_thumbnail(response["image"]["large"])
             .set_footer(**footer),
             hk.Embed(
@@ -403,7 +453,7 @@ class ALAnime(AnilistBase):
 
     _SEARCH_QUERY = """
     query ($search: String, $type: MediaType) {
-        Page (perPage: 5) {
+        Page (perPage: 10) {
             media (search: $search, type: $type) {
                 id
                 idMal
@@ -566,14 +616,14 @@ class ALAnime(AnilistBase):
     query ($id: Int, $search: String) {
         Media(id: $id, search: $search, type: ANIME) {
             id
-            title { romaji }
+            title { english romaji }
             startDate { year month day }
             duration
             episodes
             relations {
                 edges {
                     relationType
-                    node { id title { romaji } type }
+                    node { id title { english romaji } type }
                 }
             }
         }
@@ -617,10 +667,11 @@ class ALAnime(AnilistBase):
         if not media:
             return []
 
+        title = media["title"]["english"] or media["title"]["romaji"]
         entries = [
             AnimeNode(
                 media["id"],
-                media["title"]["romaji"],
+                title,
                 media["startDate"],
                 media.get("duration", 0),
                 media.get("episodes", 1),
@@ -633,6 +684,10 @@ class ALAnime(AnilistBase):
                 "PREQUEL",
                 "SEQUEL",
                 "SIDE_STORY",
+                "PARENT",
+                "ALTERNATIVE",
+                "SPIN_OFF",
+                "SUMMARY",
             ):
                 entries.extend(
                     await cls.get_complete_series(client, node["id"], visited)
@@ -823,6 +878,31 @@ class ALManga(AnilistBase):
 
 
 class ALNovel(AnilistBase):
+    _SEARCH_QUERY = """
+    query ($search: String, $type: MediaType) {
+        Page (perPage: 10) {
+            media (search: $search, type: $type,
+                   sort: POPULARITY_DESC, format_in: [NOVEL]) {
+                id
+                idMal
+                title { english romaji }
+                type
+                averageScore
+                format
+                meanScore
+                volumes
+                startDate { year }
+                coverImage { large }
+                bannerImage
+                genres
+                status
+                description (asHtml: false)
+                siteUrl
+            }
+        }
+    }
+    """
+
     _FROM_SEARCH_QUERY = """
     query ($search: String, $type: MediaType) {
         Media (search: $search, type: $type,
@@ -850,6 +930,17 @@ class ALNovel(AnilistBase):
         self.url = f"https://anilist.co/manga/{id_}"
         self.client = client
         super().__init__(name, id_)
+
+    @classmethod
+    async def from_search_multiple(cls, query_: str, client: AniListClient) -> list:
+        try:
+            data = await client.query(
+                cls._SEARCH_QUERY,
+                {"search": query_, "type": "MANGA"},
+            )
+        except AniListError:
+            return []
+        return data.get("Page", {}).get("media", []) or []
 
     @classmethod
     async def from_search(cls, query_: str, client: AniListClient) -> Optional[dict]:
@@ -896,17 +987,65 @@ class ALUser(AnilistBase):
 
 class ALStudio(AnilistBase):
     _QUERY = """
+    fragment MediaFields on Media {
+        id
+        title { english romaji }
+        coverImage { large }
+        averageScore
+        popularity
+        favourites
+        relations {
+            edges {
+                relationType
+                node {
+                    id
+                    type
+                    relations {
+                        edges {
+                            relationType
+                            node {
+                                id
+                                type
+                                relations {
+                                    edges {
+                                        relationType
+                                        node {
+                                            id
+                                            type
+                                            relations {
+                                                edges {
+                                                    relationType
+                                                    node {
+                                                        id
+                                                        type
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     query ($search: String, $sort: [MediaSort]) {
         Studio(search: $search) {
             name
             siteUrl
             id
             favourites
-            media(sort: $sort) {
+            media(sort: $sort, page: 1, perPage: 25) {
                 nodes {
-                    title { english romaji }
-                    coverImage { large }
-                    averageScore
+                    ...MediaFields
+                }
+            }
+            media2: media(sort: $sort, page: 2, perPage: 25) {
+                nodes {
+                    ...MediaFields
                 }
             }
         }
@@ -919,15 +1058,28 @@ class ALStudio(AnilistBase):
         super().__init__(name, id_)
 
     @classmethod
-    async def from_search(cls, query_: str, client: AniListClient) -> Optional[dict]:
+    async def from_search(
+        cls, query_: str, client: AniListClient, per_page: int = 50, cache_ttl: Optional[int] = None
+    ) -> Optional[dict]:
         try:
             data = await client.query(
                 cls._QUERY,
                 {"search": query_, "sort": "FAVOURITES_DESC"},
+                cache_ttl=cache_ttl,
             )
         except AniListError:
             return None
-        return data.get("Studio")
+        studio = data.get("Studio")
+        if studio:
+            nodes1 = studio.get("media", {}).get("nodes", [])
+            nodes2 = studio.get("media2", {}).get("nodes", [])
+            media_nodes = nodes1 + nodes2
+            studio["media_nodes"] = media_nodes
+            if media_nodes:
+                first_node = media_nodes[0]
+                if first_node.get("id") is None and cache_ttl != 0:
+                    return await cls.from_search(query_, client, per_page=per_page, cache_ttl=0)
+        return studio
 
 
 class ALStaff(AnilistBase):
@@ -968,7 +1120,7 @@ class ALStaff(AnilistBase):
 
     @classmethod
     async def from_search(
-        cls, query_: str, client: AniListClient, per_page: int = 10
+        cls, query_: str, client: AniListClient, per_page: int = 12
     ) -> Optional[dict]:
         try:
             data = await client.query(
