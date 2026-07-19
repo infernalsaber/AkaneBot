@@ -322,7 +322,7 @@ class ALCharacter(AnilistBase):
 
         best_va, _ = max(va_counts.items(), key=lambda item: item[1])
         va_id, va_name = best_va
-        return f"{va_name} [ext.](https://anilist.co/staff/{va_id})"
+        return f"[{va_name}](https://anilist.co/staff/{va_id})"
 
     async def make_embed(self) -> hk.Embed:
         response = await self._fetch_detail()
