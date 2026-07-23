@@ -395,12 +395,11 @@ async def _search_game(ctx: lb.Context, query: str):
     if not sup:
         await ctx.respond(
             hk.Embed(
-                title="CAN'T FIND THE REQUESTED GAME",
+                title="GAME NOT FOUND",
                 color=colors.ERROR,
-                description=f"Can't find the game `{query}`, maybe it's not on steam?",
+                description=f"Couldn't find game `{query}` 😵",
                 timestamp=datetime.now().astimezone(),
-            ),
-            delete_after=15,
+            )
         )
         return
     sup = sup.get("href")
@@ -461,7 +460,6 @@ async def _search_studio(ctx: lb.Context, query: str):
                     description=f"Couldn't find studio `{query}` on AniList 😵",
                     timestamp=datetime.now().astimezone(),
                 ),
-                delete_after=15,
             )
             return
 
@@ -631,7 +629,6 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
                     description=f"Couldn't find voice actor `{query}` 😵",
                     timestamp=datetime.now().astimezone(),
                 ),
-                delete_after=15,
             )
             return
         
@@ -661,7 +658,6 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
                     description=f"{data.get('name', {}).get('full', '')} has no voice acting roles. Visit {data.get('siteUrl', '')} to view info about them.",
                     timestamp=datetime.now().astimezone(),
                 ),
-                delete_after=15,
             )
             return
         
@@ -713,7 +709,7 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
             if non_anime_roles:
                 other_roles_list = [role['character'] for role in non_anime_roles if role['character'].strip() != "~!"]
                 if other_roles_list:
-                    emb.add_field("Other Roles", ",".join([f"{role}" for role in other_roles_list[:5]]), inline=False)
+                    emb.add_field("Other Roles", ", ".join([f"{role}" for role in other_roles_list[:5]]), inline=False)
             
             return emb
 
@@ -793,7 +789,14 @@ async def _search_novel(ctx: lb.Context, novel: str):
             media_list = [single_res]
 
     if not media_list:
-        await ctx.respond("No novel found")
+        await ctx.respond(
+            hk.Embed(
+                title="NOVEL NOT FOUND",
+                color=colors.ERROR,
+                description=f"Couldn't find novel `{novel}` 😵",
+                timestamp=datetime.now().astimezone(),
+            )
+        )
         return
 
     pages = {}
@@ -875,13 +878,29 @@ async def _time_to(ctx: lb.Context, series: str) -> None:
         data = await ALAnime.get_anime_data(ctx.bot.d.anilist, search=series)
         media = data.get("Media") if data else None
         if not media:
-            await ctx.edit_last_response(f"Could not find any anime matching `{series}` 😵")
+            await ctx.edit_last_response(
+                content=None,
+                embed=hk.Embed(
+                    title="ANIME NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find anime `{series}` 😵",
+                    timestamp=datetime.now().astimezone(),
+                ),
+            )
             return
 
         anime_id = int(media["id"])
         series_list = await ALAnime.format_chronological_order(ctx.bot.d.anilist, anime_id=anime_id)
         if not series_list:
-            await ctx.edit_last_response(f"Could not find watch order for `{series}` 😵")
+            await ctx.edit_last_response(
+                content=None,
+                embed=hk.Embed(
+                    title="WATCH ORDER NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find watch order for `{series}` 😵",
+                    timestamp=datetime.now().astimezone(),
+                ),
+            )
             return
 
         order = " -> ".join(str(entry) for entry in series_list)
@@ -938,7 +957,14 @@ async def _search_anime(ctx, anime: str):
     media_list = await ALAnime.from_search_multiple(anime, ctx.bot.d.anilist)
 
     if not media_list:
-        return await ctx.respond("Your query doesn't match any results 😵")
+        return await ctx.respond(
+            hk.Embed(
+                title="ANIME NOT FOUND",
+                color=colors.ERROR,
+                description=f"Couldn't find anime `{anime}` 😵",
+                timestamp=datetime.now().astimezone(),
+            )
+        )
 
     pages = {}
     trailers_dict = {}
@@ -1060,7 +1086,14 @@ async def _search_manga(ctx, manga: str):
     try:
         series_list = await ALManga.from_search_multiple(manga, ctx.bot.d.anilist)
         if not series_list:
-            await ctx.respond("No manga found")
+            await ctx.respond(
+                hk.Embed(
+                    title="MANGA NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find manga `{manga}` 😵",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
             return
 
         pages = {}
@@ -1206,7 +1239,14 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
             characters = await ALCharacter.from_search_multiple(query, ctx.bot.d.anilist, per_page=25)
             
             if not characters:
-                await ctx.respond("No characters found for your search query 😵")
+                await ctx.respond(
+                    hk.Embed(
+                        title="CHARACTER NOT FOUND",
+                        color=colors.ERROR,
+                        description=f"Couldn't find character `{query}` 😵",
+                        timestamp=datetime.now().astimezone(),
+                    )
+                )
                 return
             
             # Create dropdown options sorted by popularity (already sorted by API)
@@ -1258,7 +1298,14 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
             title, characters = await ALCharacter.from_series_characters(series, ctx.bot.d.anilist)
             
             if not title or not characters:
-                await ctx.respond(f"Couldn't find series '{series}' or no characters found 😵")
+                await ctx.respond(
+                    hk.Embed(
+                        title="CHARACTER NOT FOUND",
+                        color=colors.ERROR,
+                        description=f"Couldn't find series `{series}` or no characters found 😵",
+                        timestamp=datetime.now().astimezone(),
+                    )
+                )
                 return
             
             if query.strip() == "":

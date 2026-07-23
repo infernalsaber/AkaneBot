@@ -354,12 +354,11 @@ async def _search_vn(ctx: lb.Context, query: str):
         if not req["results"]:
             return await ctx.respond(
                 hk.Embed(
-                    title="CAN'T FIND YOUR VN",
+                    title="VISUAL NOVEL NOT FOUND",
                     color=colors.ERROR,
-                    description=f"Couldn't find the vn {query}",
+                    description=f"Couldn't find visual novel `{query}` 😵",
                     timestamp=datetime.now().astimezone(),
-                ),
-                delete_after=15,
+                )
             )
 
         pages = {}
@@ -538,12 +537,11 @@ async def _search_vnchara(ctx: lb.Context, query: str):
     if not req["results"]:
         return await ctx.respond(
             hk.Embed(
-                title="CAN'T FIND YOUR CHARACTER",
+                title="VN CHARACTER NOT FOUND",
                 color=colors.ERROR,
-                description=f"Couldn't find the character {query}",
+                description=f"Couldn't find character `{query}` 😵",
                 timestamp=datetime.now().astimezone(),
-            ),
-            delete_after=15,
+            )
         )
 
     try:
@@ -647,12 +645,11 @@ async def _search_vntag(ctx: lb.Context, query: str):
     if not req["results"]:
         return await ctx.respond(
             hk.Embed(
-                title="CAN'T FIND YOUR TAG",
+                title="TAG NOT FOUND",
                 color=colors.ERROR,
-                description=f"Couldn't find the tag {query}",
+                description=f"Couldn't find tag `{query}` 😵",
                 timestamp=datetime.now().astimezone(),
-            ),
-            delete_after=15,
+            )
         )
 
     if req["results"][0]["description"]:
@@ -717,12 +714,11 @@ async def _search_vntrait(ctx: lb.Context, query: str):
     if not req["results"]:
         return await ctx.respond(
             hk.Embed(
-                title="CAN'T FIND YOUR TRAIT",
+                title="TRAIT NOT FOUND",
                 color=colors.ERROR,
-                description=f"Couldn't find the trait {query}",
+                description=f"Couldn't find trait `{query}` 😵",
                 timestamp=datetime.now().astimezone(),
-            ),
-            delete_after=15,
+            )
         )
 
     if req["results"][0]["description"]:
