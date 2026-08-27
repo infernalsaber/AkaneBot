@@ -27,7 +27,7 @@ from utils.anilist import (
     AnilistBase,
 )
 from utils.anilist_graph import find_series_name
-from utils.components import CharacterSelect, SimpleTextSelect
+from utils.components import CharacterSelect, SimpleTextSelect, SwapTextSelect
 from utils.errors import RequestsFailedError
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
@@ -751,34 +751,6 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
         await ctx.edit_last_response(f"Error: {e}")
     
 
-class AnimeSelect(miru.TextSelect):
-    """A text select for Anime search that updates embeds and trailer swap button"""
-
-    def __init__(
-        self,
-        *,
-        options: list[miru.SelectOption],
-        placeholder: str = "Select an anime",
-    ) -> None:
-        super().__init__(options=options, placeholder=placeholder)
-
-    async def callback(self, ctx: miru.ViewContext) -> None:
-        selected_id = self.values[0]
-        if hasattr(self.view, "pages") and selected_id in self.view.pages:
-            new_embed = self.view.pages[selected_id]
-            trailer = getattr(self.view, "trailers", {}).get(selected_id, "Couldn't find anything.")
-
-            for child in self.view.children:
-                if isinstance(child, btns.SwapButton):
-                    child.original_page = new_embed
-                    child.swap_page = trailer
-                    child.label = child.label1
-                    child.emoji = child.emoji1
-                    break
-
-            await ctx.edit_response(content=None, embeds=[new_embed], components=self.view)
-
-
 async def _search_novel(ctx: lb.Context, novel: str):
     """Search a novel on AL"""
     media_list = await ALNovel.from_search_multiple(novel, ctx.bot.d.anilist)
@@ -1062,7 +1034,7 @@ async def _search_anime(ctx, anime: str):
 
     view = views.SelectView(user_id=ctx.author.id, pages=pages)
     view.trailers = trailers_dict
-    view.add_item(AnimeSelect(options=options, placeholder="Select an anime"))
+    view.add_item(SwapTextSelect(options=options, placeholder="Select an anime", swap_attr="trailers"))
     view.add_item(
         btns.SwapButton(
             swap_page=first_trailer,
