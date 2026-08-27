@@ -7,8 +7,14 @@ import miru
 from curl_cffi import requests
 from miru.ext import nav
 
+from utils.emotes_helper import (
+    add_emoji_from_source,
+    format_emote_error,
+    sanitize_emoji_name,
+)
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
+
 
 
 async def preview_maker(series_id) -> t.Union[list[hk.Embed], None]:
@@ -196,19 +202,44 @@ class AddEmoteButton(nav.NavButton):
             self.selected_embed = 0
 
     async def callback(self, ctx: miru.ViewContext):
-        try:
-            emote_name = ctx.message.embeds[self.selected_embed].title.replace(
-                "Emote: ", ""
-            )
-            image_url = ctx.message.embeds[self.selected_embed].image.url
+        if not ctx.guild_id:
+            await ctx.respond("This command can only be used in a server.", flags=hk.MessageFlag.EPHEMERAL)
+            return
 
-            emoji = await ctx.bot.rest.create_emoji(
-                ctx.guild_id, name=emote_name, image=image_url
-            )
-            await ctx.respond(f"Added emote: {emoji.mention}")
+        try:
+            embed = None
+            view_obj = getattr(self, "_handler", None)
+            if view_obj and hasattr(view_obj, "pages") and hasattr(view_obj, "current_page"):
+                idx = view_obj.current_page
+                if 0 <= idx < len(view_obj.pages):
+                    page = view_obj.pages[idx]
+                    if isinstance(page, hk.Embed):
+                        embed = page
+                    elif isinstance(page, (list, tuple)) and page:
+                        embed = page[0]
+                    elif hasattr(page, "embed") and page.embed:
+                        embed = page.embed
+
+            if embed is None and ctx.message and ctx.message.embeds:
+                idx = min(self.selected_embed, len(ctx.message.embeds) - 1)
+                embed = ctx.message.embeds[idx]
+
+            if not embed or not embed.image or not embed.image.url:
+                await ctx.respond("Could not find an emote image to add.", flags=hk.MessageFlag.EPHEMERAL)
+                return
+
+            raw_name = embed.title or "emote"
+            if raw_name.startswith("Emote: "):
+                raw_name = raw_name[7:].strip()
+
+            safe_name = sanitize_emoji_name(raw_name)
+            image_url = embed.image.url
+
+            new_emoji = await add_emoji_from_source(ctx, image_url, name=safe_name)
+            await ctx.respond(f"Added emote: {new_emoji.mention}")
 
         except Exception as e:
-            await ctx.respond(f"Failed to add emote: {e}")
+            await ctx.respond(format_emote_error(e))
 
     async def before_page_change(self) -> None:
         ...

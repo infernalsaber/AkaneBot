@@ -13,7 +13,7 @@ import pandas as pd
 from extensions.adata import al_search
 from utils import buttons as btns
 from utils import views as views
-from utils.components import SimpleTextSelect
+from utils.components import SimpleTextSelect, SwapTextSelect
 from utils.misc import dlogger, verbose_date
 from utils.models import ColorPalette as colors
 
@@ -288,35 +288,6 @@ def truncate_words(text: str, limit: int) -> str:
     return truncated + "..."
 
 
-class VNSelect(miru.TextSelect):
-    """A text select for VN search that updates embeds and screenshot swap button"""
-
-    def __init__(
-        self,
-        *,
-        options: list[miru.SelectOption],
-        placeholder: str = "Other visual novels",
-    ) -> None:
-        super().__init__(options=options, placeholder=placeholder)
-
-    async def callback(self, ctx: miru.ViewContext) -> None:
-        selected_id = self.values[0]
-        if hasattr(self.view, "pages") and selected_id in self.view.pages:
-            new_embed = self.view.pages[selected_id]
-            screenshots = getattr(self.view, "screenshots", {}).get(selected_id, [])
-
-            for child in self.view.children:
-                if isinstance(child, btns.SwapButton):
-                    child.original_page = new_embed
-                    child.swap_page = screenshots
-                    child.label = child.label1
-                    child.emoji = child.emoji1
-                    break
-
-            embeds_list = new_embed if isinstance(new_embed, list) else [new_embed]
-            await ctx.edit_response(content=None, embeds=embeds_list, components=self.view)
-
-
 # ============ INTERNAL SEARCH FUNCTIONS ============
 
 async def _search_vn(ctx: lb.Context, query: str):
@@ -494,7 +465,7 @@ async def _search_vn(ctx: lb.Context, query: str):
 
         view = views.SelectView(user_id=ctx.author.id, pages=pages)
         view.screenshots = screenshots_dict
-        view.add_item(VNSelect(options=options, placeholder="Other visual novels"))
+        view.add_item(SwapTextSelect(options=options, placeholder="Other visual novels", swap_attr="screenshots"))
         view.add_item(
             btns.SwapButton(
                 swap_page=first_screenshots,

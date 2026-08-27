@@ -14,3 +14,8 @@ class TransportError(RequestsFailedError):
 
 class AniListError(RequestsFailedError):
     """Raised when AniList GraphQL returns a hard failure (non-retryable or retries exhausted)."""
+
+
+class SevenTVError(RequestsFailedError):
+    """Raised when 7TV API returns an error or fails."""
+
