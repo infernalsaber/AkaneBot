@@ -76,6 +76,14 @@ def format_emote_error(error: Exception) -> str:
     return f"❌ Error: {error}"
 
 
+async def get_remaining_slots(ctx: t.Any) -> list[int]:
+    """Fetch remaining [static_free, animated_free] emote slots directly from REST."""
+    guild = await ctx.bot.rest.fetch_guild(ctx.guild_id)
+    limit = {0: 50, 1: 100, 2: 150, 3: 250}.get(int(guild.premium_tier), 50)
+    emojis = guild.emojis.values()
+    return [limit - sum(not e.is_animated for e in emojis), limit - sum(e.is_animated for e in emojis)]
+
+
 async def add_emoji_from_source(
     ctx: t.Any,
     source: t.Union[hk.CustomEmoji, hk.Attachment, str, bytes],
@@ -90,13 +98,27 @@ async def add_emoji_from_source(
     if not guild_id:
         raise ValueError("This command can only be used in a server.")
 
-    # 1. If the source is an emote itself, add it
+    # 0. If source is string, check if mention / custom emoji string: <:name:id> or <a:name:id>
+    if isinstance(source, str):
+        try:
+            parsed = hk.Emoji.parse(source)
+            if isinstance(parsed, hk.CustomEmoji):
+                source = parsed
+        except ValueError:
+            pass
+
+    # 1. If the source is an emote itself, add it (fallback to url if direct add fails)
     if isinstance(source, hk.CustomEmoji):
         raw_name = name or source.name
         final_name = sanitize_emoji_name(raw_name) if raw_name else "emote"
         if len(final_name) < 2 or len(final_name) > 32:
             raise ValueError("Invalid emote name length. Must be between 2 and 32 characters.")
-        return await ctx.bot.rest.create_emoji(guild_id, name=final_name, image=source)
+        try:
+            return await ctx.bot.rest.create_emoji(guild_id, name=final_name, image=source)
+        except Exception:
+            if hasattr(source, "url") and source.url:
+                return await add_emoji_from_source(ctx, str(source.url), name=final_name)
+            raise
 
     if isinstance(source, bytes):
         if not name:
@@ -105,19 +127,6 @@ async def add_emoji_from_source(
         if len(final_name) < 2 or len(final_name) > 32:
             raise ValueError("Invalid emote name length. Must be between 2 and 32 characters.")
         return await ctx.bot.rest.create_emoji(guild_id, name=final_name, image=source)
-
-    if isinstance(source, str):
-        # Check if mention / custom emoji string: <:name:id> or <a:name:id>
-        try:
-            parsed = hk.Emoji.parse(source)
-            if isinstance(parsed, hk.CustomEmoji):
-                raw_name = name or parsed.name
-                final_name = sanitize_emoji_name(raw_name) if raw_name else "emote"
-                if len(final_name) < 2 or len(final_name) > 32:
-                    raise ValueError("Invalid emote name length. Must be between 2 and 32 characters.")
-                return await ctx.bot.rest.create_emoji(guild_id, name=final_name, image=parsed)
-        except ValueError:
-            pass
 
     # 2. If source is link or attachment, validate name
     raw_name = name or "emote"

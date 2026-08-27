@@ -1,15 +1,12 @@
 """Emote management commands for AkaneBot."""
 import io
-import time
 import typing as t
 from datetime import datetime
 
 import hikari as hk
 import lightbulb as lb
 from miru.ext import nav
-from PIL import Image, ImageOps
-from rapidfuzz import process
-from rapidfuzz.utils import default_process
+
 
 from utils.buttons import (
     AddEmoteButton,
@@ -21,6 +18,7 @@ from utils.emotes_helper import (
     add_emoji_from_source,
     check_if_known_emoji_provider,
     format_emote_error,
+    get_remaining_slots,
     sanitize_emoji_name,
 )
 from utils.errors import SevenTVError
@@ -114,14 +112,33 @@ async def swipe_emotes(
         await ctx.respond("No valid custom emotes found to swipe.")
         return
 
+    try:
+        static_free, animated_free = await get_remaining_slots(ctx)
+        if static_free <= 0 and animated_free <= 0:
+            await ctx.respond("No emote slots remaining in this server.")
+            return
+    except Exception:
+        static_free, animated_free = 50, 50
+
     added_emotes: list[hk.KnownCustomEmoji] = []
     failed_emotes: list[str] = []
     rate_limit_msg: t.Optional[str] = None
 
     for idx, emote in enumerate(parsed_emotes):
+        if emote.is_animated and animated_free <= 0:
+            failed_emotes.append(f"`{emote.name}` (animated slots full)")
+            continue
+        elif not emote.is_animated and static_free <= 0:
+            failed_emotes.append(f"`{emote.name}` (static slots full)")
+            continue
+
         try:
             new_emoji = await add_emoji_from_source(ctx, emote)
             added_emotes.append(new_emoji)
+            if emote.is_animated:
+                animated_free -= 1
+            else:
+                static_free -= 1
         except hk.RateLimitTooLongError as e:
             rate_limit_msg = format_emote_error(e)
             remaining_count = len(parsed_emotes) - idx
@@ -179,6 +196,14 @@ async def add_emote(
     if not ctx.guild_id:
         await ctx.respond("This command can only be used in a server.")
         return
+
+    try:
+        static_free, animated_free = await get_remaining_slots(ctx)
+        if static_free <= 0 and animated_free <= 0:
+            await ctx.respond("No emote slots remaining in this server.")
+            return
+    except Exception:
+        pass
 
     try:
         new_emoji = await add_emoji_from_source(ctx, emote, name=name)

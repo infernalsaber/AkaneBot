@@ -10,6 +10,7 @@ from miru.ext import nav
 from utils.emotes_helper import (
     add_emoji_from_source,
     format_emote_error,
+    get_remaining_slots,
     sanitize_emoji_name,
 )
 from utils.models import ColorPalette as colors
@@ -205,6 +206,14 @@ class AddEmoteButton(nav.NavButton):
         if not ctx.guild_id:
             await ctx.respond("This command can only be used in a server.", flags=hk.MessageFlag.EPHEMERAL)
             return
+
+        try:
+            static_free, animated_free = await get_remaining_slots(ctx)
+            if static_free <= 0 and animated_free <= 0:
+                await ctx.respond("No emote slots remaining in this server.", flags=hk.MessageFlag.EPHEMERAL)
+                return
+        except Exception:
+            pass
 
         try:
             embed = None
