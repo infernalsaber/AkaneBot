@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from lightbulb.ext import tasks
 
 from utils.anilist_client import AniListClient
+from utils.mal_client import MalClient
 from utils.help import BotHelpCommand
 from utils.misc import dlogger, verbose_timedelta
 
@@ -91,6 +92,7 @@ async def on_starting(event: hk.StartingEvent) -> None:
             "*.mangadex.org": 15 * 60,
             "*.steampowered.com": 1 * 60 * 60,
             "*.hakush.in": 1 * 60 * 60,
+            "*.jikan.moe": 30 * 60,
         },
         allowed_codes=(200, 404),  # Cache responses with these status codes
         allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
@@ -100,9 +102,16 @@ async def on_starting(event: hk.StartingEvent) -> None:
         ],  # Keep using the cached response even if this param changes
         timeout=ClientTimeout(total=10),
     )
-    bot.d.anilist = AniListClient(bot.d.aio_session)
     with open("config.json") as f:
         bot.d.config = json.load(f)
+    mal_base_url = bot.d.config.get("MAL_API_BASE_URL")
+    server_key = (
+        os.getenv("MAL_SERVER_KEY")
+        or bot.d.config.get("MAL_SERVER_KEY")
+    )
+    bot.d.mal = MalClient(bot.d.aio_session, base_url=mal_base_url, server_key=server_key)
+    bot.d.anilist = AniListClient(bot.d.aio_session, fallback=bot.d.mal)
+    bot.d.anilist_up = True
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.con = sqlite3.connect("akane_db.db")

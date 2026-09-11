@@ -41,6 +41,19 @@ async def clear_session_cache():
     await task_plugin.bot.d.aio_session.delete_expired_responses()
 
 
+@tasks.task(m=15, auto_start=True, wait_before_execution=False)
+async def check_anilist_status():
+    """Check AniList API availability every 15 minutes and update bot.d.anilist_up."""
+    bot = task_plugin.bot
+    if not bot or not hasattr(bot, "d") or not hasattr(bot.d, "anilist") or bot.d.anilist is None:
+        return
+
+    is_up = await bot.d.anilist.check_health()
+    bot.d.anilist_up = is_up
+    status_str = "ONLINE" if is_up else "OFFLINE (Using MAL Fallback)"
+    print(f"AniList API status: {status_str}")
+
+
 @tasks.task(d=10)
 async def clear_pic_files():
     """Clear image files"""

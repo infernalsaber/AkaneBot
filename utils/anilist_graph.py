@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
 
 from utils.algorithms import longest_common_substring
 
@@ -20,9 +20,11 @@ class AnimeNode:
         date_info: Dict,
         duration: int = 0,
         episodes: int = 0,
+        url: Optional[str] = None,
     ):
         self.id = id
         self.title = title
+        self.url = url or f"https://anilist.co/anime/{id}"
         try:
             year = date_info.get("year", 0)
             month = date_info.get("month", 1)
@@ -45,7 +47,7 @@ class AnimeNode:
             minutes = total_minutes % 60
             watch_time = f"({hours}h{minutes}m)"
 
-        url = f"https://anilist.co/anime/{self.id}"
+        url = self.url or f"https://anilist.co/anime/{self.id}"
         return f"[{self.title}]({url}) {watch_time}"
 
 

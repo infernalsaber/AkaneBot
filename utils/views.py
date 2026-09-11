@@ -77,9 +77,13 @@ class AuthorView(miru.View):
         session: t.Optional[aiohttp_client_cache.CachedSession] = None,
         user_id: t.Optional[hk.Snowflake] = None,
         clean_items: t.Optional[bool] = True,
+        is_fallback: bool = False,
+        provider: t.Optional[str] = None,
     ) -> None:
         self.user_id = user_id
         self.session = session
+        self.is_fallback = is_fallback
+        self.provider = provider or ("mal" if is_fallback else "anilist")
         self.answer = None
         self.clean_items = clean_items
         super().__init__(autodefer=autodefer, timeout=timeout)
@@ -112,9 +116,21 @@ class AuthorView(miru.View):
 class SelectView(AuthorView):
     """A subclassed view designed for Text Select"""
 
-    def __init__(self, user_id: hk.Snowflake, pages: dict[str, hk.Embed]) -> None:
+    def __init__(
+        self,
+        user_id: hk.Snowflake,
+        pages: dict[str, hk.Embed],
+        is_fallback: bool = False,
+        provider: t.Optional[str] = None,
+    ) -> None:
         self.pages = pages
-        super().__init__(timeout=60 * 60, clean_items=False, user_id=user_id)
+        super().__init__(
+            timeout=60 * 60,
+            clean_items=False,
+            user_id=user_id,
+            is_fallback=is_fallback,
+            provider=provider,
+        )
 
 
 class SelectNavigator(AuthorNavi):

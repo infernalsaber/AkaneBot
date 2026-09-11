@@ -1,4 +1,4 @@
-﻿"""Domain classes wrapping AniList GraphQL responses.
+"""Domain classes wrapping AniList GraphQL responses.
 
 Each class takes an AniListClient and returns typed objects from `from_*`
 classmethods, or `None` / `[]` on a miss (never a raw error dict). Embed
@@ -13,9 +13,13 @@ from typing import List, Optional, Set, Tuple
 import hikari as hk
 
 from utils.anilist_client import AniListClient, end_of_day_utc_ttl
-from utils.errors import AniListError
+from utils.errors import AniListError, MalError, MediaProviderError
 from utils.misc import verbose_timedelta
 from utils.models import ColorPalette as colors
+from utils.mal_adapter import MalAdapter, MAL_ICON_URL, extract_primary_va
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AnilistBase:
@@ -192,9 +196,35 @@ class ALCharacter(AnilistBase):
 
     @classmethod
     async def from_search(cls, query_: str, client: AniListClient) -> Optional["ALCharacter"]:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            try:
+                results = await client.fallback.search_characters(query_, limit=1)
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback character search failed: {e}")
+                results = []
+            if not results:
+                return None
+            norm = MalAdapter.normalize_character(results[0])
+            obj = cls(norm["name"]["full"], norm["id"], client)
+            obj._data = norm
+            return obj
+
         try:
             data = await client.query(cls._FROM_SEARCH_QUERY, {"search": query_})
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for character search '{query_}'; falling back to MAL")
+                try:
+                    results = await client.fallback.search_characters(query_, limit=1)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback character search failed: {e}")
+                    results = []
+                if not results:
+                    return None
+                norm = MalAdapter.normalize_character(results[0])
+                obj = cls(norm["name"]["full"], norm["id"], client)
+                obj._data = norm
+                return obj
             return None
         character = data.get("Character")
         if not character:
@@ -202,10 +232,40 @@ class ALCharacter(AnilistBase):
         return cls(character["name"]["full"], character["id"], client)
 
     @classmethod
-    async def from_id(cls, id_: int, client: AniListClient) -> Optional["ALCharacter"]:
+    async def from_id(
+        cls, id_: int, client: AniListClient, *, force_fallback: bool = False
+    ) -> Optional["ALCharacter"]:
+        if getattr(client, "fallback", None) and (force_fallback or not getattr(client, "is_available", True)):
+            try:
+                detail = await client.fallback.get_character(id_, full=True)
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback get_character failed: {e}")
+                detail = None
+            if not detail:
+                return None
+            norm = MalAdapter.normalize_character(detail)
+            obj = cls(norm["name"]["full"], norm["id"], client)
+            obj._data = norm
+            obj._is_fallback = True
+            return obj
+
         try:
             data = await client.query(cls._FROM_ID_QUERY, {"id": id_})
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for character id {id_}; falling back to MAL")
+                try:
+                    detail = await client.fallback.get_character(id_, full=True)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback get_character failed: {e}")
+                    detail = None
+                if not detail:
+                    return None
+                norm = MalAdapter.normalize_character(detail)
+                obj = cls(norm["name"]["full"], norm["id"], client)
+                obj._data = norm
+                obj._is_fallback = True
+                return obj
             return None
         character = data.get("Character")
         if not character:
@@ -214,6 +274,8 @@ class ALCharacter(AnilistBase):
 
     @classmethod
     async def is_birthday(cls, client: AniListClient) -> Optional["ALCharacter"]:
+        if not getattr(client, "is_available", True):
+            return None
         try:
             data = await client.query(
                 cls._IS_BIRTHDAY_SINGLE_QUERY,
@@ -231,12 +293,28 @@ class ALCharacter(AnilistBase):
     async def from_search_multiple(
         cls, query_: str, client: AniListClient, per_page: int = 10
     ) -> list:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            try:
+                results = await client.fallback.search_characters(query_, limit=per_page)
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback character search failed: {e}")
+                results = []
+            return [MalAdapter.normalize_character(c) for c in results]
+
         try:
             data = await client.query(
                 cls._SEARCH_MULTIPLE_QUERY,
                 {"search": query_, "perPage": per_page},
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for character search '{query_}'; falling back to MAL")
+                try:
+                    results = await client.fallback.search_characters(query_, limit=per_page)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback character search failed: {e}")
+                    results = []
+                return [MalAdapter.normalize_character(c) for c in results]
             return []
         return data.get("Page", {}).get("characters", []) or []
 
@@ -244,9 +322,15 @@ class ALCharacter(AnilistBase):
     async def from_series_characters(
         cls, series: str, client: AniListClient
     ) -> Tuple[Optional[str], list]:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            return await cls._mal_from_series_characters(series, client)
+
         try:
             data = await client.query(cls._SERIES_CHARACTERS_QUERY, {"search": series})
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for series characters '{series}'; falling back to MAL")
+                return await cls._mal_from_series_characters(series, client)
             return None, []
         media = data.get("Media")
         if not media:
@@ -255,7 +339,32 @@ class ALCharacter(AnilistBase):
         return title, media["characters"]["nodes"]
 
     @classmethod
+    async def _mal_from_series_characters(
+        cls, series: str, client: AniListClient
+    ) -> Tuple[Optional[str], list]:
+        if not getattr(client, "fallback", None):
+            return None, []
+        try:
+            animes = await client.fallback.search_anime(series, limit=1)
+            if not animes:
+                return None, []
+            anime = animes[0]
+            title = anime.get("title_english") or anime.get("title")
+            chars = await client.fallback.get_anime_characters(anime["mal_id"])
+            norm_chars = []
+            for c in chars:
+                char_info = c.get("character", {})
+                if char_info:
+                    norm_chars.append(MalAdapter.normalize_character(char_info))
+            return title, norm_chars
+        except (MalError, Exception) as e:
+            logger.warning(f"MAL fallback series characters failed: {e}")
+            return None, []
+
+    @classmethod
     async def get_birthday_characters(cls, client: AniListClient) -> list:
+        if not getattr(client, "is_available", True):
+            return []
         try:
             data = await client.query(
                 cls._BIRTHDAY_CHARACTERS_QUERY,
@@ -267,9 +376,14 @@ class ALCharacter(AnilistBase):
 
     @classmethod
     async def get_character_media(cls, character_id: int, client: AniListClient) -> Optional[dict]:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            return await cls._mal_get_character_media(character_id, client)
+
         try:
             data = await client.query(cls._CHARACTER_MEDIA_QUERY, {"id": character_id})
         except AniListError:
+            if getattr(client, "fallback", None):
+                return await cls._mal_get_character_media(character_id, client)
             return None
         character = data.get("Character")
         if not character:
@@ -286,10 +400,58 @@ class ALCharacter(AnilistBase):
             "media_titles": media_titles,
         }
 
+    @classmethod
+    async def _mal_get_character_media(
+        cls, character_id: int, client: AniListClient
+    ) -> Optional[dict]:
+        if not getattr(client, "fallback", None):
+            return None
+        try:
+            detail = await client.fallback.get_character(character_id, full=True)
+            if not detail:
+                return None
+            norm = MalAdapter.normalize_character(detail)
+            media_titles = [
+                n["title"]["romaji"]
+                for n in norm["media"]["nodes"]
+                if n.get("title")
+            ]
+            return {
+                "id": norm["id"],
+                "name": norm["name"]["full"],
+                "media_titles": media_titles,
+            }
+        except (MalError, Exception) as e:
+            logger.warning(f"MAL fallback get_character_media failed: {e}")
+            return None
+
     async def _fetch_detail(self) -> Optional[dict]:
+        if hasattr(self, "_data") and self._data:
+            return self._data
+        force_fallback = getattr(self, "_is_fallback", False)
+        if getattr(self.client, "fallback", None) and (force_fallback or not getattr(self.client, "is_available", True)):
+            try:
+                detail = await self.client.fallback.get_character(self.id, full=True)
+                if detail:
+                    self._data = MalAdapter.normalize_character(detail)
+                    self._is_fallback = True
+                    return self._data
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback _fetch_detail failed: {e}")
+            return None
+
         try:
             data = await self.client.query(self._CHARACTER_DETAIL_QUERY, {"id": self.id})
         except AniListError:
+            if getattr(self.client, "fallback", None):
+                logger.info(f"AniList failed for character detail {self.id}; falling back to MAL")
+                try:
+                    detail = await self.client.fallback.get_character(self.id, full=True)
+                    if detail:
+                        self._data = MalAdapter.normalize_character(detail)
+                        return self._data
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback _fetch_detail failed: {e}")
             return None
         return data.get("Character")
 
@@ -336,30 +498,41 @@ class ALCharacter(AnilistBase):
                 ),
             )
 
-        dob = self._format_dob(response["dateOfBirth"])
+        is_fallback = response.get("_is_fallback", False)
+        footer_text = response.get("_source", "Source: AniList") if is_fallback else "Source: AniList"
+        footer_icon = (
+            response.get("_source_icon", MAL_ICON_URL)
+            if is_fallback
+            else "https://anilist.co/img/icons/android-chrome-512x512.png"
+        )
+
+        dob = self._format_dob(response.get("dateOfBirth"))
         description = (
             self.parse_description(response["description"])
-            if response["description"] else "NA"
+            if response.get("description") else "NA"
         )
-        primary_va = self.get_primary_va(response)
+        if is_fallback and "voices" in response:
+            primary_va = extract_primary_va(response["voices"])
+        else:
+            primary_va = self.get_primary_va(response)
 
         return (
             hk.Embed(
                 title=self.name,
-                url=self.url,
+                url=response.get("siteUrl") or self.url,
                 description="\n\n",
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Gender", response["gender"] or "Unknown")
+            .add_field("Gender", response.get("gender") or "Unknown")
             .add_field("DOB", dob, inline=True)
-            .add_field("Favourites", f"{response['favourites']}❤", inline=True)
+            .add_field("Favourites", f"{response.get('favourites', 0)}❤", inline=True)
             .add_field("Character Description", description)
             .add_field("Primary Voice Actor", primary_va, inline=False)
-            .set_thumbnail(response["image"]["large"])
+            .set_thumbnail(response.get("image", {}).get("large"))
             .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                text=footer_text,
+                icon=footer_icon,
             )
         )
 
@@ -378,48 +551,53 @@ class ALCharacter(AnilistBase):
             ]
 
         title = response["name"]["full"]
-        dob = self._format_dob(response["dateOfBirth"])
+        dob = self._format_dob(response.get("dateOfBirth"))
         description = (
             self.parse_description(response["description"])
-            if response["description"] else "NA"
+            if response.get("description") else "NA"
         )
-        primary_va = self.get_primary_va(response)
+        is_fallback = response.get("_is_fallback", False)
+        if is_fallback and "voices" in response:
+            primary_va = extract_primary_va(response["voices"])
+        else:
+            primary_va = self.get_primary_va(response)
 
         series = ""
         nodes = (response.get("media") or {}).get("nodes", [])
         for i, item in enumerate(nodes[:3]):
+            score = item.get('meanScore', 'NA')
             series += (
                 f"```ansi\n{i+1}. \u001b[0;35m{item['title']['romaji']}"
-                f" \u001b[0;32m({item['meanScore']})```"
+                f" \u001b[0;32m({score})```"
             )
 
         footer = {
-            "text": "Source: AniList",
-            "icon": "https://anilist.co/img/icons/android-chrome-512x512.png",
+            "text": response.get("_source", "Source: AniList") if is_fallback else "Source: AniList",
+            "icon": response.get("_source_icon", MAL_ICON_URL) if is_fallback else "https://anilist.co/img/icons/android-chrome-512x512.png",
         }
 
         return [
             hk.Embed(
                 title=title,
-                url=response["siteUrl"],
+                url=response.get("siteUrl") or self.url,
                 description="\n\n",
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .add_field("Gender", response["gender"] or "Unknown")
+            .add_field("Gender", response.get("gender") or "Unknown")
             .add_field("DOB", dob, inline=True)
-            .add_field("Favourites", f"{response['favourites']}❤", inline=True)
+            .add_field("Favourites", f"{response.get('favourites', 0)}❤", inline=True)
             .add_field("Character Description", description)
             .add_field("Primary Voice Actor", primary_va, inline=False)
-            .set_thumbnail(response["image"]["large"])
+            .set_thumbnail(response.get("image", {}).get("large"))
             .set_footer(**footer),
             hk.Embed(
                 title=title,
-                url=response["siteUrl"],
+                url=response.get("siteUrl") or self.url,
                 color=colors.ANILIST,
                 timestamp=datetime.now().astimezone(),
             )
-            .set_thumbnail(response["image"]["large"])
+            .set_thumbnail(response.get("image", {}).get("large"))
             .set_footer(**footer)
             .add_field("Appears in ", series),
         ]
@@ -511,20 +689,68 @@ class ALAnime(AnilistBase):
     async def from_search_multiple(
         cls, query_: str, client: AniListClient
     ) -> list:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            try:
+                mal_data = await client.fallback.search_anime(query_)
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback search_anime failed: {e}")
+                mal_data = []
+            return [MalAdapter.normalize_anime(a) for a in mal_data]
+
         try:
             data = await client.query(
                 cls._SEARCH_QUERY,
                 {"search": query_, "type": "ANIME"},
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for anime search '{query_}'; falling back to MAL")
+                try:
+                    mal_data = await client.fallback.search_anime(query_)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback search_anime failed: {e}")
+                    mal_data = []
+                return [MalAdapter.normalize_anime(a) for a in mal_data]
             return []
         return data.get("Page", {}).get("media", []) or []
 
     @classmethod
-    async def from_id(cls, id_: int, client: AniListClient) -> Optional["ALAnime"]:
+    async def from_id(
+        cls, id_: int, client: AniListClient, *, force_fallback: bool = False
+    ) -> Optional["ALAnime"]:
+        if getattr(client, "fallback", None) and (force_fallback or not getattr(client, "is_available", True)):
+            try:
+                detail = await client.fallback.get_anime(id_, full=True)
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback get_anime failed: {e}")
+                detail = None
+            if not detail:
+                return None
+            norm = MalAdapter.normalize_anime(detail)
+            title = norm["title"]["english"] or norm["title"]["romaji"]
+            obj = cls(title, norm["id"], client)
+            obj._data = norm
+            obj._is_fallback = True
+            return obj
+
         try:
             data = await client.query(cls._FROM_ID_QUERY, {"id": id_, "type": "ANIME"})
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for anime id {id_}; falling back to MAL")
+                try:
+                    detail = await client.fallback.get_anime(id_, full=True)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback get_anime failed: {e}")
+                    detail = None
+                if not detail:
+                    return None
+                norm = MalAdapter.normalize_anime(detail)
+                title = norm["title"]["english"] or norm["title"]["romaji"]
+                obj = cls(title, norm["id"], client)
+                obj._data = norm
+                obj._is_fallback = True
+                return obj
             return None
         media = data.get("Media")
         if not media:
@@ -551,13 +777,27 @@ class ALAnime(AnilistBase):
     async def make_embed(self):
         media = getattr(self, "_data", None)
         if media is None:
-            try:
-                data = await self.client.query(
-                    self._FROM_ID_QUERY, {"id": self.id, "type": "ANIME"}
-                )
-            except AniListError:
-                return None
-            media = data.get("Media")
+            if getattr(self.client, "fallback", None) and not getattr(self.client, "is_available", True):
+                try:
+                    detail = await self.client.fallback.get_anime(self.id, full=True)
+                    if detail:
+                        media = MalAdapter.normalize_anime(detail)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback make_embed failed: {e}")
+            if media is None:
+                try:
+                    data = await self.client.query(
+                        self._FROM_ID_QUERY, {"id": self.id, "type": "ANIME"}
+                    )
+                    media = data.get("Media")
+                except AniListError:
+                    if getattr(self.client, "fallback", None):
+                        try:
+                            detail = await self.client.fallback.get_anime(self.id, full=True)
+                            if detail:
+                                media = MalAdapter.normalize_anime(detail)
+                        except (MalError, Exception) as e:
+                            logger.warning(f"MAL fallback make_embed failed: {e}")
             if not media:
                 return None
 
@@ -565,13 +805,21 @@ class ALAnime(AnilistBase):
         no_of_items = (
             media["episodes"]
             if media["episodes"] != 1
-            else verbose_timedelta(timedelta(minutes=media["duration"]))
+            else verbose_timedelta(timedelta(minutes=media.get("duration") or 24))
         )
         description = (
             self.parse_description(media["description"])
-            if media["description"] else "NA"
+            if media.get("description") else "NA"
         )
-        studios = media["studios"]["nodes"]
+        studios = media.get("studios", {}).get("nodes", [])
+
+        is_fallback = media.get("_is_fallback", False)
+        footer_text = media.get("_source", "Source: AniList") if is_fallback else "Source: AniList"
+        footer_icon = (
+            media.get("_source_icon", MAL_ICON_URL)
+            if is_fallback
+            else "https://anilist.co/img/icons/android-chrome-512x512.png"
+        )
 
         embed = (
             hk.Embed(
@@ -582,8 +830,8 @@ class ALAnime(AnilistBase):
                 timestamp=datetime.now().astimezone(),
             )
             .add_field("Rating", media.get("meanScore", "NA"))
-            .add_field("Genres", ", ".join(media["genres"][:4]))
-            .add_field("Status", media["status"].replace("_", " "), inline=True)
+            .add_field("Genres", ", ".join(media.get("genres", [])[:4]))
+            .add_field("Status", (media.get("status") or "NA").replace("_", " "), inline=True)
             .add_field(
                 "Episodes" if media["episodes"] != 1 else "Duration",
                 no_of_items,
@@ -591,21 +839,21 @@ class ALAnime(AnilistBase):
             )
             .add_field("Studio", studios[0]["name"] if studios else "Unknown", inline=True)
             .add_field("Summary", description)
-            .set_thumbnail(media["coverImage"]["large"])
-            .set_image(media["bannerImage"])
+            .set_thumbnail(media.get("coverImage", {}).get("large"))
+            .set_image(media.get("bannerImage"))
             .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                text=footer_text,
+                icon=footer_icon,
             )
         )
 
         trailer = None
-        if media["trailer"]:
-            site = media["trailer"]["site"]
-            vid = media["trailer"]["id"]
+        if media.get("trailer"):
+            site = media["trailer"].get("site")
+            vid = media["trailer"].get("id")
             if site == "youtube":
-                trailer = f"https://{site}.com/watch?v={vid}"
-            else:
+                trailer = f"https://youtube.com/watch?v={vid}"
+            elif site:
                 trailer = f"https://{site}.com/video/{vid}"
 
         return [embed, trailer]
@@ -639,8 +887,82 @@ class ALAnime(AnilistBase):
         search: Optional[str] = None,
     ) -> dict:
         """Return the raw Media dict (id/title/duration/episodes/relations)."""
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            return await cls._get_mal_anime_data(client, anime_id=anime_id, search=search)
+
         variables = {"id": anime_id} if anime_id else {"search": search}
-        return await client.query(cls._RELATIONS_QUERY, variables)
+        try:
+            return await client.query(cls._RELATIONS_QUERY, variables)
+        except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for anime relations; falling back to MAL")
+                return await cls._get_mal_anime_data(client, anime_id=anime_id, search=search)
+            return {}
+
+    @classmethod
+    async def _get_mal_anime_data(
+        cls,
+        client: AniListClient,
+        *,
+        anime_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> dict:
+        if not getattr(client, "fallback", None):
+            return {}
+        try:
+            if not anime_id and search:
+                results = await client.fallback.search_anime(search, limit=1)
+                if not results:
+                    return {}
+                anime_id = results[0]["mal_id"]
+            if not anime_id:
+                return {}
+
+            anime_full = await client.fallback.get_anime(anime_id, full=True)
+            if not anime_full:
+                return {}
+
+            relations_raw = await client.fallback.get_anime_relations(anime_id)
+        except (MalError, Exception) as e:
+            logger.warning(f"MAL fallback _get_mal_anime_data failed for anime_id={anime_id}: {e}")
+            return {}
+
+        edges = []
+        for rel in relations_raw:
+            rel_type = rel.get("relation", "").upper().replace(" ", "_")
+            for entry in rel.get("entry", []):
+                if entry.get("type") == "anime":
+                    edges.append({
+                        "relationType": rel_type,
+                        "node": {
+                            "id": entry.get("mal_id"),
+                            "title": {
+                                "english": entry.get("name"),
+                                "romaji": entry.get("name"),
+                            },
+                            "type": "ANIME",
+                        }
+                    })
+
+        aired_from = anime_full.get("aired", {}).get("prop", {}).get("from", {})
+        return {
+            "Media": {
+                "id": anime_id,
+                "title": {
+                    "english": anime_full.get("title_english") or anime_full.get("title"),
+                    "romaji": anime_full.get("title"),
+                },
+                "startDate": {
+                    "year": aired_from.get("year"),
+                    "month": aired_from.get("month"),
+                    "day": aired_from.get("day"),
+                },
+                "duration": MalAdapter.normalize_anime(anime_full).get("duration"),
+                "episodes": anime_full.get("episodes"),
+                "relations": {"edges": edges},
+                "siteUrl": anime_full.get("url") or f"https://myanimelist.net/anime/{anime_id}",
+            }
+        }
 
     @classmethod
     async def get_complete_series(
@@ -660,7 +982,7 @@ class ALAnime(AnilistBase):
 
         try:
             data = await cls.get_anime_data(client, anime_id=anime_id)
-        except AniListError:
+        except (AniListError, MalError):
             return []
 
         media = data.get("Media")
@@ -668,6 +990,13 @@ class ALAnime(AnilistBase):
             return []
 
         title = media["title"]["english"] or media["title"]["romaji"]
+        url = media.get("siteUrl")
+        if not url:
+            if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+                url = f"https://myanimelist.net/anime/{media['id']}"
+            else:
+                url = f"https://anilist.co/anime/{media['id']}"
+
         entries = [
             AnimeNode(
                 media["id"],
@@ -675,6 +1004,7 @@ class ALAnime(AnilistBase):
                 media["startDate"],
                 media.get("duration", 0),
                 media.get("episodes", 1),
+                url=url,
             )
         ]
 
@@ -689,9 +1019,12 @@ class ALAnime(AnilistBase):
                 "SPIN_OFF",
                 "SUMMARY",
             ):
-                entries.extend(
-                    await cls.get_complete_series(client, node["id"], visited)
-                )
+                try:
+                    entries.extend(
+                        await cls.get_complete_series(client, node["id"], visited)
+                    )
+                except (AniListError, MalError):
+                    continue
 
         return entries
 
@@ -742,7 +1075,16 @@ class ALAnime(AnilistBase):
     @classmethod
     async def fetch_trends(cls, client: AniListClient, search_query: str) -> dict:
         """Return the activity / episodes / scores trend data for an anime."""
-        data = await client.query(cls._TRENDS_MEDIA_QUERY, {"search": search_query})
+        if not getattr(client, "is_available", True):
+            raise AniListError(
+                "AniList API is currently unavailable. Anime trend analytics require AniList."
+            )
+
+        try:
+            data = await client.query(cls._TRENDS_MEDIA_QUERY, {"search": search_query})
+        except AniListError as e:
+            raise AniListError(f"AniList API error retrieving trends: {e}") from e
+
         media = data.get("Media")
         if not media:
             raise AniListError(f"No anime found for '{search_query}'")
@@ -764,16 +1106,20 @@ class ALAnime(AnilistBase):
         trend_score: list[dict] = []
         page = 1
         while True:
-            page_data = await client.query(
-                cls._TRENDS_PAGE_QUERY,
-                {
-                    "id": al_id,
-                    "page": page,
-                    "perpage": 50,
-                    "date_greater": int(lower_limit.timestamp()),
-                    "date_lesser": int(upper_limit.timestamp()),
-                },
-            )
+            try:
+                page_data = await client.query(
+                    cls._TRENDS_PAGE_QUERY,
+                    {
+                        "id": al_id,
+                        "page": page,
+                        "perpage": 50,
+                        "date_greater": int(lower_limit.timestamp()),
+                        "date_lesser": int(upper_limit.timestamp()),
+                    },
+                )
+            except AniListError as e:
+                raise AniListError(f"AniList API error retrieving trends: {e}") from e
+
             page_info = page_data["Page"]["pageInfo"]
             trend_score.extend(page_data["Page"]["mediaTrends"])
             if not page_info["hasNextPage"]:
@@ -840,12 +1186,28 @@ class ALManga(AnilistBase):
 
     @classmethod
     async def from_search_multiple(cls, query_: str, client: AniListClient) -> list:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            try:
+                mal_data = await client.fallback.search_manga(query_)
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback search_manga failed: {e}")
+                mal_data = []
+            return [MalAdapter.normalize_manga(m) for m in mal_data]
+
         try:
             data = await client.query(
                 cls._SEARCH_QUERY,
                 {"search": query_, "type": "MANGA"},
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for manga search '{query_}'; falling back to MAL")
+                try:
+                    mal_data = await client.fallback.search_manga(query_)
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback search_manga failed: {e}")
+                    mal_data = []
+                return [MalAdapter.normalize_manga(m) for m in mal_data]
             return []
         return data.get("Page", {}).get("media", []) or []
 
@@ -866,12 +1228,34 @@ class ALManga(AnilistBase):
         name: Optional[str] = None,
     ) -> Optional[str]:
         """Resolve the AniList URL for a manga given its MAL id or a title."""
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            if mal_id:
+                return f"https://myanimelist.net/manga/{mal_id}"
+            if name:
+                try:
+                    results = await client.fallback.search_manga(name, limit=1)
+                    if results:
+                        return results[0].get("url")
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback search_manga for url failed: {e}")
+            return None
+
         try:
             data = await client.query(
                 cls._URL_FROM_MAL_QUERY,
                 {"mal_id": mal_id, "search": name},
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                if mal_id:
+                    return f"https://myanimelist.net/manga/{mal_id}"
+                if name:
+                    try:
+                        results = await client.fallback.search_manga(name, limit=1)
+                        if results:
+                            return results[0].get("url")
+                    except (MalError, Exception) as e:
+                        logger.warning(f"MAL fallback search_manga for url failed: {e}")
             return None
         media = data.get("Media")
         return media["siteUrl"] if media else None
@@ -933,23 +1317,46 @@ class ALNovel(AnilistBase):
 
     @classmethod
     async def from_search_multiple(cls, query_: str, client: AniListClient) -> list:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            try:
+                mal_data = await client.fallback.search_manga(query_, type_="lightnovel")
+            except (MalError, Exception) as e:
+                logger.warning(f"MAL fallback search_manga (novel) failed: {e}")
+                mal_data = []
+            return [MalAdapter.normalize_manga(m, is_novel=True) for m in mal_data]
+
         try:
             data = await client.query(
                 cls._SEARCH_QUERY,
                 {"search": query_, "type": "MANGA"},
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for novel search '{query_}'; falling back to MAL")
+                try:
+                    mal_data = await client.fallback.search_manga(query_, type_="lightnovel")
+                except (MalError, Exception) as e:
+                    logger.warning(f"MAL fallback search_manga (novel) failed: {e}")
+                    mal_data = []
+                return [MalAdapter.normalize_manga(m, is_novel=True) for m in mal_data]
             return []
         return data.get("Page", {}).get("media", []) or []
 
     @classmethod
     async def from_search(cls, query_: str, client: AniListClient) -> Optional[dict]:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            results = await cls.from_search_multiple(query_, client)
+            return results[0] if results else None
+
         try:
             data = await client.query(
                 cls._FROM_SEARCH_QUERY,
                 {"search": query_, "type": "MANGA"},
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                results = await cls.from_search_multiple(query_, client)
+                return results[0] if results else None
             return None
         return data.get("Media")
 
@@ -1061,6 +1468,9 @@ class ALStudio(AnilistBase):
     async def from_search(
         cls, query_: str, client: AniListClient, per_page: int = 50, cache_ttl: Optional[int] = None
     ) -> Optional[dict]:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            return await cls._mal_from_search(query_, client, per_page=per_page)
+
         try:
             data = await client.query(
                 cls._QUERY,
@@ -1068,6 +1478,9 @@ class ALStudio(AnilistBase):
                 cache_ttl=cache_ttl,
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for studio search '{query_}'; falling back to MAL")
+                return await cls._mal_from_search(query_, client, per_page=per_page)
             return None
         studio = data.get("Studio")
         if studio:
@@ -1080,6 +1493,23 @@ class ALStudio(AnilistBase):
                 if first_node.get("id") is None and cache_ttl != 0:
                     return await cls.from_search(query_, client, per_page=per_page, cache_ttl=0)
         return studio
+
+    @classmethod
+    async def _mal_from_search(
+        cls, query_: str, client: AniListClient, per_page: int = 50
+    ) -> Optional[dict]:
+        if not getattr(client, "fallback", None):
+            return None
+        try:
+            producers = await client.fallback.search_producers(query_, limit=1)
+            if not producers:
+                return None
+            producer = producers[0]
+            anime_list = await client.fallback.get_producer_anime(producer["mal_id"], limit=per_page)
+            return MalAdapter.normalize_studio(producer, anime_list)
+        except (MalError, Exception) as e:
+            logger.warning(f"MAL fallback studio search failed: {e}")
+            return None
 
 
 class ALStaff(AnilistBase):
@@ -1122,6 +1552,9 @@ class ALStaff(AnilistBase):
     async def from_search(
         cls, query_: str, client: AniListClient, per_page: int = 12
     ) -> Optional[dict]:
+        if getattr(client, "fallback", None) and not getattr(client, "is_available", True):
+            return await cls._mal_from_search(query_, client, per_page=per_page)
+
         try:
             data = await client.query(
                 cls._QUERY,
@@ -1133,5 +1566,27 @@ class ALStaff(AnilistBase):
                 },
             )
         except AniListError:
+            if getattr(client, "fallback", None):
+                logger.info(f"AniList failed for staff search '{query_}'; falling back to MAL")
+                return await cls._mal_from_search(query_, client, per_page=per_page)
             return None
         return data.get("Staff")
+
+    @classmethod
+    async def _mal_from_search(
+        cls, query_: str, client: AniListClient, per_page: int = 12
+    ) -> Optional[dict]:
+        if not getattr(client, "fallback", None):
+            return None
+        try:
+            people = await client.fallback.search_people(query_, limit=1)
+            if not people:
+                return None
+            person = await client.fallback.get_person(people[0]["mal_id"], full=True)
+            if not person:
+                return None
+            return MalAdapter.normalize_staff(person)
+        except (MalError, Exception) as e:
+            logger.warning(f"MAL fallback staff search failed: {e}")
+            return None
+

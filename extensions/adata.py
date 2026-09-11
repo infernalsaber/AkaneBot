@@ -212,8 +212,18 @@ async def user_al(ctx: lb.PrefixContext, user: str):
     """
 
     al_user = await ALUser.from_name(user, ctx.bot.d.anilist)
-    if al_user is None:
-        return await ctx.respond(f"https://anilist.co/user/{user}")
+
+    if not al_user:
+        if not getattr(ctx.bot.d.anilist, "is_available", True):
+            return await ctx.respond(
+                hk.Embed(
+                    title="SERVICE TEMPORARILY UNAVAILABLE",
+                    color=colors.ERROR,
+                    description="AniList API is currently unavailable. User profiles cannot be retrieved via catalog fallback.",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+        return await ctx.respond(f"Couldn't find user `{user}` 😵")
 
     await ctx.respond(
         content=f"https://anilist.co/user/{al_user.id}",
@@ -516,8 +526,8 @@ async def _search_studio(ctx: lb.Context, query: str):
             )
             .set_image(hk.Bytes(image, 'studio_card.png'))
             .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                text=studio.get("_source", "Source: AniList"),
+                icon=studio.get("_source_icon", "https://anilist.co/img/icons/android-chrome-512x512.png"),
             )
         )
 
@@ -684,8 +694,8 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
                 )
                 .set_thumbnail(data.get('image', {}).get('medium'))
                 .set_footer(
-                    text="Source: AniList",
-                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                    text=data.get("_source", "Source: AniList"),
+                    icon=data.get("_source_icon", "https://anilist.co/img/icons/android-chrome-512x512.png"),
                 )
             )
             
@@ -753,94 +763,105 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
 
 async def _search_novel(ctx: lb.Context, novel: str):
     """Search a novel on AL"""
-    media_list = await ALNovel.from_search_multiple(novel, ctx.bot.d.anilist)
+    try:
+        media_list = await ALNovel.from_search_multiple(novel, ctx.bot.d.anilist)
 
-    if not media_list:
-        single_res = await ALNovel.from_search(novel, ctx.bot.d.anilist)
-        if single_res:
-            media_list = [single_res]
+        if not media_list:
+            single_res = await ALNovel.from_search(novel, ctx.bot.d.anilist)
+            if single_res:
+                media_list = [single_res]
 
-    if not media_list:
+        if not media_list:
+            await ctx.respond(
+                hk.Embed(
+                    title="NOVEL NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find novel `{novel}` 😵",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+            return
+
+        pages = {}
+        options = []
+        first_page = None
+
+        for i, response in enumerate(media_list[:15]):
+            title = (response["title"]["english"] or response["title"]["romaji"])[:99]
+
+            if response.get("description"):
+                clean_desc = parse_description(response["description"])
+            else:
+                clean_desc = "NA"
+
+            rel_year = response.get("startDate", {}).get("year")
+            label_text = f"{title} ({rel_year})" if rel_year else title
+            label_text = truncate_words(label_text, 100)
+
+            if clean_desc != "NA":
+                short_desc = " ".join(clean_desc.split())
+                if len(response.get("description", "")) > 75 or len(short_desc) > 75:
+                    short_desc = truncate_words(short_desc, 75)
+            else:
+                short_desc = "No description"
+
+            item_id_str = str(response["id"])
+
+            options.append(
+                miru.SelectOption(
+                    label=label_text,
+                    value=item_id_str,
+                    description=short_desc,
+                )
+            )
+
+            embed = (
+                hk.Embed(
+                    title=title,
+                    url=response["siteUrl"],
+                    description="\n\n",
+                    color=colors.ANILIST,
+                    timestamp=datetime.now().astimezone(),
+                )
+                .add_field("Rating", response.get("meanScore") or "NA")
+                .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
+                .add_field("Status", response.get("status", "NA"), inline=True)
+                .add_field(
+                    "Volumes",
+                    response.get("volumes") or "NA",
+                    inline=True,
+                )
+                .add_field("Summary", clean_desc)
+                .set_thumbnail(response.get("coverImage", {}).get("large"))
+                .set_image(response.get("bannerImage"))
+                .set_footer(
+                    text=response.get("_source", "Source: AniList"),
+                    icon=response.get("_source_icon", "https://anilist.co/img/icons/android-chrome-512x512.png"),
+                )
+            )
+
+            if not i:
+                first_page = embed
+
+            pages[item_id_str] = embed
+
+        is_fallback = any(response.get("_is_fallback", False) for response in media_list)
+        view = views.SelectView(user_id=ctx.author.id, pages=pages, is_fallback=is_fallback)
+        view.add_item(SimpleTextSelect(options=options, placeholder="Select a novel"))
+        view.add_item(btns.KillButton())
+
+        choice = await ctx.respond(embed=first_page, components=view)
+        await view.start(choice)
+        await view.wait()
+    except Exception as e:
         await ctx.respond(
             hk.Embed(
-                title="NOVEL NOT FOUND",
+                title="ERROR",
                 color=colors.ERROR,
-                description=f"Couldn't find novel `{novel}` 😵",
+                description=f"Error searching novel: {e}",
                 timestamp=datetime.now().astimezone(),
             )
         )
-        return
-
-    pages = {}
-    options = []
-    first_page = None
-
-    for i, response in enumerate(media_list[:15]):
-        title = (response["title"]["english"] or response["title"]["romaji"])[:99]
-
-        if response.get("description"):
-            clean_desc = parse_description(response["description"])
-        else:
-            clean_desc = "NA"
-
-        rel_year = response.get("startDate", {}).get("year")
-        label_text = f"{title} ({rel_year})" if rel_year else title
-        label_text = truncate_words(label_text, 100)
-
-        if clean_desc != "NA":
-            short_desc = " ".join(clean_desc.split())
-            if len(response.get("description", "")) > 75 or len(short_desc) > 75:
-                short_desc = truncate_words(short_desc, 75)
-        else:
-            short_desc = "No description"
-
-        item_id_str = str(response["id"])
-
-        options.append(
-            miru.SelectOption(
-                label=label_text,
-                value=item_id_str,
-                description=short_desc,
-            )
-        )
-
-        embed = (
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                description="\n\n",
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
-            )
-            .add_field("Rating", response.get("meanScore") or "NA")
-            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
-            .add_field("Status", response.get("status", "NA"), inline=True)
-            .add_field(
-                "Volumes",
-                response.get("volumes") or "NA",
-                inline=True,
-            )
-            .add_field("Summary", clean_desc)
-            .set_thumbnail(response.get("coverImage", {}).get("large"))
-            .set_image(response.get("bannerImage"))
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            )
-        )
-
-        if not i:
-            first_page = embed
-
-        pages[item_id_str] = embed
-
-    view = views.SelectView(user_id=ctx.author.id, pages=pages)
-    view.add_item(SimpleTextSelect(options=options, placeholder="Select a novel"))
-    view.add_item(btns.KillButton())
-
-    choice = await ctx.respond(embed=first_page, components=view)
-    await view.start(choice)
-    await view.wait()
 
 
 async def _time_to(ctx: lb.Context, series: str) -> None:
@@ -926,131 +947,140 @@ async def _time_to(ctx: lb.Context, series: str) -> None:
 
 async def _search_anime(ctx, anime: str):
     """Search an anime on AL"""
-    media_list = await ALAnime.from_search_multiple(anime, ctx.bot.d.anilist)
+    try:
+        media_list = await ALAnime.from_search_multiple(anime, ctx.bot.d.anilist)
 
-    if not media_list:
-        return await ctx.respond(
+        if not media_list:
+            return await ctx.respond(
+                hk.Embed(
+                    title="ANIME NOT FOUND",
+                    color=colors.ERROR,
+                    description=f"Couldn't find anime `{anime}` 😵",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
+
+        pages = {}
+        trailers_dict = {}
+        options = []
+        first_page = None
+        first_trailer = "Couldn't find anything."
+
+        for i, response in enumerate(media_list[:15]):
+            title = response["title"]["english"] or response["title"]["romaji"]
+
+            no_of_items = response.get("episodes") if response.get("episodes") else "NA"
+
+            if isinstance(response.get("episodes"), int) and no_of_items == 1:
+                no_of_items = (
+                    verbose_timedelta(timedelta(minutes=response["duration"]))
+                    if response.get("duration")
+                    else "NA"
+                )
+            elif response.get("nextAiringEpisode"):
+                if no_of_items == "NA":
+                    no_of_items = f"{response['nextAiringEpisode']['episode']-1}/??"
+                else:
+                    no_of_items = f"{response['nextAiringEpisode']['episode']-1}/{no_of_items}"
+
+            if response.get("description"):
+                clean_desc = parse_description(response["description"])
+            else:
+                clean_desc = "NA"
+
+            rel_year = response.get("startDate", {}).get("year")
+            label_text = f"{title} ({rel_year})" if rel_year else title
+            label_text = truncate_words(label_text, 100)
+
+            if clean_desc != "NA":
+                short_desc = " ".join(clean_desc.split())
+                if len(response.get("description", "")) > 75 or len(short_desc) > 75:
+                    short_desc = truncate_words(short_desc, 75)
+            else:
+                short_desc = "No description"
+
+            if response.get("studios") and response["studios"].get("nodes"):
+                studios = ", ".join([st["name"] for st in response["studios"]["nodes"]])
+            else:
+                studios = "Unknown"
+
+            embed = (
+                hk.Embed(
+                    title=title,
+                    url=response["siteUrl"],
+                    description="\n\n",
+                    color=colors.ANILIST,
+                    timestamp=datetime.now().astimezone(),
+                )
+                .add_field(
+                    "Rating", response.get("meanScore") or "NA"
+                )
+                .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
+                .add_field("Status", response.get("status", "NA").replace("_", " "), inline=True)
+                .add_field(
+                    "Episodes" if response.get("episodes") != 1 else "Duration",
+                    no_of_items,
+                    inline=True,
+                )
+                .add_field("Studio", studios, inline=True)
+                .add_field("Summary", clean_desc)
+                .set_thumbnail(response.get("coverImage", {}).get("large"))
+                .set_image(response.get("bannerImage"))
+                .set_footer(
+                    text=response.get("_source", "Source: AniList"),
+                    icon=response.get("_source_icon", "https://anilist.co/img/icons/android-chrome-512x512.png"),
+                )
+            )
+
+            trailer = "Couldn't find anything."
+            if response.get("trailer") and response["trailer"].get("site") and response["trailer"].get("id"):
+                if response["trailer"]["site"] == "youtube":
+                    trailer = f"https://youtube.com/watch?v={response['trailer']['id']}"
+                else:
+                    trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
+
+            item_id_str = str(response["id"])
+            if not i:
+                first_page = embed
+                first_trailer = trailer
+
+            options.append(
+                miru.SelectOption(
+                    label=label_text,
+                    value=item_id_str,
+                    description=short_desc,
+                )
+            )
+            pages[item_id_str] = embed
+            trailers_dict[item_id_str] = trailer
+
+        is_fallback = any(response.get("_is_fallback", False) for response in media_list)
+        view = views.SelectView(user_id=ctx.author.id, pages=pages, is_fallback=is_fallback)
+        view.trailers = trailers_dict
+        view.add_item(SwapTextSelect(options=options, placeholder="Select an anime", swap_attr="trailers"))
+        view.add_item(
+            btns.SwapButton(
+                swap_page=first_trailer,
+                original_page=first_page,
+                label1="Trailer",
+                emoji1=hk.Emoji.parse(emotes.YOUTUBE.value),
+                emoji2=hk.Emoji.parse("🔍"),
+            )
+        )
+        view.add_item(btns.KillButton())
+
+        choice = await ctx.respond(embed=first_page, components=view)
+        await view.start(choice)
+        await view.wait()
+    except Exception as e:
+        await ctx.respond(
             hk.Embed(
-                title="ANIME NOT FOUND",
+                title="ERROR",
                 color=colors.ERROR,
-                description=f"Couldn't find anime `{anime}` 😵",
+                description=f"Error searching anime: {e}",
                 timestamp=datetime.now().astimezone(),
             )
         )
-
-    pages = {}
-    trailers_dict = {}
-    options = []
-    first_page = None
-    first_trailer = "Couldn't find anything."
-
-    for i, response in enumerate(media_list[:15]):
-        title = response["title"]["english"] or response["title"]["romaji"]
-
-        no_of_items = response.get("episodes") if response.get("episodes") else "NA"
-
-        if isinstance(response.get("episodes"), int) and no_of_items == 1:
-            no_of_items = (
-                verbose_timedelta(timedelta(minutes=response["duration"]))
-                if response.get("duration")
-                else "NA"
-            )
-        elif response.get("nextAiringEpisode"):
-            if no_of_items == "NA":
-                no_of_items = f"{response['nextAiringEpisode']['episode']-1}/??"
-            else:
-                no_of_items = f"{response['nextAiringEpisode']['episode']-1}/{no_of_items}"
-
-        if response.get("description"):
-            clean_desc = parse_description(response["description"])
-        else:
-            clean_desc = "NA"
-
-        rel_year = response.get("startDate", {}).get("year")
-        label_text = f"{title} ({rel_year})" if rel_year else title
-        label_text = truncate_words(label_text, 100)
-
-        if clean_desc != "NA":
-            short_desc = " ".join(clean_desc.split())
-            if len(response.get("description", "")) > 75 or len(short_desc) > 75:
-                short_desc = truncate_words(short_desc, 75)
-        else:
-            short_desc = "No description"
-
-        if response.get("studios") and response["studios"].get("nodes"):
-            studios = ", ".join([st["name"] for st in response["studios"]["nodes"]])
-        else:
-            studios = "Unknown"
-
-        embed = (
-            hk.Embed(
-                title=title,
-                url=response["siteUrl"],
-                description="\n\n",
-                color=colors.ANILIST,
-                timestamp=datetime.now().astimezone(),
-            )
-            .add_field(
-                "Rating", response.get("meanScore") or "NA"
-            )
-            .add_field("Genres", ", ".join(response.get("genres", [])[:4]) or "NA")
-            .add_field("Status", response.get("status", "NA").replace("_", " "), inline=True)
-            .add_field(
-                "Episodes" if response.get("episodes") != 1 else "Duration",
-                no_of_items,
-                inline=True,
-            )
-            .add_field("Studio", studios, inline=True)
-            .add_field("Summary", clean_desc)
-            .set_thumbnail(response.get("coverImage", {}).get("large"))
-            .set_image(response.get("bannerImage"))
-            .set_footer(
-                text="Source: AniList",
-                icon="https://anilist.co/img/icons/android-chrome-512x512.png",
-            )
-        )
-
-        trailer = "Couldn't find anything."
-        if response.get("trailer") and response["trailer"].get("site") and response["trailer"].get("id"):
-            if response["trailer"]["site"] == "youtube":
-                trailer = f"https://youtube.com/watch?v={response['trailer']['id']}"
-            else:
-                trailer = f"https://{response['trailer']['site']}.com/video/{response['trailer']['id']}"
-
-        item_id_str = str(response["id"])
-        if not i:
-            first_page = embed
-            first_trailer = trailer
-
-        options.append(
-            miru.SelectOption(
-                label=label_text,
-                value=item_id_str,
-                description=short_desc,
-            )
-        )
-        pages[item_id_str] = embed
-        trailers_dict[item_id_str] = trailer
-
-    view = views.SelectView(user_id=ctx.author.id, pages=pages)
-    view.trailers = trailers_dict
-    view.add_item(SwapTextSelect(options=options, placeholder="Select an anime", swap_attr="trailers"))
-    view.add_item(
-        btns.SwapButton(
-            swap_page=first_trailer,
-            original_page=first_page,
-            label1="Trailer",
-            emoji1=hk.Emoji.parse(emotes.YOUTUBE.value),
-            emoji2=hk.Emoji.parse("🔍"),
-        )
-    )
-    view.add_item(btns.KillButton())
-
-    choice = await ctx.respond(embed=first_page, components=view)
-    await view.start(choice)
-    await view.wait()
-    # except Exception as e:
-    #     print(e)
 
 
 async def _search_manga(ctx, manga: str):
@@ -1101,8 +1131,8 @@ async def _search_manga(ctx, manga: str):
                 .set_thumbnail(series["coverImage"]["large"] if series.get("coverImage") else None)
                 .set_image(series.get("bannerImage"))
                 .set_footer(
-                    text="Source: AniList",
-                    icon="https://anilist.co/img/icons/android-chrome-512x512.png",
+                    text=series.get("_source", "Source: AniList"),
+                    icon=series.get("_source_icon", "https://anilist.co/img/icons/android-chrome-512x512.png"),
                 )
             )
 
@@ -1120,7 +1150,8 @@ async def _search_manga(ctx, manga: str):
             )
             pages[series_id_str] = embed
 
-        view = views.SelectView(user_id=ctx.author.id, pages=pages)
+        is_fallback = any(series.get("_is_fallback", False) for series in series_list)
+        view = views.SelectView(user_id=ctx.author.id, pages=pages, is_fallback=is_fallback)
         view.add_item(SimpleTextSelect(options=options, placeholder="Other manga"))
         view.add_item(btns.KillButton())
 
@@ -1156,10 +1187,28 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
     """Interlude function for character search with dropdowns sorted by popularity"""
 
     if birthday:
+        if not getattr(ctx.bot.d.anilist, "is_available", True):
+            return await ctx.respond(
+                hk.Embed(
+                    title="SERVICE TEMPORARILY UNAVAILABLE",
+                    color=colors.ERROR,
+                    description="AniList API is currently unavailable. Character birthdays cannot be retrieved.",
+                    timestamp=datetime.now().astimezone(),
+                )
+            )
         try:
             characters = await ALCharacter.get_birthday_characters(ctx.bot.d.anilist)
             
             if not characters:
+                if not getattr(ctx.bot.d.anilist, "is_available", True):
+                    return await ctx.respond(
+                        hk.Embed(
+                            title="SERVICE TEMPORARILY UNAVAILABLE",
+                            color=colors.ERROR,
+                            description="AniList API is currently unavailable. Character birthdays cannot be retrieved.",
+                            timestamp=datetime.now().astimezone(),
+                        )
+                    )
                 await ctx.respond("No characters have their birthday today 😵")
                 return
             
@@ -1182,19 +1231,23 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                     )
                 )
             
+            is_fallback = any(char.get("_is_fallback", False) for char in characters)
             view = views.AuthorView(
-                user_id=ctx.author.id, session=ctx.bot.d.anilist
+                user_id=ctx.author.id, session=ctx.bot.d.anilist, is_fallback=is_fallback
             )
             
             view.add_item(
                 CharacterSelect(
                     options=options, 
-                    placeholder="Select character"
+                    placeholder="Select character",
+                    is_fallback=is_fallback,
                 )
             )
             view.add_item(btns.KillButton())
             
-            first_chara = await ALCharacter.from_id(int(characters[0]["id"]), ctx.bot.d.anilist)
+            first_chara = await ALCharacter.from_id(
+                int(characters[0]["id"]), ctx.bot.d.anilist, force_fallback=is_fallback
+            )
             first_embed = await first_chara.make_embed() if first_chara else None
 
             resp = await ctx.respond(embed=first_embed, components=view)
@@ -1241,19 +1294,23 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                     )
                 )
             
+            is_fallback = any(char.get("_is_fallback", False) for char in characters)
             view = views.AuthorView(
-                user_id=ctx.author.id, session=ctx.bot.d.anilist
+                user_id=ctx.author.id, session=ctx.bot.d.anilist, is_fallback=is_fallback
             )
             
             view.add_item(
                 CharacterSelect(
                     options=options, 
-                    placeholder=f"Select character"
+                    placeholder=f"Select character",
+                    is_fallback=is_fallback,
                 )
             )
             view.add_item(btns.KillButton())
             
-            first_chara = await ALCharacter.from_id(int(characters[0]["id"]), ctx.bot.d.anilist)
+            first_chara = await ALCharacter.from_id(
+                int(characters[0]["id"]), ctx.bot.d.anilist, force_fallback=is_fallback
+            )
             first_embed = await first_chara.make_embed() if first_chara else None
 
             resp = await ctx.respond(embed=first_embed, components=view)
@@ -1296,19 +1353,23 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                         )
                     )
                 
+                is_fallback = any(char.get("_is_fallback", False) for char in characters)
                 view = views.AuthorView(
-                    user_id=ctx.author.id, session=ctx.bot.d.anilist
+                    user_id=ctx.author.id, session=ctx.bot.d.anilist, is_fallback=is_fallback
                 )
                 
                 view.add_item(
                     CharacterSelect(
                         options=options, 
-                        placeholder=f"Select {title[:50]} character"
+                        placeholder=f"Select {title[:50]} character",
+                        is_fallback=is_fallback,
                     )
                 )
                 view.add_item(btns.KillButton())
                 
-                first_chara = await ALCharacter.from_id(int(characters[0]["id"]), ctx.bot.d.anilist)
+                first_chara = await ALCharacter.from_id(
+                    int(characters[0]["id"]), ctx.bot.d.anilist, force_fallback=is_fallback
+                )
                 first_embed = await first_chara.make_embed() if first_chara else None
 
                 resp = await ctx.respond(embed=first_embed, components=view)
@@ -1374,19 +1435,23 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                         )
                     )
                 
+                is_fallback = any(char.get("_is_fallback", False) for char in similar_characters)
                 view = views.AuthorView(
-                    user_id=ctx.author.id, session=ctx.bot.d.anilist
+                    user_id=ctx.author.id, session=ctx.bot.d.anilist, is_fallback=is_fallback
                 )
                 
                 view.add_item(
                     CharacterSelect(
                         options=options, 
-                        placeholder=f"Select character from '{title[:50]}'"
+                        placeholder=f"Select character from '{title[:50]}'",
+                        is_fallback=is_fallback,
                     )
                 )
                 view.add_item(btns.KillButton())
                 
-                first_chara = await ALCharacter.from_id(int(similar_characters[0]["id"]), ctx.bot.d.anilist)
+                first_chara = await ALCharacter.from_id(
+                    int(similar_characters[0]["id"]), ctx.bot.d.anilist, force_fallback=is_fallback
+                )
                 first_embed = await first_chara.make_embed() if first_chara else None
 
                 resp = await ctx.respond(embed=first_embed, components=view)

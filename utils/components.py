@@ -88,14 +88,28 @@ class SwapTextSelect(miru.TextSelect):
 class CharacterSelect(miru.TextSelect):
     """A text select made for the character command's dropdown"""
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        *args,
+        is_fallback: bool = False,
+        provider: str | None = None,
+        **kwargs,
+    ) -> None:
         super().__init__(*args, **kwargs)
+        self.is_fallback = is_fallback
+        self.provider = provider
 
     async def callback(self, ctx: miru.ViewContext) -> None:
         try:
             if hasattr(self.view, "session"):
+                force_fallback = (
+                    getattr(self, "is_fallback", False)
+                    or getattr(self.view, "is_fallback", False)
+                    or getattr(self, "provider", None) == "mal"
+                    or getattr(self.view, "provider", None) == "mal"
+                )
                 chara = await ALCharacter.from_id(
-                    int(self.values[0]), self.view.session
+                    int(self.values[0]), self.view.session, force_fallback=force_fallback
                 )
                 if chara is None:
                     await ctx.respond(

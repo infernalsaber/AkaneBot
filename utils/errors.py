@@ -12,10 +12,18 @@ class TransportError(RequestsFailedError):
     """Raised on network error, non-OK HTTP status, or retries exhausted."""
 
 
-class AniListError(RequestsFailedError):
+class MediaProviderError(RequestsFailedError):
+    """Common base exception for media catalog providers (AniList, MAL, etc.)."""
+
+
+class AniListError(MediaProviderError):
     """Raised when AniList GraphQL returns a hard failure (non-retryable or retries exhausted)."""
 
 
 class SevenTVError(RequestsFailedError):
     """Raised when 7TV API returns an error or fails."""
+
+
+class MalError(MediaProviderError):
+    """Raised when MAL REST API returns an error or fails."""
 
