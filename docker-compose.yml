@@ -1,0 +1,15 @@
+services:
+  akane-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: akane-bot:latest
+    container_name: akane-bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./akane_db.db:/app/akane_db.db
+      - ./logs:/app/logs
+      - ./pictures:/app/pictures
+      - ./config.json:/app/config.json
+      - ./extensions:/app/extensions

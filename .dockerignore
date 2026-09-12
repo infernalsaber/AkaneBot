@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+*.pyc
+logs
+pictures
+akane_db.db
+cache_db.db
+.cache
