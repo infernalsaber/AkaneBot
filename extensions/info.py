@@ -372,6 +372,16 @@ async def user_info(ctx: lb.Context, user: hk.Member) -> None:
         await ctx.respond(e)
 
 
+def _git(cmd: str) -> t.Optional[str]:
+    """Run a git command, returning its stripped output or None if git/the repo is unavailable"""
+    try:
+        process = Popen(cmd, text=True, shell=True, stdout=PIPE, stderr=PIPE)
+        out, _ = process.communicate()
+    except OSError:
+        return None
+    return out.strip() if process.returncode == 0 and out.strip() else None
+
+
 @info_plugin.command
 @lb.add_cooldown(10, 1, lb.UserBucket)
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
@@ -390,33 +400,21 @@ async def botinfo(ctx: lb.Context) -> None:
             guild_obj = ctx.bot.cache.get_guild(guild)
             member = member + guild_obj.member_count
 
-        process = Popen(
-            "git rev-list --count main",
-            text=True,
-            shell=True,
-            stdout=PIPE,
-            stderr=PIPE,
-        )
-        num_commits, _ = process.communicate()
+        num_commits = _git("git rev-list --count main")
+        changes = _git('git log -5 --format="<t:%at:D>: %s"')
 
-        num_commits = int(num_commits)
+        if num_commits and num_commits.isdigit():
+            num_commits = int(num_commits)
+            version = f"0.{floor(num_commits/100)}.{floor((num_commits%100)/10)}"
+        else:
+            version = "unknown"
 
-        process = Popen(
-            'git log -5 --format="<t:%at:D>: %s"',
-            text=True,
-            shell=True,
-            stdout=PIPE,
-            stderr=PIPE,
-        )
-        changes, _ = process.communicate()
-
-        change_list: t.List[str] = [
-            f"{i+1}. {item}" for i, item in enumerate(changes.split("\n")[:5])
-        ]
-
-        changes = "\n".join(change_list)
-
-        version = f"0.{floor(num_commits/100)}.{floor((num_commits%100)/10)}"
+        if changes:
+            changes = "\n".join(
+                f"{i+1}. {item}" for i, item in enumerate(changes.split("\n")[:5])
+            )
+        else:
+            changes = "Change log unavailable (no local git)."
 
         pages = [
             hk.Embed(
