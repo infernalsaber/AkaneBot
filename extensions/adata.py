@@ -259,7 +259,8 @@ async def _show_user(ctx: lb.Context, user: Optional[str]) -> None:
     resp = await ctx.respond(attachment=view.card("about"), components=view)
     await view.start(await resp.message())
     view.render_in_background()
-    await _maybe_prompt_link(ctx, al_user["name"])
+    # Shelved for now: the "save your username?" prompt after the card
+    # await _maybe_prompt_link(ctx, al_user["name"])
     await view.wait()
 
 
