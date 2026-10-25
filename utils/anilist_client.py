@@ -164,8 +164,12 @@ class AniListClient(HttpClient):
         variables: Optional[dict] = None,
         *,
         cache_ttl: Optional[int] = None,
+        partial: bool = False,
     ) -> dict:
-        """POST a GraphQL op, return the `data` payload."""
+        """POST a GraphQL op, return the `data` payload.
+
+        `partial` tolerates errors on some fields (left null) if the rest came back.
+        """
         if not self.is_available:
             raise AniListError(
                 f"AniList is currently unavailable (is_up={self.is_up}, circuit_open={self.is_circuit_open})"
@@ -182,6 +186,9 @@ class AniListClient(HttpClient):
             raise AniListError(str(e)) from e
 
         body = await resp.json()
+        if body.get("errors") and partial and any((body.get("data") or {}).values()):
+            self.record_success()
+            return body["data"]
         if body.get("errors"):
             err_msg = f"AniList GraphQL errors: {body['errors']}"
             err_str = str(body["errors"]).lower()

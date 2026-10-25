@@ -2,6 +2,7 @@
 import asyncio
 import glob
 import os
+import re
 import typing as t
 from datetime import datetime
 from random import randint
@@ -10,6 +11,7 @@ from subprocess import PIPE, Popen
 import arrow
 import hikari as hk
 import lightbulb as lb
+import miru
 import pytz
 from lightbulb.ext import tasks
 from rapidfuzz import process
@@ -24,7 +26,7 @@ from utils.misc import (
     poor_mans_proxy,
     proxy_img
 )
-from utils.views import AuthorNavi
+from utils.views import AuthorNavi, AuthorView
 
 task_plugin = lb.Plugin("Tasks", "Background processes", include_datastore=True)
 task_plugin.d.help = False
@@ -391,6 +393,91 @@ async def shutdown(ctx: lb.Context) -> None:
         ded.write(str(ctx.channel_id))
     await ctx.respond("Shutting bot down...")
     await ctx.bot.close()
+
+BUTTON_STYLES = {
+    "primary": hk.ButtonStyle.PRIMARY,
+    "blurple": hk.ButtonStyle.PRIMARY,
+    "secondary": hk.ButtonStyle.SECONDARY,
+    "grey": hk.ButtonStyle.SECONDARY,
+    "success": hk.ButtonStyle.SUCCESS,
+    "green": hk.ButtonStyle.SUCCESS,
+    "danger": hk.ButtonStyle.DANGER,
+    "red": hk.ButtonStyle.DANGER,
+}
+MAX_BUTTONS = 25  # 5 rows of 5, Discord's limit per message
+
+custom_emoji_pattern = re.compile(r"<a?:\w{2,32}:\d{17,20}>")
+unicode_emoji_pattern = re.compile(
+    "^[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u2300-\u23FF"
+    "\uFE0F\u200D\U0001F3FB-\U0001F3FF\u20E3#*0-9]+$"
+)
+
+
+class TestButton(miru.Button):
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        await ctx.respond(f"Clicked `{self.style.name.lower()}` button", flags=hk.MessageFlag.EPHEMERAL)
+
+
+def parse_button_line(line: str) -> t.Union[TestButton, str]:
+    """Parse `type [emote] [text]` into a button, or return an error message"""
+    style, _, rest = line.strip().partition(" ")
+    if style.lower() not in BUTTON_STYLES:
+        return f"unknown type `{style}`. Use one of: {', '.join(BUTTON_STYLES)}"
+
+    first, _, text = rest.strip().partition(" ")
+    is_emote = custom_emoji_pattern.fullmatch(first) or (
+        unicode_emoji_pattern.match(first) and not first.isdigit()
+    )
+    emoji = hk.Emoji.parse(first) if is_emote else None
+    label = (text if emoji else rest).strip()[:80] or None
+
+    if not (emoji or label):
+        return "a button needs an emote or some text"
+    return TestButton(style=BUTTON_STYLES[style.lower()], label=label, emoji=emoji)
+
+
+@task_plugin.command
+@lb.add_checks(lb.owner_only)
+@lb.set_help(
+    "### Button types:\n"
+    "- `primary` (aliases: `blurple`)\n"
+    "- `secondary` (aliases: `grey`)\n"
+    "- `success` (aliases: `green`)\n"
+    "- `danger` (aliases: `red`)\n\n"
+    "The emote is optional: if the first word isn't a custom or unicode emote, "
+    "it becomes part of the text.\n\n"
+    f"Put each button on its own line to send several at once (up to {MAX_BUTTONS}).\n\n"
+    "Example:\n```\n[p]btn success 🔥 Ship it\ndanger Abort\nprimary 👍\n```"
+)
+@lb.option(
+    "buttons",
+    "One button per line: type [emote] [text]",
+    modifier=lb.commands.OptionModifier.CONSUME_REST,
+)
+@lb.command(
+    "button",
+    "Send test buttons: -button [type] [emote] [text], one per line",
+    pass_options=True,
+    aliases=["btn"],
+)
+@lb.implements(lb.PrefixCommand)
+async def button_test(ctx: lb.Context, buttons: str) -> None:
+    """Send buttons to test styles; each line is one button and non-emotes are skipped"""
+    lines = [line for line in buttons.splitlines() if line.strip()]
+    if len(lines) > MAX_BUTTONS:
+        return await ctx.respond(f"Too many buttons, the max is {MAX_BUTTONS}")
+
+    view = AuthorView(user_id=ctx.author.id)
+    for i, line in enumerate(lines, 1):
+        button = parse_button_line(line)
+        if isinstance(button, str):
+            prefix = f"Line {i}: " if len(lines) > 1 else ""
+            return await ctx.respond(f"{prefix}{button[0].upper()}{button[1:]}")
+        view.add_item(button)
+
+    resp = await ctx.respond("Test buttons:" if len(lines) > 1 else "Test button:", components=view)
+    await view.start(resp)
+
 
 @task_plugin.command
 @lb.add_checks(lb.owner_only)

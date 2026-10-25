@@ -7,6 +7,7 @@ isort==5.12.0
 black==23.7.0
 pre-commit==3.3.3
 ipdb
+watchfiles
 
 # Testing dependencies
 pytest==7.4.3
