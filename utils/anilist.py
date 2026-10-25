@@ -18,6 +18,7 @@ from utils.misc import verbose_timedelta
 from utils.models import ColorPalette as colors
 from utils.mal_adapter import MalAdapter, MAL_ICON_URL, extract_primary_va
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,16 @@ class AnilistBase:
 
         if len(description) > limit:
             description = description[:limit]
+
+            # Fix incomplete markdown links cut off during truncation
+            if re.search(r"\[[^\]]+\]\([^)]*$", description):
+                if description.endswith("("):
+                    description = description[:-1]
+                else:
+                    description += ")"
+            elif re.search(r"\[[^\]]*$", description):
+                description = re.sub(r"\[([^\]]*)$", r"\1", description)
+
             if description.count("||") % 2:
                 description += "||"
             description += "..."
@@ -89,7 +100,7 @@ class ALCharacter(AnilistBase):
                 favourites
                 description (asHtml: false)
                 image { large }
-                media { nodes { title { romaji english } } }
+                media (sort: POPULARITY_DESC, perPage: 1) { nodes { title { romaji english } } }
             }
         }
     }
@@ -99,7 +110,7 @@ class ALCharacter(AnilistBase):
     query ($search: String) {
         Media (search: $search) {
             title { english romaji }
-            characters (sort: FAVOURITES_DESC) {
+            characters (sort: [ROLE, FAVOURITES_DESC]) {
                 nodes {
                     id
                     name { full alternative }
@@ -352,7 +363,7 @@ class ALCharacter(AnilistBase):
             title = anime.get("title_english") or anime.get("title")
             chars = await client.fallback.get_anime_characters(anime["mal_id"])
             norm_chars = []
-            for c in chars:
+            for c in sorted(chars, key=lambda c: c.get("role") != "Main"):  # main characters first
                 char_info = c.get("character", {})
                 if char_info:
                     norm_chars.append(MalAdapter.normalize_character(char_info))

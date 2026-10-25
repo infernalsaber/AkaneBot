@@ -407,8 +407,9 @@ class SwapButton(miru.Button):
         emoji2: t.Optional[t.Union[hk.Emoji, str]] = None,
         row: t.Optional[int] = None,
         original_page: t.Union[hk.Embed, str],
-        swap_page: t.Union[hk.Embed, str],
+        swap_page: t.Union[hk.Embed, str, t.Callable[[], t.Awaitable[t.Union[hk.Embed, str]]]],
     ):
+        # swap_page can be an async function; it's only built on the first click
         self.swap_page = swap_page
         self.original_page = original_page
 
@@ -431,6 +432,8 @@ class SwapButton(miru.Button):
                     self.emoji = self.emoji2
 
                 # Page 1 -> 2
+                if callable(self.swap_page):
+                    self.swap_page = await self.swap_page()
 
                 if isinstance(self.swap_page, str):
                     await ctx.edit_response(

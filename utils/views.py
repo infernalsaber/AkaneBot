@@ -1,4 +1,6 @@
 """Custom view classes"""
+import asyncio
+import logging
 import typing as t
 from datetime import timedelta
 
@@ -7,8 +9,11 @@ import hikari as hk
 import miru
 from miru.ext import nav
 
-from utils.buttons import CustomNextButton, CustomPrevButton, KillNavButton
+from utils import usercard
+from utils.buttons import CustomNextButton, CustomPrevButton, KillButton, KillNavButton
+from utils.components import UserCardSelect
 from utils.misc import check_if_url
+from utils.models import EmoteCollection as emotes
 
 
 class PeristentViewTest(miru.View):
@@ -131,6 +136,58 @@ class SelectView(AuthorView):
             is_fallback=is_fallback,
             provider=provider,
         )
+
+
+class UserCardView(AuthorView):
+    """A view switching between an AL user's About, Favourites and Friends cards
+
+    Skeletons (no images) are shown right away and replaced by the full cards
+    as they finish rendering in the background.
+    """
+
+    def __init__(self, user_id: hk.Snowflake, session, user: dict) -> None:
+        super().__init__(user_id=user_id, session=session)
+        self.user = user
+        self.current = "about"
+        self.cards: dict[str, bytes] = {}
+        self._tasks: set[asyncio.Task] = set()  # keeps the background renders alive
+
+        self.add_item(UserCardSelect())
+        self.add_item(
+            miru.Button(
+                style=hk.ButtonStyle.LINK,
+                url=f"https://anilist.co/user/{user['name']}",
+                label="Profile",
+                emoji=hk.Emoji.parse(emotes.AL.value),
+            )
+        )
+        self.add_item(KillButton())
+
+    def card(self, kind: str) -> hk.Bytes:
+        return hk.Bytes(self.cards[kind], f"{kind}.png")
+
+    async def render_skeletons(self) -> None:
+        for kind in usercard.KINDS:
+            self.cards[kind] = await usercard.render_skeleton(kind, self.user)
+
+    def render_in_background(self) -> None:
+        for kind in usercard.KINDS:
+            task = asyncio.create_task(self._render(kind))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+
+    async def _render(self, kind: str) -> None:
+        try:
+            self.cards[kind] = await usercard.render_card(kind, self.user, self.session)
+        except Exception:
+            logging.exception(f"Failed to render {kind} card for {self.user['name']}")
+            return  # the skeleton stays up
+
+        if kind == self.current and self.message:
+            try:
+                await self.message.edit(attachment=self.card(kind), components=self)
+            except hk.HTTPError:
+                pass  # message deleted or not editable anymore
 
 
 class SelectNavigator(AuthorNavi):

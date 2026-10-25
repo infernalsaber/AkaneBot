@@ -85,6 +85,28 @@ class SwapTextSelect(miru.TextSelect):
 
 
 
+class UserCardSelect(miru.TextSelect):
+    """A text select which switches between the cards of a UserCardView"""
+
+    def __init__(self) -> None:
+        super().__init__(
+            options=[
+                miru.SelectOption("About", "about", "Bio and basic stats", is_default=True),
+                miru.SelectOption("Favourites", "favourites", "Favourite anime, manga, characters and staff"),
+                miru.SelectOption("Friends", "friends", "Mutual followers"),
+            ],
+            placeholder="Select a view",
+        )
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        kind = self.values[0]
+        for option in self.options:
+            option.is_default = option.value == kind
+        self.view.current = kind
+        # The full card if it's finished, else its skeleton (swapped in once it finishes)
+        await ctx.edit_response(content=None, attachment=self.view.card(kind), components=self.view)
+
+
 class CharacterSelect(miru.TextSelect):
     """A text select made for the character command's dropdown"""
 

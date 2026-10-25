@@ -1,5 +1,6 @@
 """The animanga related plugin"""
 
+import asyncio
 from io import BytesIO
 import re
 from datetime import datetime, timedelta
@@ -15,6 +16,7 @@ from rapidfuzz.fuzz import partial_ratio
 from rapidfuzz.utils import default_process
 
 from utils import buttons as btns
+from utils import user_links, usercard
 from utils import views as views
 from utils.anilist import (
     ALAnime,
@@ -23,12 +25,11 @@ from utils.anilist import (
     ALNovel,
     ALStaff,
     ALStudio,
-    ALUser,
     AnilistBase,
 )
 from utils.anilist_graph import find_series_name
 from utils.components import CharacterSelect, SimpleTextSelect, SwapTextSelect
-from utils.errors import RequestsFailedError
+from utils.errors import AniListError, RequestsFailedError
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
 from utils.misc import verbose_timedelta, truncate_words, get_random_quote
@@ -77,6 +78,9 @@ async def get_imp_info(chapters):
     "\nOptions: \n**anime**: Anime from AL"
     "\n**manga**: Manga from AL (with preview)"
     "\n**novel**: Novel/Light Novel from AL"
+    "\n**user**: User profile card from AL"
+    "\n**voiceactor**: Voice actor from AL"
+    "\n**studio**: Studio from AL"
     "\n**vn**: Visual Novel from VNDB"
     "\n**vnc**: VN character from VNDB"
     "\n**vntag**: VN Tag from VNDB"
@@ -142,6 +146,28 @@ async def character_search(ctx: lb.Context, character: str) -> None:
     return await _search_characters(ctx, character)
 
 
+@al_search.child
+@lb.option(
+    "voiceactor",
+    "The voice actor to search for",
+)
+@lb.command("voiceactor", "Search for a voice actor on Anilist", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def voiceactor_lookup(ctx: lb.Context, voiceactor: str) -> None:
+    """Search for a voice actor on AL"""
+    return await _search_voiceactor(ctx, voiceactor)
+
+@al_search.child
+@lb.option(
+    "studio",
+    "The studio to search for",
+)
+@lb.command("studio", "Search for a studio on Anilist", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def studio_lookup(ctx: lb.Context, studio: str) -> None:
+    """Search for a studio on AL"""
+    return await _search_studio(ctx, studio)
+
 
 
 # ============= LOOKUP SLASH COMMANDS END HERE =============
@@ -196,45 +222,112 @@ async def manga_search(ctx: lb.PrefixContext, query: str):
     await _search_manga(ctx, query)
 
 
+@al_listener.listener(hk.StartedEvent)
+async def _create_tables(_: hk.StartedEvent) -> None:
+    user_links.create_table(al_listener.bot.d.con)
+
+
+async def _show_user(ctx: lb.Context, user: Optional[str]) -> None:
+    """Send an AL user's profile cards, with a dropdown to switch between them
+
+    With no `user`, shows the invoker's saved AniList account.
+    """
+    if not user:
+        anilist_id = user_links.get_link(ctx.bot.d.con, ctx.author.id)
+        if not anilist_id:
+            return await ctx.respond(
+                "You haven't saved your AniList username yet. Use `-um set <name>` to add it."
+            )
+        user = str(anilist_id)
+
+    al_user = await usercard.fetch_profile(ctx.bot.d.anilist, user)
+    if not al_user:
+        if not getattr(ctx.bot.d.anilist, "is_available", True):
+            return await ctx.respond(
+                embed=hk.Embed(
+                    title="SERVICE TEMPORARILY UNAVAILABLE",
+                    color=colors.ERROR,
+                    description="AniList API is currently unavailable. User profiles cannot be retrieved right now.",
+                    timestamp=datetime.now().astimezone(),
+                ),
+            )
+        return await ctx.respond(f"Couldn't find user `{user}` 😵")
+
+    # Skeletons first; the full cards replace them once their images download
+    view = views.UserCardView(ctx.author.id, ctx.bot.d.aio_session, al_user)
+    await view.render_skeletons()
+    resp = await ctx.respond(attachment=view.card("about"), components=view)
+    await view.start(await resp.message())
+    view.render_in_background()
+    await _maybe_prompt_link(ctx, al_user["name"])
+    await view.wait()
+
+
+async def _maybe_prompt_link(ctx: lb.PrefixContext, prefill: str) -> None:
+    """A little after the card, offer to save the invoker's AniList username if they haven't yet"""
+    if not user_links.should_prompt(ctx.bot.d.con, ctx.author.id):
+        return
+
+    await asyncio.sleep(10)
+    view = user_links.LinkPromptView(ctx.author.id, ctx.bot.d.con, ctx.bot.d.anilist, prefill)
+    resp = await ctx.respond("Would you like to save your username?", components=view, reply=True)
+    await view.start(await resp.message())
+
+
 @al_listener.command
 @lb.option(
     "user",
-    "The user whose anilist is to be shown",
+    "The user whose anilist is to be shown (leave empty for your own)",
+    required=False,
+    default=None,
 )
 @lb.command("user", "Show a user's AL and stats", pass_options=True, aliases=["u"])
 @lb.implements(lb.PrefixCommand)
-async def user_al(ctx: lb.PrefixContext, user: str):
+async def user_al(ctx: lb.PrefixContext, user: Optional[str]):
     """Shortcut for AL username
 
     Args:
         ctx (lb.PrefixContext): The context
-        query (str): The user
+        user (str): The user
     """
+    return await _show_user(ctx, user)
 
-    al_user = await ALUser.from_name(user, ctx.bot.d.anilist)
 
-    if not al_user:
-        if not getattr(ctx.bot.d.anilist, "is_available", True):
-            return await ctx.respond(
-                hk.Embed(
-                    title="SERVICE TEMPORARILY UNAVAILABLE",
-                    color=colors.ERROR,
-                    description="AniList API is currently unavailable. User profiles cannot be retrieved via catalog fallback.",
-                    timestamp=datetime.now().astimezone(),
-                )
-            )
-        return await ctx.respond(f"Couldn't find user `{user}` 😵")
+@al_listener.command
+@lb.set_help(
+    "Save or remove the AniList username linked to your Discord account.\n"
+    "`[p]um set <name>` (or `add`) saves it, `[p]um remove` (or `rm`, `delete`, `reset`) "
+    "removes it. Once saved, `[p]user` on its own shows your profile."
+)
+@lb.option("name", "The AniList username", required=False, default=None)
+@lb.option("action", "set/add or remove/rm/delete/reset")
+@lb.command(
+    "usermanage", "Manage your linked AniList username", pass_options=True, aliases=["um"]
+)
+@lb.implements(lb.PrefixCommand)
+async def user_manage(ctx: lb.PrefixContext, action: str, name: Optional[str]):
+    """Set or unset the invoker's AniList username"""
+    con = ctx.bot.d.con
+    action = action.lower()
 
-    await ctx.respond(
-        content=f"https://anilist.co/user/{al_user.id}",
-        embed=hk.Embed(
-            title=al_user.name,
-            url=f"https://anilist.co/user/{al_user.name}",
-            description=f"{al_user.name}'s Anilist profile",
-            color=colors.ANILIST,
-            timestamp=datetime.now().astimezone(),
-        ).set_image(f"https://img.anili.st/user/{al_user.id}"),
-    )
+    if action in ("add", "set"):
+        if not name:
+            return await ctx.respond("Usage: `-um set <anilist username>`")
+        try:
+            al_user = await user_links.resolve_user(ctx.bot.d.anilist, name)
+        except AniListError:
+            return await ctx.respond("AniList is down right now, try again later.")
+        if not al_user:
+            return await ctx.respond(f"Couldn't find an AniList user called `{name}` 😵")
+        user_links.set_link(con, ctx.author.id, al_user["name"], al_user["id"])
+        return await ctx.respond(f"Saved ✅ You're linked to **{al_user['name']}**.")
+
+    if action in ("remove", "rm", "delete", "reset"):
+        if user_links.remove_link(con, ctx.author.id):
+            return await ctx.respond("Removed your saved AniList username.")
+        return await ctx.respond("You don't have a saved AniList username.")
+
+    await ctx.respond("Unknown action. Use `-um set <name>` or `-um remove`.")
 
 
 @al_listener.command
@@ -626,13 +719,11 @@ def trim_va_description(description: str) -> str:
 
 async def _search_voiceactor(ctx: lb.Context, query: str):
     """Search for a voice actor on AniList"""
-    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
     try:
         data = await ALStaff.from_search(query, ctx.bot.d.anilist, per_page=15)
 
         if not data:
-            await ctx.edit_last_response(
-                content=None,
+            await ctx.respond(
                 embed=hk.Embed(
                     title="VOICE ACTOR NOT FOUND",
                     color=colors.ERROR,
@@ -660,8 +751,7 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
         characters = data.get('characters', {}).get('nodes', [])
         
         if not characters:
-            await ctx.edit_last_response(
-                content=None,
+            await ctx.respond(
                 embed=hk.Embed(
                     title="NO VA ROLES FOUND",
                     color=colors.WARN,
@@ -723,28 +813,30 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
             
             return emb
 
-        embed = build_base_embed()
-        
-        if anime_roles:
-            card_image_4 = await card_maker(anime_roles[:4], ctx.bot.d.anilist)
-            buf4 = BytesIO()
-            card_image_4.save(buf4, format='PNG')
-            embed.set_image(hk.Bytes(buf4.getvalue(), 'va_card_4.png'))
+        def card_bytes(image) -> bytes:
+            buf = BytesIO()
+            image.save(buf, format='PNG')
+            return buf.getvalue()
 
-        swap_embed = None
-        if len(anime_roles) > 4:
+        embed = build_base_embed()
+        if anime_roles:
+            # Blank card for now; the 4-role card is built in the background below
+            blank = await card_maker([])
+            embed.set_image(hk.Bytes(card_bytes(blank), 'va_card_4.png'))
+
+        async def build_swap_embed() -> hk.Embed:
+            """The 8-role card behind the "See more roles" button"""
             swap_embed = build_base_embed()
             card_image_8 = await card_maker(anime_roles[:8], ctx.bot.d.anilist)
-            buf8 = BytesIO()
-            card_image_8.save(buf8, format='PNG')
-            swap_embed.set_image(hk.Bytes(buf8.getvalue(), 'va_card_8.png'))
+            return swap_embed.set_image(hk.Bytes(card_bytes(card_image_8), 'va_card_8.png'))
 
         view = views.AuthorView(user_id=ctx.author.id)
-        if swap_embed:
+        swap_btn = None
+        if len(anime_roles) > 4:
             view.add_item(
-                btns.SwapButton(
+                swap_btn := btns.SwapButton(
                     original_page=embed,
-                    swap_page=swap_embed,
+                    swap_page=build_swap_embed,
                     label1="See more roles",
                     emoji1="⬇",
                     label2="See less roles",
@@ -753,12 +845,32 @@ async def _search_voiceactor(ctx: lb.Context, query: str):
             )
         view.add_item(btns.KillButton())
         
-        choice = await ctx.edit_last_response(content=None, embed=embed, components=view)
+        resp = await ctx.respond(embed=embed, components=view)
+        choice = await resp.message()
         await view.start(choice)
+
+        if anime_roles:
+            # `embed` is the same object the swap button shows when going back,
+            # so once the image is set there it stays even if we skip the edit
+            card_image_4 = await card_maker(anime_roles[:4], ctx.bot.d.anilist)
+            embed.set_image(hk.Bytes(card_bytes(card_image_4), 'va_card_4.png'))
+            on_first_page = swap_btn is None or swap_btn.label == swap_btn.label1
+            if on_first_page:
+                try:
+                    await choice.edit(embed=embed, components=view)
+                except hk.HTTPError:
+                    pass  # message was deleted
+
+            # Build the 8-role card in the background so "See more roles" doesn't wait for it
+            # (unless it was already clicked, which builds it on the spot)
+            if swap_btn and callable(swap_btn.swap_page):
+                swap_task = asyncio.create_task(build_swap_embed())
+                swap_btn.swap_page = lambda: swap_task
+
         await view.wait()
         
     except Exception as e:
-        await ctx.edit_last_response(f"Error: {e}")
+        await ctx.respond(f"Error: {e}")
     
 
 async def _search_novel(ctx: lb.Context, novel: str):
@@ -1170,17 +1282,13 @@ def cleanup_character_description_for_dropdown(description: str) -> str:
     
     desc_lines = parsed_desc.split('\n')
     
-    final_desc = ""
-    
+    # Only the first line of plain text (skips **Height:**-style info lines and spoilers)
     for line in desc_lines:
-        
         line = line.strip()
-        if line.startswith('**') or line.startswith('__') or line.startswith('||'):
-            pass
-        else:
-            final_desc += line + "\n"
-    
-    return final_desc.strip()[:50] if final_desc.strip() else "-"
+        if line and not line.startswith(('**', '__', '||')):
+            return truncate_words(line, 50)
+
+    return "-"
     
 
 async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] = None, birthday: Optional[bool] = False):
@@ -1281,15 +1389,17 @@ async def _search_characters(ctx: lb.Context, query: str, series: Optional[str] 
                 label = char["name"]["full"]
                 if char["favourites"]:
                     label += f" ({char['favourites']}❤)"
-                
-                
-                series_titles = [node["title"]["romaji"] or node["title"]["english"] for node in char["media"]["nodes"]]
-                
+
+                # Most popular series (the query sorts media by popularity)
+                top = (char.get("media") or {}).get("nodes") or [{}]
+                top_title = (top[0].get("title") or {}) if top[0] else {}
+                series_title = top_title.get("romaji") or top_title.get("english") or ""
+
                 options.append(
                     miru.SelectOption(
                         label=label[:100],  # Discord limit
                         value=str(char["id"]),
-                        description=longest_common_substring(series_titles)
+                        description=series_title[:100] or None
                         # description=cleanup_character_description_for_dropdown(char["description"])
                     )
                 )
