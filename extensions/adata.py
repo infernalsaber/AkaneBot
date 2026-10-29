@@ -168,6 +168,18 @@ async def studio_lookup(ctx: lb.Context, studio: str) -> None:
     """Search for a studio on AL"""
     return await _search_studio(ctx, studio)
 
+@al_search.child
+@lb.option(
+    "user",
+    "The user whose anilist is to be shown (leave empty for your own)",
+    required=False,
+    default=None,
+)
+@lb.command("user", "Show a user's AL profile and stats", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def user_lookup(ctx: lb.Context, user: Optional[str]) -> None:
+    """Show an AL user's profile cards"""
+    return await _show_user(ctx, user)
 
 
 # ============= LOOKUP SLASH COMMANDS END HERE =============

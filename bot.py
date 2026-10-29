@@ -86,20 +86,23 @@ async def on_starting(event: hk.StartingEvent) -> None:
     """Code which is executed once when the bot starts"""
 
     bot.d.aio_session = aiohttp_client_cache.CachedSession(
-        cache_name="cache_db.db",
-        expire_after=24 * 60 * 60,
-        urls_expire_after={
-            "*.mangadex.org": 15 * 60,
-            "*.steampowered.com": 1 * 60 * 60,
-            "*.hakush.in": 1 * 60 * 60,
-            "*.jikan.moe": 30 * 60,
-        },
-        allowed_codes=(200, 404),  # Cache responses with these status codes
-        allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
-        include_headers=True,
-        ignored_params=[
-            "auth_token"
-        ],  # Keep using the cached response even if this param changes
+        # Cache settings belong on the backend; CachedSession drops them otherwise
+        cache=aiohttp_client_cache.CacheBackend(
+            cache_name="cache_db.db",
+            expire_after=24 * 60 * 60,
+            urls_expire_after={
+                "*.mangadex.org": 15 * 60,
+                "*.steampowered.com": 1 * 60 * 60,
+                "*.hakush.in": 1 * 60 * 60,
+                "*.jikan.moe": 30 * 60,
+            },
+            allowed_codes=(200, 404),  # Cache responses with these status codes
+            allowed_methods=["GET", "POST"],  # Cache requests with these HTTP methods
+            include_headers=True,
+            ignored_params=[
+                "auth_token"
+            ],  # Keep using the cached response even if this param changes
+        ),
         timeout=ClientTimeout(total=10),
     )
     with open("config.json") as f:
