@@ -7,3 +7,5 @@ pictures
 akane_db.db
 cache_db.db
 .cache
+.env
+docker-compose*.yml

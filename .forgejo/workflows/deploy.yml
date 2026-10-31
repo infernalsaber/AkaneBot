@@ -1,0 +1,24 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    # Runs straight on hermes (host-mode runner), in the checkout the bot runs from.
+    runs-on: hermes
+    defaults:
+      run:
+        working-directory: /home/hermes/Projects/AkaneBot
+    steps:
+      - name: Pull latest main
+        # --ff-only never overwrites edits made on the Pi; it fails instead.
+        run: git pull --ff-only origin main
+
+      - name: Rebuild and restart the bot
+        run: docker compose up -d --build
+
+      - name: Remove old bot images
+        run: docker image prune -f --filter label=com.docker.compose.project=akanebot

@@ -1,3 +1,5 @@
+name: akanebot
+
 services:
   akane-bot:
     build:
@@ -13,3 +15,19 @@ services:
       - ./pictures:/app/pictures
       - ./config.json:/app/config.json
       - ./extensions:/app/extensions
+    labels:
+      icon: https://files.isaber.in/akanepfp.webp
+
+# Lets CasaOS list the bot on its dashboard. Change settings here, not in the
+# CasaOS app settings: saving there rewrites this file with the tokens inlined.
+x-casaos:
+  author: self
+  category: self
+  hostname: ""
+  icon: https://files.isaber.in/akanepfp.webp
+  index: /
+  is_uncontrolled: false
+  port_map: ""
+  scheme: http
+  title:
+    custom: AkaneBot

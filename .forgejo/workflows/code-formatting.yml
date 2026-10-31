@@ -1,0 +1,34 @@
+name: Code Formatting
+
+on: [push, pull_request]
+
+jobs:
+  format:
+    runs-on: docker
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: https://github.com/astral-sh/setup-uv@v6
+
+      - name: Auto-format with isort
+        run: |
+          uvx isort .
+
+      - name: Auto-format with Black
+        run: |
+          uvx black .
+
+      - name: Auto-fix with Ruff
+        run: |
+          uvx ruff check . --fix --ignore E501
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "Forgejo Actions"
+          git config --global user.email "actions@noreply.localhost"
+          git add .
+          # Skip commit if no changes
+          git diff --quiet && git diff --staged --quiet || \
+            (git commit -m "refactor: format code [skip ci]" && git push)
