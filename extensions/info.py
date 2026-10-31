@@ -573,21 +573,6 @@ async def sticker_removal(ctx: lb.MessageContext):
         await ctx.respond("A hiccup from discord's side, please try again")
 
 
-@info_plugin.command
-@lb.option("message", "What to say")
-@lb.command("echo", "Echo a message back", pass_options=True)
-@lb.implements(lb.SlashCommand)
-async def echo_cmd(ctx: lb.SlashContext, message: str) -> None:
-    """Echo the invoking user's message"""
-
-    await ctx.respond(
-        f"{ctx.author.mention} said: {message}",
-        user_mentions=False,
-        role_mentions=False,
-        mentions_everyone=False,
-    )
-
-
 def load(bot: lb.BotApp) -> None:
     """Load the plugin"""
     bot.add_plugin(info_plugin)
