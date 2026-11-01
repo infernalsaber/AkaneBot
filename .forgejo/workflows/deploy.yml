@@ -7,15 +7,15 @@ on:
 
 jobs:
   deploy:
-    # Runs straight on hermes (host-mode runner), in the checkout the bot runs from.
+    # Runs on the host-mode runner, in the checkout the bot runs from.
     runs-on: hermes
     defaults:
       run:
-        # Optional Forgejo repo variable (Settings > Actions > Variables); falls back to the Pi checkout
-        working-directory: ${{ vars.DEPLOY_DIR || '/home/hermes/Projects/AkaneBot' }}
+        # Set as a Forgejo repo variable: Settings > Actions > Variables
+        working-directory: ${{ vars.DEPLOY_DIR }}
     steps:
       - name: Pull latest main
-        # --ff-only never overwrites edits made on the Pi; it fails instead.
+        # --ff-only never overwrites local edits on the server; it fails instead.
         run: git pull --ff-only origin main
 
       - name: Rebuild and restart the bot
