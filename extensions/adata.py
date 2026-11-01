@@ -236,7 +236,7 @@ async def manga_search(ctx: lb.PrefixContext, query: str):
 
 @al_listener.listener(hk.StartedEvent)
 async def _create_tables(_: hk.StartedEvent) -> None:
-    user_links.create_table(al_listener.bot.d.con)
+    await user_links.create_table(al_listener.bot.d.pg)
 
 
 async def _show_user(ctx: lb.Context, user: Optional[str]) -> None:
@@ -245,7 +245,7 @@ async def _show_user(ctx: lb.Context, user: Optional[str]) -> None:
     With no `user`, shows the invoker's saved AniList account.
     """
     if not user:
-        anilist_id = user_links.get_link(ctx.bot.d.con, ctx.author.id)
+        anilist_id = await user_links.get_link(ctx.bot.d.pg, ctx.author.id)
         if not anilist_id:
             return await ctx.respond(
                 "You haven't saved your AniList username yet. Use `-um set <name>` to add it."
@@ -278,11 +278,11 @@ async def _show_user(ctx: lb.Context, user: Optional[str]) -> None:
 
 async def _maybe_prompt_link(ctx: lb.PrefixContext, prefill: str) -> None:
     """A little after the card, offer to save the invoker's AniList username if they haven't yet"""
-    if not user_links.should_prompt(ctx.bot.d.con, ctx.author.id):
+    if not await user_links.should_prompt(ctx.bot.d.pg, ctx.author.id):
         return
 
     await asyncio.sleep(10)
-    view = user_links.LinkPromptView(ctx.author.id, ctx.bot.d.con, ctx.bot.d.anilist, prefill)
+    view = user_links.LinkPromptView(ctx.author.id, ctx.bot.d.pg, ctx.bot.d.anilist, prefill)
     resp = await ctx.respond("Would you like to save your username?", components=view, reply=True)
     await view.start(await resp.message())
 
@@ -320,7 +320,7 @@ async def user_al(ctx: lb.PrefixContext, user: Optional[str]):
 @lb.implements(lb.PrefixCommand)
 async def user_manage(ctx: lb.PrefixContext, action: str, name: Optional[str]):
     """Set or unset the invoker's AniList username"""
-    con = ctx.bot.d.con
+    pg = ctx.bot.d.pg
     action = action.lower()
 
     if action in ("add", "set"):
@@ -332,11 +332,11 @@ async def user_manage(ctx: lb.PrefixContext, action: str, name: Optional[str]):
             return await ctx.respond("AniList is down right now, try again later.")
         if not al_user:
             return await ctx.respond(f"Couldn't find an AniList user called `{name}` 😵")
-        user_links.set_link(con, ctx.author.id, al_user["name"], al_user["id"])
+        await user_links.set_link(pg, ctx.author.id, al_user["name"], al_user["id"])
         return await ctx.respond(f"Saved ✅ You're linked to **{al_user['name']}**.")
 
     if action in ("remove", "rm", "delete", "reset"):
-        if user_links.remove_link(con, ctx.author.id):
+        if await user_links.remove_link(pg, ctx.author.id):
             return await ctx.respond("Removed your saved AniList username.")
         return await ctx.respond("You don't have a saved AniList username.")
 

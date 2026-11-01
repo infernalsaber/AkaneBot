@@ -1,10 +1,11 @@
 """Discord user -> AniList user links, plus the "save your username?" prompt"""
 
-import sqlite3
 import time
 
 import hikari as hk
 import miru
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from utils.errors import AniListError
 from utils.views import AuthorView
@@ -13,69 +14,89 @@ SNOOZE_SECONDS = 10 * 24 * 60 * 60  # "Not now" waits 10 days before asking agai
 NEVER = -1  # prompt_after value for "Don't ask again"
 
 
-def create_table(con: sqlite3.Connection) -> None:
-    con.execute(
-        """
-        CREATE TABLE IF NOT EXISTS user_links (
-            discord_id   INTEGER PRIMARY KEY,
-            anilist_name TEXT,
-            anilist_id   INTEGER,
-            prompt_after INTEGER  -- unix ts; NULL = can ask, -1 = never ask
+async def create_table(pg: async_sessionmaker) -> None:
+    """The akanebot schema itself is created (and owned by the akanebot role) by hand"""
+    async with pg() as session, session.begin():
+        await session.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS akanebot.users (
+                    discord_id   bigint      PRIMARY KEY,
+                    anilist_name text,
+                    anilist_id   integer,
+                    prompt_after bigint,  -- unix ts; NULL = can ask, -1 = never ask
+                    created_at   timestamptz NOT NULL DEFAULT now(),
+                    updated_at   timestamptz NOT NULL DEFAULT now()
+                )
+                """
+            )
         )
-        """
-    )
-    con.commit()
 
 
-def get_link(con: sqlite3.Connection, discord_id: int) -> int | None:
+async def get_link(pg: async_sessionmaker, discord_id: int) -> int | None:
     """The saved AniList id, or None"""
-    row = con.execute(
-        "SELECT anilist_id FROM user_links WHERE discord_id = ? AND anilist_name IS NOT NULL",
-        (discord_id,),
-    ).fetchone()
-    return row[0] if row else None
+    async with pg() as session:
+        result = await session.execute(
+            text(
+                "SELECT anilist_id FROM akanebot.users "
+                "WHERE discord_id = :id AND anilist_name IS NOT NULL"
+            ),
+            {"id": discord_id},
+        )
+        return result.scalar()
 
 
-def set_link(con: sqlite3.Connection, discord_id: int, name: str, anilist_id: int) -> None:
-    con.execute(
-        """
-        INSERT INTO user_links (discord_id, anilist_name, anilist_id) VALUES (?, ?, ?)
-        ON CONFLICT(discord_id) DO UPDATE
-        SET anilist_name = excluded.anilist_name, anilist_id = excluded.anilist_id
-        """,
-        (discord_id, name, anilist_id),
-    )
-    con.commit()
+async def set_link(pg: async_sessionmaker, discord_id: int, name: str, anilist_id: int) -> None:
+    async with pg() as session, session.begin():
+        await session.execute(
+            text(
+                """
+                INSERT INTO akanebot.users (discord_id, anilist_name, anilist_id)
+                VALUES (:id, :name, :anilist_id)
+                ON CONFLICT (discord_id) DO UPDATE
+                SET anilist_name = EXCLUDED.anilist_name, anilist_id = EXCLUDED.anilist_id,
+                    updated_at = now()
+                """
+            ),
+            {"id": discord_id, "name": name, "anilist_id": anilist_id},
+        )
 
 
-def remove_link(con: sqlite3.Connection, discord_id: int) -> bool:
+async def remove_link(pg: async_sessionmaker, discord_id: int) -> bool:
     """Unset the saved username. False if there was nothing saved."""
-    cur = con.execute(
-        "UPDATE user_links SET anilist_name = NULL, anilist_id = NULL "
-        "WHERE discord_id = ? AND anilist_name IS NOT NULL",
-        (discord_id,),
-    )
-    con.commit()
-    return cur.rowcount > 0
+    async with pg() as session, session.begin():
+        result = await session.execute(
+            text(
+                "UPDATE akanebot.users SET anilist_name = NULL, anilist_id = NULL, updated_at = now() "
+                "WHERE discord_id = :id AND anilist_name IS NOT NULL"
+            ),
+            {"id": discord_id},
+        )
+    return result.rowcount > 0
 
 
-def set_prompt_after(con: sqlite3.Connection, discord_id: int, value: int) -> None:
-    con.execute(
-        """
-        INSERT INTO user_links (discord_id, prompt_after) VALUES (?, ?)
-        ON CONFLICT(discord_id) DO UPDATE SET prompt_after = excluded.prompt_after
-        """,
-        (discord_id, value),
-    )
-    con.commit()
+async def set_prompt_after(pg: async_sessionmaker, discord_id: int, value: int) -> None:
+    async with pg() as session, session.begin():
+        await session.execute(
+            text(
+                """
+                INSERT INTO akanebot.users (discord_id, prompt_after) VALUES (:id, :value)
+                ON CONFLICT (discord_id) DO UPDATE
+                SET prompt_after = EXCLUDED.prompt_after, updated_at = now()
+                """
+            ),
+            {"id": discord_id, "value": value},
+        )
 
 
-def should_prompt(con: sqlite3.Connection, discord_id: int) -> bool:
+async def should_prompt(pg: async_sessionmaker, discord_id: int) -> bool:
     """True if the user has no saved username and hasn't snoozed or declined the prompt"""
-    row = con.execute(
-        "SELECT anilist_name, prompt_after FROM user_links WHERE discord_id = ?",
-        (discord_id,),
-    ).fetchone()
+    async with pg() as session:
+        result = await session.execute(
+            text("SELECT anilist_name, prompt_after FROM akanebot.users WHERE discord_id = :id"),
+            {"id": discord_id},
+        )
+        row = result.first()
     if not row:
         return True
     name, prompt_after = row
@@ -128,7 +149,7 @@ class LinkModal(miru.Modal):
                 f"Couldn't find an AniList user called `{name}` 😵",
                 flags=hk.MessageFlag.EPHEMERAL,
             )
-        set_link(self.prompt.con, ctx.user.id, user["name"], user["id"])
+        await set_link(self.prompt.pg, ctx.user.id, user["name"], user["id"])
         await self.prompt.finish(
             ctx,
             f"Saved ✅ You're linked to **{user['name']}**. Use `-user` on its own to see your profile.",
@@ -143,9 +164,9 @@ class LinkPromptView(AuthorView):
     clicks are ephemeral.
     """
 
-    def __init__(self, user_id: hk.Snowflake, con, client, prefill: str) -> None:
+    def __init__(self, user_id: hk.Snowflake, pg, client, prefill: str) -> None:
         super().__init__(timeout=60, user_id=user_id, clean_items=False)
-        self.con = con
+        self.pg = pg
         self.client = client
         self.prefill = prefill
 
@@ -169,12 +190,12 @@ class LinkPromptView(AuthorView):
 
     @miru.button(label="Not now", emoji="⏲️", style=hk.ButtonStyle.SECONDARY)
     async def later(self, _: miru.Button, ctx: miru.ViewContext) -> None:
-        set_prompt_after(self.con, ctx.user.id, int(time.time()) + SNOOZE_SECONDS)
+        await set_prompt_after(self.pg, ctx.user.id, int(time.time()) + SNOOZE_SECONDS)
         await self.finish(ctx, "Okay, I'll ask again in a while. You can also use `-um set <name>`.")
 
     @miru.button(label="Don't ask again", emoji="🚫", style=hk.ButtonStyle.DANGER)
     async def never(self, _: miru.Button, ctx: miru.ViewContext) -> None:
-        set_prompt_after(self.con, ctx.user.id, NEVER)
+        await set_prompt_after(self.pg, ctx.user.id, NEVER)
         await self.finish(ctx, "Got it, I won't ask again. You can still use `-um set <name>`.")
 
     async def on_timeout(self) -> None:

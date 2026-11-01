@@ -13,6 +13,7 @@ import miru
 from aiohttp import ClientTimeout
 from dotenv import load_dotenv
 from lightbulb.ext import tasks
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from utils.anilist_client import AniListClient
 from utils.mal_client import MalClient
@@ -118,6 +119,9 @@ async def on_starting(event: hk.StartingEvent) -> None:
     bot.d.timeup = datetime.now().astimezone()
     bot.d.chapter_info = {}
     bot.d.con = sqlite3.connect("akane_db.db")
+    # Postgres: akanebot schema in the fairy database (saved AniList usernames)
+    bot.d.pg_engine = create_async_engine(os.getenv("DATABASE_URL"), pool_pre_ping=True)
+    bot.d.pg = async_sessionmaker(bot.d.pg_engine, expire_on_commit=False)
     os.makedirs("pictures", exist_ok=True)
     os.makedirs("logs", exist_ok=True)
     with open("./logs/log.txt", "w+", encoding="UTF-8"):
@@ -135,6 +139,7 @@ async def on_stopping(event: hk.StoppingEvent) -> None:
         f"Bot closed with {verbose_timedelta(datetime.now().astimezone()-bot.d.timeup)} uptime",
     )
     await bot.d.aio_session.close()
+    await bot.d.pg_engine.dispose()
 
 
 @bot.command
