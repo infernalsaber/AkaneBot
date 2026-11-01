@@ -11,7 +11,8 @@ jobs:
     runs-on: hermes
     defaults:
       run:
-        working-directory: /home/hermes/Projects/AkaneBot
+        # Set as a Forgejo repo variable: Settings > Actions > Variables
+        working-directory: ${{ vars.DEPLOY_DIR }}
     steps:
       - name: Pull latest main
         # --ff-only never overwrites edits made on the Pi; it fails instead.
