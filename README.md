@@ -8,7 +8,7 @@
 <img src="https://files.catbox.moe/ule0bb.png" width="250" />
 
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
- [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+ [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 An discord bot for animanga related search and feed functions
@@ -28,8 +28,7 @@ using [`hikari-lightbulb`](https://github.com/tandemdude/hikari-lightbulb) and [
 
 ## Adding the bot
 
-As of present, the bot is not public.  
-Please contact `fenix.er` on Discord should you want to add it to your server.
+To add the public instance of the bot, click [here](https://discord.com/oauth2/authorize?client_id=1070568737549332560&permissions=275952028736&scope=bot+applications.commands).
 
 ## Features
 
