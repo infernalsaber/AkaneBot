@@ -25,11 +25,12 @@ from utils.anilist import (
     ALNovel,
     ALStaff,
     ALStudio,
+    ALUser,
     AnilistBase,
 )
 from utils.anilist_graph import find_series_name
 from utils.components import CharacterSelect, SimpleTextSelect, SwapTextSelect
-from utils.errors import AniListError, RequestsFailedError
+from utils.errors import RequestsFailedError
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
 from utils.misc import verbose_timedelta, truncate_words, get_random_quote
@@ -326,14 +327,13 @@ async def user_manage(ctx: lb.PrefixContext, action: str, name: Optional[str]):
     if action in ("add", "set"):
         if not name:
             return await ctx.respond("Usage: `-um set <anilist username>`")
-        try:
-            al_user = await user_links.resolve_user(ctx.bot.d.anilist, name)
-        except AniListError:
-            return await ctx.respond("AniList is down right now, try again later.")
+        al_user = await ALUser.from_name(name, ctx.bot.d.anilist)
         if not al_user:
+            if not ctx.bot.d.anilist.is_available:
+                return await ctx.respond("AniList is down right now, try again later.")
             return await ctx.respond(f"Couldn't find an AniList user called `{name}` 😵")
-        await user_links.set_link(pg, ctx.author.id, al_user["name"], al_user["id"])
-        return await ctx.respond(f"Saved ✅ You're linked to **{al_user['name']}**.")
+        await user_links.set_link(pg, ctx.author.id, al_user.name, al_user.id)
+        return await ctx.respond(f"Saved ✅ You're linked to **{al_user.name}**.")
 
     if action in ("remove", "rm", "delete", "reset"):
         if await user_links.remove_link(pg, ctx.author.id):

@@ -7,7 +7,7 @@ import miru
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from utils.errors import AniListError
+from utils.anilist import ALUser
 from utils.views import AuthorView
 
 SNOOZE_SECONDS = 10 * 24 * 60 * 60  # "Not now" waits 10 days before asking again
@@ -105,22 +105,6 @@ async def should_prompt(pg: async_sessionmaker, discord_id: int) -> bool:
     return prompt_after is None or (prompt_after != NEVER and prompt_after <= time.time())
 
 
-async def resolve_user(client, name: str) -> dict | None:
-    """Look up an AniList user by name -> {"id", "name"}
-
-    None if the user doesn't exist. Raises AniListError if AniList is unreachable.
-    """
-    if not getattr(client, "is_available", True):
-        raise AniListError("AniList is unavailable")
-    try:
-        data = await client.query("query ($name: String) { User(name: $name) { id name } }", {"name": name})
-    except AniListError:
-        if not getattr(client, "is_available", True):
-            raise
-        return None  # GraphQL "not found" error
-    return data.get("User")
-
-
 class LinkModal(miru.Modal):
     """Asks for the AniList username and saves it"""
 
@@ -137,9 +121,8 @@ class LinkModal(miru.Modal):
 
     async def callback(self, ctx: miru.ModalContext) -> None:
         name = (self.username.value or "").strip()
-        try:
-            user = await resolve_user(self.prompt.client, name)
-        except AniListError:
+        user = await ALUser.from_name(name, self.prompt.client)
+        if not user and not self.prompt.client.is_available:
             return await ctx.respond(
                 "AniList is down right now, try again later with `-um set <name>`.",
                 flags=hk.MessageFlag.EPHEMERAL,
@@ -149,10 +132,10 @@ class LinkModal(miru.Modal):
                 f"Couldn't find an AniList user called `{name}` 😵",
                 flags=hk.MessageFlag.EPHEMERAL,
             )
-        await set_link(self.prompt.pg, ctx.user.id, user["name"], user["id"])
+        await set_link(self.prompt.pg, ctx.user.id, user.name, user.id)
         await self.prompt.finish(
             ctx,
-            f"Saved ✅ You're linked to **{user['name']}**. Use `-user` on its own to see your profile.",
+            f"Saved ✅ You're linked to **{user.name}**. Use `-user` on its own to see your profile.",
         )
 
 

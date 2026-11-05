@@ -436,7 +436,7 @@ async def botinfo(ctx: lb.Context) -> None:
             )
             .add_field(
                 "System Usage",
-                f"RAM: {psutil.virtual_memory()[2]}% (of 512MB) \nCPU: {psutil.cpu_percent(4)}%",
+                f"RAM: {psutil.virtual_memory()[2]}%\nCPU: {psutil.cpu_percent(4)}%",
             )
             .set_author(name=f"{user.username} Bot")
             .set_thumbnail(user.avatar_url)

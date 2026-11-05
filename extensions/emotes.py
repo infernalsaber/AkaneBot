@@ -1,19 +1,16 @@
 """Emote management commands for AkaneBot."""
-import io
 import typing as t
 from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
 
 import hikari as hk
 import lightbulb as lb
-from miru.ext import nav
+from rapidfuzz import process
+from rapidfuzz.utils import default_process
 
 
-from utils.buttons import (
-    AddEmoteButton,
-    CustomNextButton,
-    CustomPrevButton,
-    KillNavButton,
-)
+from utils.buttons import GenericButton
 from utils.emotes_helper import (
     add_emoji_from_source,
     check_if_known_emoji_provider,
@@ -21,55 +18,15 @@ from utils.emotes_helper import (
     get_remaining_slots,
     sanitize_emoji_name,
 )
-from utils.errors import SevenTVError
 from utils.misc import check_if_url, is_image
 from utils.models import ColorPalette as colors
-from utils.seventv import SevenTVClient, SevenTVEmote
-from utils.views import AuthorNavi
+from utils.seventv import SevenTVEmote
+from utils.views import AuthorView
 
 emotes_plugin = lb.Plugin("Emotes", "Emote management commands", include_datastore=True)
 emotes_plugin.d.help = True
 emotes_plugin.d.help_emoji = "😀"
 emotes_plugin.d.help_image = "https://i.imgur.com/nsg3lZJ.png"
-
-
-@emotes_plugin.command
-@lb.add_checks(
-    lb.guild_only, lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS)
-)
-@lb.option("query", "The emote to search for", modifier=lb.OptionModifier.CONSUME_REST)
-@lb.command(
-    "searchemote", "Search for an emote on 7tv", aliases=["se"], pass_options=True
-)
-@lb.implements(lb.PrefixCommand)
-async def search_emote(ctx: lb.Context, query: str) -> None:
-    """Search for emotes on 7TV and add them using interactive navigation."""
-    session = getattr(ctx.bot.d, "aio_session", None)
-    client = SevenTVClient(session=session)
-    try:
-        emotes = await client.search_emotes(query)
-    except SevenTVError as e:
-        await ctx.respond(f"❌ Failed to search 7TV: {e}")
-        return
-    except Exception as e:
-        await ctx.respond(f"❌ Error searching 7TV: {e}")
-        return
-
-    if not emotes:
-        await ctx.respond(f"No emotes found for `{query}` on 7TV.")
-        return
-
-    pages = [emote.to_embed() for emote in emotes]
-    buttons = [
-        CustomPrevButton(),
-        nav.IndicatorButton(),
-        CustomNextButton(),
-        AddEmoteButton(),
-        KillNavButton(),
-    ]
-    navigator = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons=buttons)
-    await navigator.send(ctx.channel_id)
-
 
 
 @emotes_plugin.command
@@ -320,247 +277,198 @@ async def emote_removal(
 
     for emote in emotes[:5]:
         try:
-            ext = emote.url.split(".")[-1]
-            await ctx.author.send(
-                hk.Embed(
-                    title="EMOTE REMOVAL NOTIFICATION",
-                    color=colors.ERROR,
-                    description=f"Emote `{emote.name}` removed from `{ctx.get_guild()}`",
-                    timestamp=datetime.now().astimezone(),
-                ).set_image(
-                    hk.Bytes(
-                        io.BytesIO(await emote.read()), f"{emote.name}_archive.{ext}"
-                    )
-                )
-            )
-            await ctx.bot.rest.delete_emoji(ctx.guild_id, emote)
-            await ctx.respond(f"Removed emote: `{emote.name}`")
+            await _backup_and_delete_emote(ctx, emote)
         except Exception as e:
             await ctx.respond(f"Error: {e}")
 
 
-# @emotes_plugin.command
-# @lb.command("emote", "Emote management commands")
-# @lb.implements(lb.SlashCommandGroup)
-# async def emote_group(ctx: lb.Context) -> None:
-#     """Group command for emote management."""
-#     pass
-# 
-# 
-# @emote_group.child
-# @lb.add_checks(
-#     lb.guild_only,
-#     lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS),
-# )
-# @lb.option("name", "The emote to remove", autocomplete=True)
-# @lb.command("remove", "Remove an emote from the server", pass_options=True)
-# @lb.implements(lb.SlashSubCommand)
-# async def emote_remove_slash(ctx: lb.SlashContext, name: str) -> None:
-#     """Remove an emote from the current guild"""
-#     if not ctx.guild_id:
-#         await ctx.respond("This command can only be used in a server.")
-#         return
-# 
-#     try:
-#         guild_emojis = await ctx.bot.rest.fetch_guild_emojis(ctx.guild_id)
-#         target_emoji = None
-#         for emoji in guild_emojis:
-#             if emoji.name == name or str(emoji.id) == name:
-#                 target_emoji = emoji
-#                 break
-# 
-#         if not target_emoji:
-#             await ctx.respond(f"Emote `{name}` not found in this server.")
-#             return
-# 
-#         try:
-#             ext = target_emoji.url.split(".")[-1]
-#             guild_obj = ctx.get_guild()
-#             guild_name = guild_obj.name if guild_obj else "Server"
-#             await ctx.author.send(
-#                 hk.Embed(
-#                     title="EMOTE REMOVAL NOTIFICATION",
-#                     color=colors.ERROR,
-#                     description=f"Emote `{target_emoji.name}` removed from `{guild_name}`",
-#                     timestamp=datetime.now().astimezone(),
-#                 ).set_image(
-#                     hk.Bytes(
-#                         io.BytesIO(await target_emoji.read()), f"{target_emoji.name}_archive.{ext}"
-#                     )
-#                 )
-#             )
-#         except Exception:
-#             pass
-# 
-#         await ctx.bot.rest.delete_emoji(ctx.guild_id, target_emoji.id)
-#         await ctx.respond(f"Removed emote: `{target_emoji.name}`")
-#     except Exception as e:
-#         await ctx.respond(f"Error removing emote: {e}")
-# 
-# 
-# @emote_remove_slash.autocomplete("name")
-# async def emote_remove_autocomplete(
-#     option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
-# ) -> t.Sequence[str]:
-#     if not interaction.guild_id:
-#         return []
-# 
-#     try:
-#         guild_emojis = await interaction.app.rest.fetch_guild_emojis(interaction.guild_id)
-#         emoji_names = [emoji.name for emoji in guild_emojis if emoji.name]
-# 
-#         if not option.value or not str(option.value).strip():
-#             return emoji_names[:25]
-# 
-#         matches = process.extract(
-#             str(option.value),
-#             emoji_names,
-#             score_cutoff=40,
-#             limit=25,
-#             processor=default_process,
-#         )
-#         return [match[0] for match in matches]
-#     except Exception:
-#         return []
-# 
-# 
-# @emote_group.child
-# @lb.add_checks(
-#     lb.guild_only,
-#     lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS),
-# )
-# @lb.option("image", "Image file to upload for the emote", type=hk.Attachment, required=False)
-# @lb.option("url", "URL or custom emote link to add", required=False)
-# @lb.option("name", "Name of the emote to add")
-# @lb.command("add", "Add an emote to the server", pass_options=True)
-# @lb.implements(lb.SlashSubCommand)
-# async def emote_add_slash(
-#     ctx: lb.SlashContext,
-#     name: str,
-#     url: t.Optional[str] = None,
-#     image: t.Optional[hk.Attachment] = None,
-# ) -> None:
-#     """Add an emote to the server via URL or image attachment"""
-#     if not ctx.guild_id:
-#         await ctx.respond("This command can only be used in a server.")
-#         return
-# 
-#     if not url and not image:
-#         await ctx.respond("Please provide either a `url` or an `image` attachment.")
-#         return
-# 
-#     source = image if image is not None else url
-#     try:
-#         new_emoji = await add_emoji_from_source(ctx, source, name=name)
-#         await ctx.respond(f"Added emote: {new_emoji.mention}")
-#     except Exception as e:
-#         await ctx.respond(format_emote_error(e))
-# 
-# 
-# @emote_group.child
-# @lb.add_checks(
-#     lb.guild_only,
-#     lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS),
-# )
-# @lb.option("query", "The emote name to search for")
-# @lb.command("search", "Search for an emote on 7tv", pass_options=True)
-# @lb.implements(lb.SlashSubCommand)
-# async def emote_search_slash(ctx: lb.SlashContext, query: str) -> None:
-#     """Search for an emote on 7tv and add it to the server"""
-#     session = getattr(ctx.bot.d, "aio_session", None)
-#     client = SevenTVClient(session=session)
-#     try:
-#         emotes = await client.search_emotes(query)
-#     except SevenTVError as e:
-#         await ctx.respond(f"❌ Failed to search 7TV: {e}")
-#         return
-#     except Exception as e:
-#         await ctx.respond(f"❌ Error searching 7TV: {e}")
-#         return
-# 
-#     if not emotes:
-#         await ctx.respond(f"No emotes found for `{query}` on 7TV.")
-#         return
-# 
-#     pages = [emote.to_embed() for emote in emotes]
-#     buttons = [
-#         CustomPrevButton(),
-#         nav.IndicatorButton(),
-#         CustomNextButton(),
-#         AddEmoteButton(),
-#         KillNavButton(),
-#     ]
-#     navigator = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons=buttons)
-#     await navigator.send(ctx.interaction)
-# 
-# 
-# 
-# @emote_group.child
-# @lb.option("emote", "The emote (or emote mention/name) to get info for", autocomplete=True)
-# @lb.command("info", "Get info about an emote", pass_options=True)
-# @lb.implements(lb.SlashSubCommand)
-# async def emote_info_slash(ctx: lb.SlashContext, emote: str) -> None:
-#     """Fetch basic info about an emote"""
-#     parsed_emotes = []
-# 
-#     try:
-#         parsed = hk.Emoji.parse(emote)
-#         if isinstance(parsed, hk.CustomEmoji):
-#             parsed_emotes.append(parsed)
-#     except ValueError:
-#         pass
-# 
-#     if not parsed_emotes and ctx.guild_id:
-#         try:
-#             guild_emojis = await ctx.bot.rest.fetch_guild_emojis(ctx.guild_id)
-#             for e in guild_emojis:
-#                 if e.name == emote or str(e.id) == emote:
-#                     parsed_emotes.append(e)
-#                     break
-#         except Exception:
-#             pass
-# 
-#     if not parsed_emotes:
-#         await ctx.respond(f"No custom emote found for `{emote}`.")
-#         return
-# 
-#     resp_embeds = []
-#     for e in parsed_emotes[:5]:
-#         embed = (
-#             hk.Embed(title=f"Emoji: {e.name}")
-#             .add_field("ID", f"`{e.id}`", inline=True)
-#             .add_field("Raw", f"`{e.mention}`", inline=True)
-#             .set_thumbnail(e.url)
-#         )
-#         resp_embeds.append(embed)
-# 
-#     await ctx.respond(embeds=resp_embeds)
-# 
-# 
-# @emote_info_slash.autocomplete("emote")
-# async def emote_info_autocomplete(
-#     option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
-# ) -> t.Sequence[str]:
-#     if not interaction.guild_id:
-#         return []
-# 
-#     try:
-#         guild_emojis = await interaction.app.rest.fetch_guild_emojis(interaction.guild_id)
-#         emoji_names = [emoji.name for emoji in guild_emojis if emoji.name]
-# 
-#         if not option.value or not str(option.value).strip():
-#             return emoji_names[:25]
-# 
-#         matches = process.extract(
-#             str(option.value),
-#             emoji_names,
-#             score_cutoff=40,
-#             limit=25,
-#             processor=default_process,
-#         )
-#         return [match[0] for match in matches]
-#     except Exception:
-#         return []
+async def _backup_and_delete_emote(ctx: lb.Context, emote: hk.KnownCustomEmoji) -> None:
+    """DM the invoker a backup of the emote (in channel if DMs fail), then delete it"""
+    guild = ctx.get_guild()
+    ext = emote.url.split(".")[-1]
+    backup_embed = hk.Embed(
+        title="EMOTE REMOVAL NOTIFICATION",
+        color=colors.ERROR,
+        description=f"Emote `{emote.name}` removed from `{guild.name if guild else 'Server'}`",
+        timestamp=datetime.now().astimezone(),
+    ).set_image(hk.Bytes(await emote.read(), f"{emote.name}_archive.{ext}"))
+
+    try:
+        await ctx.author.send(backup_embed)
+    except hk.ForbiddenError:
+        await ctx.respond(backup_embed)
+
+    await ctx.bot.rest.delete_emoji(ctx.guild_id, emote)
+    await ctx.respond(f"Removed emote: `{emote.name}`")
+
+
+@emotes_plugin.command
+@lb.command("emote", "Emote management commands")
+@lb.implements(lb.SlashCommandGroup)
+async def emote_group(ctx: lb.Context) -> None:
+    """Group command for emote management."""
+    pass
+
+
+@emote_group.child
+@lb.add_checks(
+    lb.guild_only,
+    lb.bot_has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS),
+    lb.has_guild_permissions(hk.Permissions.ADMINISTRATOR),
+)
+@lb.option("name", "The emote to remove", autocomplete=True)
+@lb.command("remove", "Remove an emote from the server", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def emote_remove_slash(ctx: lb.SlashContext, name: str) -> None:
+    """Remove an emote from the current guild"""
+    if not ctx.guild_id:
+        await ctx.respond("This command can only be used in a server.")
+        return
+
+    target_emoji = None
+    for emoji in ctx.bot.cache.get_emojis_view_for_guild(ctx.guild_id).values():
+        if emoji.name == name or str(emoji.id) == name:
+            target_emoji = emoji
+            break
+
+    if not target_emoji:
+        await ctx.respond(f"Emote `{name}` not found in this server.")
+        return
+
+    view = AuthorView(user_id=ctx.author.id, timeout=60)
+    view.add_item(GenericButton(style=hk.ButtonStyle.DANGER, label="Remove"))
+    view.add_item(GenericButton(style=hk.ButtonStyle.SECONDARY, label="Cancel"))
+    resp = await ctx.respond(
+        hk.Embed(
+            title="Remove this emote?",
+            description=f"`{target_emoji.name}`",
+            color=colors.ERROR,
+        ).set_image(target_emoji.url),
+        components=view,
+    )
+    await view.start(resp)
+    await view.wait()
+
+    # Cancel and timeout (answer stays None) both abort the removal
+    if view.answer != "Remove":
+        await resp.edit(f"Cancelled, `{target_emoji.name}` was not removed.", embed=None, components=None)
+        return
+
+    await resp.edit(components=None)
+    try:
+        await _backup_and_delete_emote(ctx, target_emoji)
+    except Exception as e:
+        await ctx.respond(f"Error removing emote: {e}")
+
+
+@emote_group.child
+@lb.add_checks(
+    lb.guild_only,
+    lb.has_guild_permissions(hk.Permissions.MANAGE_GUILD_EXPRESSIONS),
+)
+@lb.option("image", "Image file to upload for the emote", type=hk.Attachment, required=False)
+@lb.option("url", "URL or custom emote to add", required=False)
+@lb.option("name", "Name of the emote (taken from the file/url if not given)", required=False)
+@lb.command("add", "Add an emote to the server", pass_options=True, auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+async def emote_add_slash(
+    ctx: lb.SlashContext,
+    name: t.Optional[str] = None,
+    url: t.Optional[str] = None,
+    image: t.Optional[hk.Attachment] = None,
+) -> None:
+    """Add an emote to the server via URL or image attachment"""
+    if not ctx.guild_id:
+        await ctx.respond("This command can only be used in a server.")
+        return
+
+    if not url and not image:
+        await ctx.respond("Please provide either a `url` or an `image` attachment.")
+        return
+
+    try:
+        static_free, animated_free = await get_remaining_slots(ctx)
+        if static_free <= 0 and animated_free <= 0:
+            await ctx.respond("No emote slots remaining in this server.")
+            return
+    except Exception:
+        pass
+
+    # Custom emote mentions already fall back to their own name in add_emoji_from_source
+    if not name:
+        if image is not None:
+            name = Path(image.filename).stem
+        elif check_if_url(url):
+            name = Path(urlparse(url).path).stem
+
+    source = image if image is not None else url
+    try:
+        new_emoji = await add_emoji_from_source(ctx, source, name=name)
+        await ctx.respond(f"Added emote: {new_emoji.mention}")
+    except Exception as e:
+        await ctx.respond(format_emote_error(e))
+
+
+@emote_group.child
+@lb.option("emote", "The emote (or emote mention/name) to get info for", autocomplete=True)
+@lb.command("info", "Get info about an emote", pass_options=True)
+@lb.implements(lb.SlashSubCommand)
+async def emote_info_slash(ctx: lb.SlashContext, emote: str) -> None:
+    """Fetch basic info about an emote"""
+    parsed_emotes = []
+
+    try:
+        parsed = hk.Emoji.parse(emote)
+        if isinstance(parsed, hk.CustomEmoji):
+            parsed_emotes.append(parsed)
+    except ValueError:
+        pass
+
+    if not parsed_emotes and ctx.guild_id:
+        for guild_emoji in ctx.bot.cache.get_emojis_view_for_guild(ctx.guild_id).values():
+            if guild_emoji.name == emote or str(guild_emoji.id) == emote:
+                parsed_emotes.append(guild_emoji)
+                break
+
+    if not parsed_emotes:
+        await ctx.respond(f"No custom emote found for `{emote}`.")
+        return
+
+    resp_embeds = []
+    for e in parsed_emotes[:5]:
+        embed = (
+            hk.Embed(title=f"Emoji: {e.name}")
+            .add_field("ID", f"`{e.id}`", inline=True)
+            .add_field("Raw", f"`{e.mention}`", inline=True)
+            .set_thumbnail(e.url)
+        )
+        resp_embeds.append(embed)
+
+    await ctx.respond(embeds=resp_embeds)
+
+
+@emote_remove_slash.autocomplete("name")
+@emote_info_slash.autocomplete("emote")
+async def guild_emote_autocomplete(
+    option: hk.CommandInteractionOption, interaction: hk.AutocompleteInteraction
+) -> t.Sequence[str]:
+    if not interaction.guild_id:
+        return []
+
+    guild_emojis = interaction.app.cache.get_emojis_view_for_guild(interaction.guild_id)
+    emoji_names = [emoji.name for emoji in guild_emojis.values() if emoji.name]
+
+    if not option.value or not str(option.value).strip():
+        return emoji_names[:25]
+
+    matches = process.extract(
+        str(option.value),
+        emoji_names,
+        score_cutoff=40,
+        limit=25,
+        processor=default_process,
+    )
+    return [match[0] for match in matches]
 
 
 def load(bot: lb.BotApp) -> None:

@@ -1,6 +1,7 @@
 """Visual novel (VNDB) related commands"""
 
 import collections
+import logging
 import re
 from datetime import datetime
 from operator import itemgetter
@@ -14,8 +15,10 @@ from extensions.adata import al_search
 from utils import buttons as btns
 from utils import views as views
 from utils.components import SimpleTextSelect, SwapTextSelect
-from utils.misc import dlogger, verbose_date
+from utils.misc import verbose_date
 from utils.models import ColorPalette as colors
+
+logger = logging.getLogger(__name__)
 
 vn_listener = lb.Plugin(
     "VN",
@@ -482,10 +485,7 @@ async def _search_vn(ctx: lb.Context, query: str):
         await view.wait()
 
     except Exception as e:
-        import traceback
-        await dlogger(
-            ctx.bot, f"VNDB search failed: ```{traceback.format_exc()}```"
-        )
+        logger.error("VNDB search failed", exc_info=True)
 
 
 async def _search_vnchara(ctx: lb.Context, query: str):

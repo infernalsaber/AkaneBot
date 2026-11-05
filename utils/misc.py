@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 import feedparser
 import hikari as hk
 import isodate
-import lightbulb as lb
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
@@ -40,14 +39,6 @@ def proxy_img(img_url: str) -> str:
     """Simple image proxy"""
     return f"{PROXY_URL}/proxy?url={img_url}" if PROXY_URL else img_url
 
-
-async def dlogger(bot: lb.BotApp, message: str):
-    logs_channel = bot.d.config.get("LOGS_CHANNEL")
-    if logs_channel:
-        if len(message) < 2000:
-            await bot.rest.create_message(logs_channel, message)
-        else:
-            await bot.rest.create_message(logs_channel, hk.Bytes(message.encode(), "error_message.txt"))
 
 @lru_cache(maxsize=3, typed=False)
 def check_if_url(link: str) -> bool:

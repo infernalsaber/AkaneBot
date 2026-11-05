@@ -21,16 +21,12 @@ FRIEND_ROWS = 4
 _USER_FIELDS = """
     avatar { large } bannerImage id name options { profileColor } about
     statistics {
-      anime { count meanScore standardDeviation minutesWatched episodesWatched
-              statuses { status count minutesWatched }
-              genres(limit: 10, sort: COUNT_DESC) { genre count meanScore } }
-      manga { count meanScore standardDeviation chaptersRead volumesRead
-              statuses { status count }
-              genres(limit: 10, sort: COUNT_DESC) { genre count meanScore } }
+      anime { count meanScore minutesWatched episodesWatched genres(limit: 10, sort: COUNT_DESC) { genre count } }
+      manga { count meanScore chaptersRead volumesRead genres(limit: 10, sort: COUNT_DESC) { genre count } }
     }
     favourites {
       anime { pageInfo { total hasNextPage } edges { favouriteOrder node { id title { userPreferred } coverImage { large color } } } }
-      manga { pageInfo { total hasNextPage } edges { favouriteOrder node { id title { userPreferred } format coverImage { large } } } }
+      manga { pageInfo { total hasNextPage } edges { favouriteOrder node { id title { userPreferred } coverImage { large } } } }
       characters { pageInfo { total hasNextPage } edges { favouriteOrder node { name { userPreferred } image { large } media(sort: FAVOURITES_DESC, perPage: 1) { nodes { title { userPreferred } } } } } }
       staff { pageInfo { total hasNextPage } edges { favouriteOrder node { name { userPreferred } primaryOccupations image { large } } } }
       studios { pageInfo { total hasNextPage } edges { favouriteOrder node { name } } }
@@ -41,7 +37,7 @@ _SCORES = "lists { entries { mediaId score(format: POINT_100) } }"
 _MUTUALS = f"""
   mutuals: Page(perPage: {FRIEND_COLS * FRIEND_ROWS}) {{
     pageInfo {{ total }}
-    mutualFollowers(userId: $id, sort: USERNAME) {{ id name avatar {{ large }} }}
+    mutualFollowers(userId: $id, sort: USERNAME) {{ name avatar {{ large }} }}
   }}"""
 
 # Everything the three cards need in one request. Mutuals need the numeric id,
@@ -260,6 +256,17 @@ def draw_header(img: Image.Image, user: dict, images: dict[str, bytes] | None) -
     img.paste(avatar, (60, 84), avatar)
 
 
+def heading(d: ImageDraw.ImageDraw, x: int, y: int, width: int, label: str, accent, note: str | None = None,
+            small_note: bool = False) -> int:
+    """Section title with an optional note on the right and an underline; returns the y below it"""
+    d.text((x, y), label, font=font(OVERPASS, 22, 800), fill=accent)
+    if note:
+        note_font = font(ROBOTO, 20, 400) if small_note else font(ROBOTO, 22, 600)
+        d.text((x + width, y + (3 if small_note else 2)), note, font=note_font, fill=MUTED, anchor="ra")
+    d.line([(x, y + 34), (x + width, y + 34)], fill=CARD, width=3)
+    return y + 54
+
+
 # ============= ABOUT CARD =============
 
 ABOUT_CHARS = 160
@@ -380,9 +387,7 @@ def render_about(user: dict, images: dict[str, bytes] | None) -> Image.Image:
     draw_header(img, user, images)
     d = ImageDraw.Draw(img)
 
-    f_label = font(OVERPASS, 22, 800)
     f_body = font(ROBOTO, 22, 400)
-    f_small = font(ROBOTO, 20, 400)
     f_count = font(ROBOTO, 18, 600)
     f_entries = font(ROBOTO, 15, 400)
     f_chip = font(ROBOTO, 20, 500)
@@ -390,19 +395,13 @@ def render_about(user: dict, images: dict[str, bytes] | None) -> Image.Image:
     left, right = 60, W - 60
     full_w = right - left
 
-    def heading(x, y, width, label, note=None):
-        d.text((x, y), label, font=f_label, fill=accent)
-        if note:
-            d.text((x + width, y + 3), note, font=f_small, fill=MUTED, anchor="ra")
-        d.line([(x, y + 34), (x + width, y + 34)], fill=CARD, width=3)
-        return y + 54
-
     y = BANNER_H + 36
 
     # --- bio
     bio = clean_about(user.get("about"))
     if bio:
-        y = heading(left, y, full_w, "ABOUT", f"first {ABOUT_CHARS} characters" if bio.endswith("…") else None)
+        note = f"first {ABOUT_CHARS} characters" if bio.endswith("…") else None
+        y = heading(d, left, y, full_w, "ABOUT", accent, note, small_note=True)
         pad, line_h = 22, 32
         lines = wrap_paragraphs(d, bio, f_body, full_w - 2 * pad)
         box_h = 2 * pad + sum(line_h if ln else line_h // 2 for ln in lines)
@@ -441,7 +440,7 @@ def render_about(user: dict, images: dict[str, bytes] | None) -> Image.Image:
             merged[g["genre"]] = merged.get(g["genre"], 0) + g["count"]
     top = sorted(merged.items(), key=lambda kv: -kv[1])[:len(GENRE_COLORS)]
     if top:
-        y = heading(left, y, full_w, "GENRE OVERVIEW")
+        y = heading(d, left, y, full_w, "GENRE OVERVIEW", accent)
         panel_h, bar_h = 132, 16
         d.rounded_rectangle([left, y, right, y + panel_h], 20, fill=CARD)
         slot = full_w / LABELLED_GENRES
@@ -481,7 +480,7 @@ def render_about(user: dict, images: dict[str, bytes] | None) -> Image.Image:
     end_y = y
     for i, (label, items, _) in enumerate(cols):
         x = left + i * (col_w + gap)
-        cy = heading(x, y, col_w, label)
+        cy = heading(d, x, y, col_w, label, accent)
         for t, (kind, value, caption) in enumerate(items):
             tx = x + (t % per_row) * cell_w
             ty = cy + (t // per_row) * row_h
@@ -505,7 +504,6 @@ def render_favourites(user: dict, images: dict[str, bytes] | None) -> Image.Imag
     d = ImageDraw.Draw(img)
     draw_header(img, user, images)
 
-    f_label = font(OVERPASS, 22, 800)
     f_pill = font(ROBOTO, 22, 600)
     f_item = font(ROBOTO, 20, 500)
     f_sub_item = font(ROBOTO, 17, 400)
@@ -547,16 +545,13 @@ def render_favourites(user: dict, images: dict[str, bytes] | None) -> Image.Imag
         heights = [cover_row_height(r) for r in grid(items, cols, rows)] or [cover_row_height([])]
         return 48 + sum(heights) + row_gap * (len(heights) - 1) + 34
 
-    def heading(x, y, width, label, key):
+    def total(key):
         # AniList's total is only accurate on the last page, so past one page it's "25+"
         page = fav[key]["pageInfo"]
-        total = f"{len(fav[key]['nodes'])}+" if page.get("hasNextPage") else page["total"]
-        d.text((x, y), label, font=f_label, fill=accent)
-        d.text((x + width, y + 2), f"{total} total", font=f_pill, fill=MUTED, anchor="ra")
-        d.line([(x, y + 34), (x + width, y + 34)], fill=CARD, width=3)
+        return f"{len(fav[key]['nodes'])}+ total" if page.get("hasNextPage") else f"{page['total']} total"
 
     def section(x, y, width, label, key, items, cols, rows=1):
-        heading(x, y, width, label, key)
+        heading(d, x, y, width, label, accent, total(key))
         iy = y + 48
         for row in grid(items, cols, rows):
             for i, (name, src, color, badge, sub) in enumerate(row):
@@ -622,7 +617,7 @@ def render_favourites(user: dict, images: dict[str, bytes] | None) -> Image.Imag
     bottom = y + 30
     studios = fav["studios"]["nodes"]
     if studios:
-        heading(inner_l, y, inner_r - inner_l, "STUDIOS", "studios")
+        heading(d, inner_l, y, inner_r - inner_l, "STUDIOS", accent, total("studios"))
         px, py = inner_l, y + 48
         for node in studios:
             w = int(d.textlength(node["name"], font=f_pill)) + 28
@@ -647,7 +642,6 @@ def render_friends(user: dict, images: dict[str, bytes] | None) -> Image.Image:
     d = ImageDraw.Draw(img)
     draw_header(img, user, images)
 
-    f_label = font(OVERPASS, 22, 800)
     f_pill = font(ROBOTO, 22, 600)
     f_name = font(ROBOTO, 19, 500)
 
@@ -658,10 +652,7 @@ def render_friends(user: dict, images: dict[str, bytes] | None) -> Image.Image:
 
     y = BANNER_H + 36
     count = user["mutualCount"]
-    d.text((left, y), "FRIENDS", font=f_label, fill=accent)
-    d.text((right, y + 2), f"{count} mutual{'s' if count != 1 else ''}", font=f_pill, fill=MUTED, anchor="ra")
-    d.line([(left, y + 34), (right, y + 34)], fill=CARD, width=3)
-    y += 54
+    y = heading(d, left, y, right - left, "FRIENDS", accent, f"{count} mutual{'s' if count != 1 else ''}")
 
     if not user["mutuals"]:
         d.rounded_rectangle([left, y, right, y + 90], 20, fill=CARD)

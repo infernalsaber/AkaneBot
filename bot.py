@@ -18,9 +18,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from utils.anilist_client import AniListClient
 from utils.mal_client import MalClient
 from utils.help import BotHelpCommand
-from utils.misc import dlogger, verbose_timedelta
+from utils.misc import verbose_timedelta
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -134,9 +136,8 @@ async def on_starting(event: hk.StartingEvent) -> None:
 async def on_stopping(event: hk.StoppingEvent) -> None:
     """Code which is executed once when the bot stops"""
 
-    await dlogger(
-        bot,
-        f"Bot closed with {verbose_timedelta(datetime.now().astimezone()-bot.d.timeup)} uptime",
+    logger.info(
+        f"Bot closed with {verbose_timedelta(datetime.now().astimezone()-bot.d.timeup)} uptime"
     )
     await bot.d.aio_session.close()
     await bot.d.pg_engine.dispose()
