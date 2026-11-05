@@ -1,17 +1,23 @@
 """Search the source of a given image"""
 
 
+import asyncio
+import io
+import logging
 import os
 import re
-import traceback
 import typing as t
+from collections import Counter
 from datetime import datetime
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
+import aiohttp
+import av
 import dotenv
 import hikari as hk
 import lightbulb as lb
 import miru
+import yarl
 from miru.ext import nav
 
 from utils.anilist import ALManga
@@ -23,16 +29,13 @@ from utils.buttons import (
     SwapButton,
     SwapNaviButton
 )
-from utils.checks import trusted_user_check
+from utils.emotes_helper import check_if_known_emoji_provider
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
 from utils.misc import (
     check_if_url,
-    dlogger,
     get_random_quote,
-    is_image,
     iso_to_timestamp,
-    poor_mans_proxy,
     tenor_link_from_gif
 )
 from utils.views import AuthorNavi, AuthorView
@@ -40,6 +43,13 @@ from utils.views import AuthorNavi, AuthorView
 dotenv.load_dotenv()
 
 SAUCENAO_KEY = os.getenv("SAUCENAO_KEY")
+
+logger = logging.getLogger(__name__)
+
+IMAGE_TYPES = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]
+MAX_MEDIA_SIZE = 100 * 1024 * 1024
+GIF_PROVIDERS = ["Tenor", "Klipy", "GIPHY"]
+TWITTER_HOSTS = ["x.com", "twitter.com", "fixupx.com", "fxtwitter.com", "vxtwitter.com", "fixvx.com"]
 
 sauce_plugin = lb.Plugin(
     "Sauce", "Finding the source of an image", include_datastore=True
@@ -81,7 +91,8 @@ async def pfp_sauce(ctx: lb.UserContext):
             res = await res.json()
 
             if res["header"]["status"] < 0:
-                await ctx.respond(f"Error: {res['header']['message']}")
+                logger.error(f"SauceNAO error: {res['header']['message']}")
+                await ctx.respond(f"SauceNAO error (status {res['header']['status']})")
                 return
 
             try:
@@ -105,148 +116,10 @@ async def pfp_sauce(ctx: lb.UserContext):
                     embed=embed,
                     components=view,
                 )
-                await dlogger(
-                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
-                )
+                logger.error(f"Sauce parser failed, json returned: {res}")
 
         else:
             await ctx.respond(f"Ran into en error, `code : {res.status}`")
-
-
-@sauce_plugin.command
-@lb.set_max_concurrency(1, lb.GlobalBucket)
-@lb.add_checks(trusted_user_check)
-@lb.add_cooldown(length=86400, uses=10, bucket=lb.UserBucket)
-@lb.add_cooldown(length=86400, uses=20, bucket=lb.GuildBucket)
-@lb.command("Video Sauce", "Search the sauce of video", auto_defer=True)
-@lb.implements(lb.MessageCommand)
-async def find_video_sacue(ctx: lb.MessageContext):
-    """Find the sauce of a video
-
-    Args:
-        ctx (lb.MessageContext): The context the command is invoked in
-    """
-
-    if ctx.options["target"].attachments:
-        vid_url = ctx.options["target"].attachments[0].url
-
-    print("Video URL: ", vid_url)
-
-    vid_bytes = await poor_mans_proxy(vid_url, ctx.bot.d.aio_session)
-
-    print("Video Bytes")
-
-    # To save the bytes to memory
-    with open("temp.mp4", "wb") as f:
-        f.write(vid_bytes.read())
-
-    print("Written to filesystem")
-
-    os.system("ffmpeg -i temp.mp4 -vf fps=1 temp.jpg")
-
-    print("Converted to image")
-
-    msg = await ctx.respond(attachments=["temp.jpg"])
-    message = await msg.message()
-    link = message.attachments[0].url
-
-    # await msg.delete()
-
-    params = {
-        "api_key": SAUCENAO_KEY,
-        "output_type": 2,
-        "numres": 5,
-        "url": link,
-    }
-
-    async with ctx.bot.d.aio_session.get(
-        "https://saucenao.com/search.php?", params=params
-    ) as res:
-        if res.ok:
-            res = await res.json()
-
-            if res["header"]["status"] < 0:
-                await ctx.edit_last_response(f"Error: {res['header']['message']}")
-                return
-
-            try:
-                embed, view = await _complex_parsing(ctx, res["results"][0])
-
-                if float(res["results"][0]["header"]["similarity"]) < 60.0:
-                    await msg.delete()
-                    view = AuthorNavi(
-                        pages=[
-                            nav.Page(
-                                content=ctx.options.target.make_link(ctx.guild_id),
-                                embed=hk.Embed(
-                                    title="Possible false match",
-                                    description=(
-                                        "We might have encountered a false match."
-                                        "\n\nFalse matches often contain NSFW matches or "
-                                        "in rarer cases, what you're actually looking for."
-                                        "\nPlease use the ❌ or Go Back button should that happen."
-                                    ),
-                                    color=colors.WARN,
-                                    timestamp=datetime.now().astimezone(),
-                                ),
-                            ),
-                            nav.Page(
-                                content=ctx.options.target.make_link(ctx.guild_id),
-                                embed=embed,
-                            ),
-                        ],
-                        buttons=[
-                            SwapNaviButton(
-                                labels=["Show anyway", "Go Back"],
-                                emojis=[
-                                    None,
-                                    hk.Emoji.parse("<:previous:1136984315415236648>"),
-                                ],
-                            ),
-                            NavButton(
-                                url=f"https://yandex.com/images/search?url={quote(link)}&rpt=imageview",
-                                label="Search Yandex",
-                            ),
-                            KillNavButton(style=hk.ButtonStyle.SECONDARY),
-                        ],
-                        user_id=ctx.author.id,
-                    )
-                    await view.send(ctx.interaction, responded=True)
-
-                else:
-                    # view.
-                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                    view.clean_items = False
-
-                    choice = await ctx.edit_last_response(
-                        content=ctx.options.target.make_link(ctx.guild_id),
-                        embed=embed,
-                        components=view,
-                        attachments=None,
-                    )
-
-                    await view.start(choice)
-                    await view.wait()
-            except Exception as e:
-                await dlogger(
-                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
-                )
-                embed, view = await _simple_parsing(ctx, res["results"][0])
-                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                view.clean_items = False
-                choice = await ctx.edit_last_response(
-                    embed=embed, components=view, attachments=None
-                )
-                # await ctx.respond(e)
-                await view.start(choice)
-                await view.wait()
-        else:
-            await ctx.respond(f"Ran into en error, `code : {res.status}`")
-
-    os.remove("temp.mp4")
-    os.remove("temp.jpg")
-
-    # ctx.get_channel()
 
 
 @sauce_plugin.command
@@ -267,8 +140,16 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 
     if not url["errorMessage"]:
         link = url["url"]
+    elif ctx.responses:  # Reuse the dropdown/deferred message
+        await ctx.interaction.edit_initial_response(
+            url["errorMessage"], components=None, attachments=None
+        )
+        return
     else:
         await ctx.respond(url["errorMessage"])
+        return
+
+    if not link:  # Dropdown timed out
         return
 
     params = {
@@ -285,29 +166,32 @@ async def find_sauce_menu(ctx: lb.MessageContext):
             res = await res.json()
 
             if res["header"]["status"] < 0:
-                await ctx.respond(f"Error: {res['header']['message']}")
+                logger.error(f"SauceNAO error: {res['header']['message']}")
+                await ctx.interaction.edit_initial_response(
+                    f"SauceNAO error (status {res['header']['status']})",
+                    components=None,
+                    attachments=None,
+                )
                 return
 
             try:
                 embed, view = await _complex_parsing(ctx, res["results"][0])
 
                 if float(res["results"][0]["header"]["similarity"]) < 60.0:
+                    warning_embed = hk.Embed(
+                        title="Possible false match",
+                        description=(
+                            "We might have encountered a false match."
+                            "\n\nFalse matches often contain NSFW matches or "
+                            "in rarer cases, what you're actually looking for."
+                            "\nPlease use the ❌ or Go Back button should that happen."
+                        ),
+                        color=colors.WARN,
+                        timestamp=datetime.now().astimezone(),
+                    )
                     view = AuthorNavi(
                         pages=[
-                            nav.Page(
-                                content=message_link,
-                                embed=hk.Embed(
-                                    title="Possible false match",
-                                    description=(
-                                        "We might have encountered a false match."
-                                        "\n\nFalse matches often contain NSFW matches or "
-                                        "in rarer cases, what you're actually looking for."
-                                        "\nPlease use the ❌ or Go Back button should that happen."
-                                    ),
-                                    color=colors.WARN,
-                                    timestamp=datetime.now().astimezone(),
-                                ),
-                            ),
+                            nav.Page(content=message_link, embed=warning_embed),
                             nav.Page(
                                 content=message_link,
                                 embed=embed,
@@ -329,30 +213,45 @@ async def find_sauce_menu(ctx: lb.MessageContext):
                         ],
                         user_id=ctx.author.id,
                     )
-                    await view.send(ctx, responded=True)
+                    # What view.send() does, but on the existing message
+                    for item in view.children:
+                        if isinstance(item, nav.NavItem):
+                            await item.before_page_change()
+                    choice = await ctx.interaction.edit_initial_response(
+                        content=message_link,
+                        embed=warning_embed,
+                        components=view,
+                        attachments=None,
+                    )
+                    await view.start(choice)
 
                 else:
                     view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                     view.clean_items = False
-                    choice = await ctx.respond(
+                    choice = await ctx.interaction.edit_initial_response(
                         content=message_link,
                         embed=embed,
                         components=view,
+                        attachments=None,
                     )
                     await view.start(choice)
                     await view.wait()
             except Exception as e:
-                await dlogger(
-                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
-                )
+                logger.error(f"Sauce parser failed, json returned: {res}")
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                choice = await ctx.respond(embed=embed, components=view)
+                choice = await ctx.interaction.edit_initial_response(
+                    content=None, embed=embed, components=view, attachments=None
+                )
                 # await ctx.respond(e)
                 await view.start(choice)
                 await view.wait()
         else:
-            await ctx.respond(f"Ran into en error, `code : {res.status}`")
+            await ctx.interaction.edit_initial_response(
+                f"Ran into en error, `code : {res.status}`",
+                components=None,
+                attachments=None,
+            )
 
 
 @sauce_plugin.command
@@ -380,7 +279,13 @@ async def find_sauce(
         service (str, t.Optional): The service to choose. Defaults to None.
     """
 
-    await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
+    if _is_tenor_link(link):
+        await ctx.respond(
+            "⚠️ Tenor links have to be scraped and can be unreliable, use **Find the Sauce** "
+            f"on a message with the GIF instead {hk.Emoji.parse(emotes.LOADING.value)}"
+        )
+    else:
+        await ctx.respond(f"{get_random_quote()} {hk.Emoji.parse(emotes.LOADING.value)}")
 
     url = await _find_the_url(ctx)
 
@@ -400,7 +305,8 @@ async def find_sauce(
             res = await res.json()
 
             if res["header"]["status"] < 0:
-                await ctx.edit_last_response(f"Error: {res['header']['message']}")
+                logger.error(f"SauceNAO error: {res['header']['message']}")
+                await ctx.edit_last_response(f"SauceNAO error (status {res['header']['status']})")
                 return
 
             data = res["results"][0]
@@ -453,9 +359,7 @@ async def find_sauce(
                     await view.wait()
 
             except Exception:
-                await dlogger(
-                    ctx.bot, f"Sauce parser failed, json returned: ```{res}```"
-                )
+                logger.error(f"Sauce parser failed, json returned: {res}")
                 embed, view = await _simple_parsing(ctx, data)
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 view.clean_items = False
@@ -520,7 +424,7 @@ async def find_sauce(
                 else:
                     await ctx.respond("Couldn't find it.")
         except Exception:
-            await dlogger(ctx.bot, f"Sauce parser failed, json returned: ```{res}```")
+            logger.error(f"Sauce parser failed, json returned: {res}")
             await ctx.respond("Ran into an unknown exception")
 
 
@@ -893,89 +797,57 @@ async def _find_the_url(ctx) -> dict:
                     }
                 return {"url": link, "errorMessage": None}
 
-            if not await is_image(url, ctx.bot.d.aio_session):
-                msg = f"Please enter a valid image link {emotes.SMILE.value}"
-                return {
-                    "url": url,
-                    "errorMessage": msg,
-                }
-
-            return {"url": url, "errorMessage": None}
+            error = await _check_media(url, None, ctx.bot.d.aio_session)
+            return {"url": url, "errorMessage": error}
         except Exception as e:
-            return {"url": None, "errorMessage": f"Exception: ```{e}```"}
+            logger.error("Error while trying to find img url", exc_info=True)
+            return {"url": None, "errorMessage": f"Exception: {type(e).__name__}"}
 
     elif isinstance(ctx, lb.MessageContext):
-        url = None
-        errorMessage = "No valid url found"
+        candidates = _collect_candidates(ctx.options["target"])
 
-        message = ctx.options["target"]
-
-        if message.content:
-            match = url_regex.search(message.content)
-            if match:
-                url = match.group()
-
-        if url:
-            if await is_image(url, ctx.bot.d.aio_session):
-                return ctx, {"url": url, "errorMessage": None}
-
-            if _is_tenor_link(url):
-                link = await tenor_link_from_gif(url, ctx.bot.d.aio_session)
-                if link == url:
-                    return ctx, {
-                        "url": url,
-                        "errorMessage": "Unknown error fetching tenor url",
-                    }
-                return ctx, {"url": link, "errorMessage": None}
-
-        if not message.attachments:
+        if not candidates:
             msg = f"There's nothing here to find the sauce of {emotes.SIP.value}"
-            return ctx, {
-                "url": None,
-                "errorMessage": msg,
-            }
+            return ctx, {"url": None, "errorMessage": msg}
 
-        if len(message.attachments) > 1:
-            # Temp disable due to modal/api issues
-            # test = MyModal(title="Sauce Search Image Selection", timeout=60)
-            # await test.send(ctx)
-            # await test.wait(timeout=60)
-            # if test.last_context is None:
-            #     return
-            # ctx = test.last_context
-            
-            
-            # val = test.num.value
-            val = "1"
+        if len(candidates) == 1:
+            candidate = candidates[0]
             await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
         else:
-            val = "1"
-            await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
+            candidate = await _pick_candidate(ctx, candidates)
+            if not candidate:
+                return ctx, {"url": None, "errorMessage": None}
 
         try:
-            if not isinstance(eval(val), int):
-                return
-
-            val = int(val)
-
-            if val > len(message.attachments) + 1 or val < 1:
-                return ctx, {
-                    "url": None,
-                    "errorMessage": "Invalid attachment number",
-                }
-
-            if await is_image(message.attachments[val - 1].url, ctx.bot.d.aio_session):
-                return ctx, {
-                    "url": message.attachments[val - 1].url,
-                    "errorMessage": None,
-                }
-            return ctx, {"url": url, "errorMessage": errorMessage}
-        except Exception:
-            await dlogger(
-                ctx.bot,
-                f"Error while trying to find img url: ```{traceback.format_exc()}```",
+            error = await _check_media(
+                candidate["url"], candidate["size"], ctx.bot.d.aio_session
             )
-            await ctx.respond("Unknown Error")
+            if error:
+                return ctx, {"url": None, "errorMessage": error}
+
+            if not candidate["is_video"]:
+                return ctx, {"url": candidate["url"], "errorMessage": None}
+
+            video, download_error = await _download_video(candidate["url"])
+            if download_error:
+                msg = f"Failed to download video ({download_error})"
+                return ctx, {"url": None, "errorMessage": msg}
+
+            try:
+                frame = await asyncio.to_thread(_frame_at_quarter, video)
+            except Exception:
+                frame = None
+            if not frame:
+                return ctx, {"url": None, "errorMessage": "Failed to process video"}
+
+            # SauceNAO needs a link, so the frame is attached to the message to get one
+            frame_message = await ctx.interaction.edit_initial_response(
+                attachment=hk.Bytes(frame, "frame.jpg")
+            )
+            return ctx, {"url": frame_message.attachments[0].url, "errorMessage": None}
+        except Exception:
+            logger.error("Error while trying to find img url", exc_info=True)
+            return ctx, {"url": None, "errorMessage": "Unknown Error"}
 
     return {
         "url": None,
@@ -983,11 +855,216 @@ async def _find_the_url(ctx) -> dict:
     }
 
 
+def _collect_candidates(message: hk.Message) -> list[dict]:
+    """Gather the searchable images/videos of a message: attachments, embeds and bare links"""
+    candidates = []
+
+    for attachment in message.attachments:
+        media_type = (attachment.media_type or "").split(";")[0]
+        is_video = media_type.startswith("video/")
+        if media_type in IMAGE_TYPES or is_video:
+            candidates.append(
+                {
+                    "emoji": "🎞️" if is_video else "🖼️",
+                    "label": f"{'Video' if is_video else 'Attachment'} · {attachment.filename}",
+                    "description": f"{attachment.size / (1024 * 1024):.1f} MB",
+                    "url": attachment.url,
+                    "is_video": is_video,
+                    "size": attachment.size,
+                }
+            )
+
+    # Embeds already carry the media url (incl. tenor/klipy gifs), via Discord's proxy.
+    # Embed videos (e.g. tweets) use their thumbnail rather than being downloaded
+    media_embeds = [embed for embed in message.embeds if embed.image or embed.thumbnail]
+    image_counts = Counter(embed.url for embed in media_embeds)
+    image_positions = Counter()
+    embed_labels = {}
+
+    for embed in media_embeds:
+        media = embed.image or embed.thumbnail
+
+        # Extra images of a multi-image post come as bare embeds sharing the first one's url
+        if embed.url not in embed_labels:
+            embed_labels[embed.url] = _embed_label(embed)
+        emoji, label = embed_labels[embed.url]
+
+        image_positions[embed.url] += 1
+        if image_counts[embed.url] > 1:
+            label = f"{label} · {image_positions[embed.url]}/{image_counts[embed.url]}"
+
+        candidates.append(
+            {
+                "emoji": emoji,
+                "label": label,
+                "description": urlparse(media.url).hostname,
+                "url": media.proxy_url or media.url,
+                "is_video": False,
+                "size": None,
+            }
+        )
+
+    embed_links = {embed.url for embed in message.embeds}
+    for link in url_regex.findall(message.content or ""):
+        link = link.rstrip(">")
+        if link not in embed_links:
+            candidates.append(
+                {
+                    "emoji": "🔗",
+                    "label": f"Link · {urlparse(link).hostname or link}",
+                    "description": None,
+                    "url": link,
+                    "is_video": False,
+                    "size": None,
+                }
+            )
+
+    return candidates
+
+
+def _embed_label(embed: hk.Embed) -> tuple[str, str]:
+    """Icon and short dropdown label for an embed (GIF, tweet or anything else)"""
+    provider = embed.provider.name if embed.provider else None
+    host = (urlparse(embed.url or "").hostname or "").removeprefix("www.")
+    title = (embed.title or "").split(" - ")[0].removesuffix(" GIF")
+
+    if provider in GIF_PROVIDERS:
+        return "🎞️", f"{provider} GIF · {title}"
+
+    if host in TWITTER_HOSTS:
+        author = embed.author.name if embed.author and embed.author.name else ""
+        handle = re.search(r"\(@(\w+)\)", author)
+        name = f"@{handle.group(1)}" if handle else author or host
+        return "🐦", f"Tweet{' video' if embed.video else ''} · {name}"
+
+    if embed.video:
+        return "🎞️", f"Video · {title or provider or host}"
+    return "🖼️", f"{provider or host} · {title or 'Embed'}"
+
+
+class CandidateSelect(miru.TextSelect):
+    """Dropdown to choose which image/video of a message to search"""
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        self.view.answer = int(self.values[0])
+        label = self.options[self.view.answer].label
+        await ctx.edit_response(content=f"Searching **{label}**", components=[])
+        self.view.stop()
+
+
+async def _pick_candidate(
+    ctx: lb.MessageContext, candidates: list[dict]
+) -> t.Optional[dict]:
+    """Ask the user which candidate to search"""
+    options = [
+        miru.SelectOption(
+            label=candidate["label"][:100],
+            value=str(index),
+            description=(candidate["description"] or "")[:100] or None,
+            emoji=candidate["emoji"],
+        )
+        for index, candidate in enumerate(candidates[:25])  # Discord's dropdown limit
+    ]
+
+    view = AuthorView(user_id=ctx.author.id, timeout=60, clean_items=False)
+    view.add_item(CandidateSelect(options=options, placeholder="Pick one"))
+
+    response = await ctx.respond(
+        "Which image/video to find the source for?", components=view
+    )
+    await view.start(response)
+    await view.wait()
+
+    if view.answer is None:
+        await ctx.edit_last_response("Timed out", components=[])
+        return None
+    return candidates[view.answer]
+
+
+async def _check_media(
+    link: str, size: t.Optional[int], session
+) -> t.Optional[str]:
+    """Check a link is valid, from a trusted site, an image (when size is unknown) and within 100MB
+
+    Returns:
+        t.Optional[str]: The error message, None if all checks pass
+    """
+    if not check_if_url(link):
+        return f"There's no valid url in this message {emotes.SIP.value}"
+
+    if not check_if_known_emoji_provider(link):
+        return f"Site {urlparse(link).hostname} is not trusted ⚠️"
+
+    if size is None:
+        media_type, size = await _fetch_media_headers(link, session)
+        if media_type not in IMAGE_TYPES:
+            return f"Please enter a valid image link {emotes.SMILE.value}"
+
+    # Unknown size is allowed through
+    if size and size > MAX_MEDIA_SIZE:
+        return "Files over 100MB are not supported"
+    return None
+
+
+async def _fetch_media_headers(link: str, session) -> tuple[str, t.Optional[int]]:
+    """HEAD a link for its content type and size (None if not reported)"""
+    try:
+        # encoded=True keeps signed links (e.g. Discord's proxy) from being re-encoded
+        async with session.head(yarl.URL(link, encoded=True)) as response:
+            media_type = response.headers.get("content-type", "").split(";")[0]
+            return media_type, response.content_length
+    except Exception:
+        return "", None
+
+
+async def _download_video(
+    link: str,
+) -> tuple[t.Optional[io.BytesIO], t.Optional[str]]:
+    """Download a video into memory, abandoning it once it crosses 100MB
+
+    Returns:
+        tuple: (video, None) on success, otherwise (None, reason)
+    """
+    try:
+        # Plain session as the cached one reads and stores the whole body before returning
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=120)
+        ) as session:
+            async with session.get(yarl.URL(link, encoded=True)) as response:
+                if not response.ok:
+                    return None, f"error: HTTP {response.status}"
+
+                video = io.BytesIO()
+                async for chunk in response.content.iter_chunked(1024 * 1024):
+                    video.write(chunk)
+                    if video.tell() > MAX_MEDIA_SIZE:
+                        return None, "over 100MB"
+    except Exception as e:
+        return None, f"error: {type(e).__name__}"
+
+    video.seek(0)
+    return video, None
+
+
+def _frame_at_quarter(video: io.BytesIO) -> t.Optional[bytes]:
+    """Grab the frame at 25% of the video's length as JPEG bytes"""
+    with av.open(video) as container:
+        stream = container.streams.video[0]
+        target = (container.duration or 0) / av.time_base * 0.25
+        container.seek(int(target / stream.time_base), stream=stream)
+
+        for frame in container.decode(stream):
+            if (frame.time or 0) >= target:
+                output = io.BytesIO()
+                frame.to_image().save(output, format="JPEG", quality=90)
+                return output.getvalue()
+    return None
+
+
 def _is_tenor_link(link) -> bool:
-    """Very barebones way to check if a confirmed link is a tenor gif"""
-    if "//tenor.com/view" in link:
-        return True
-    return False
+    """Check if a link is a tenor gif page"""
+    parsed = urlparse(link)
+    return parsed.hostname in ("tenor.com", "www.tenor.com") and parsed.path.startswith("/view")
 
 
 def load(bot: lb.BotApp) -> None:

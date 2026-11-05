@@ -5,6 +5,7 @@ import io
 import re
 import time
 import typing as t
+from urllib.parse import urlparse
 
 import hikari as hk
 from PIL import Image, ImageOps
@@ -46,12 +47,19 @@ def check_if_known_emoji_provider(link: str) -> bool:
         "emoji.gg",
         "7tv.app",
         "7tv.io",
+        "pbs.twimg.com",
     ]
 
-    for provider in known_providers:
-        if provider in link:
-            return True
-    return False
+    parsed = urlparse(link)
+    host = parsed.hostname or ""
+    if parsed.scheme not in ("http", "https") or not host:
+        return False
+
+    # Match the hostname itself (or a subdomain of it), not any substring of the link
+    return any(
+        host == provider.lstrip(".") or host.endswith(f".{provider.lstrip('.')}")
+        for provider in known_providers
+    )
 
 
 def format_emote_error(error: Exception) -> str:
