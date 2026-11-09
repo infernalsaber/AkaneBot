@@ -176,74 +176,75 @@ async def find_sauce_menu(ctx: lb.MessageContext):
 
             try:
                 embed, view = await _complex_parsing(ctx, res["results"][0])
-
-                if float(res["results"][0]["header"]["similarity"]) < 60.0:
-                    warning_embed = hk.Embed(
-                        title="Possible false match",
-                        description=(
-                            "We might have encountered a false match."
-                            "\n\nFalse matches often contain NSFW matches or "
-                            "in rarer cases, what you're actually looking for."
-                            "\nPlease use the ❌ or Go Back button should that happen."
-                        ),
-                        color=colors.WARN,
-                        timestamp=datetime.now().astimezone(),
-                    )
-                    view = AuthorNavi(
-                        pages=[
-                            nav.Page(content=message_link, embed=warning_embed),
-                            nav.Page(
-                                content=message_link,
-                                embed=embed,
-                            ),
-                        ],
-                        buttons=[
-                            SwapNaviButton(
-                                labels=["Show anyway", "Go Back"],
-                                emojis=[
-                                    None,
-                                    hk.Emoji.parse("<:previous:1136984315415236648>"),
-                                ],
-                            ),
-                            NavButton(
-                                url=f"https://yandex.com/images/search?url={quote(url['url'])}&rpt=imageview",
-                                label="Search Yandex",
-                            ),
-                            KillNavButton(style=hk.ButtonStyle.SECONDARY),
-                        ],
-                        user_id=ctx.author.id,
-                    )
-                    # What view.send() does, but on the existing message
-                    for item in view.children:
-                        if isinstance(item, nav.NavItem):
-                            await item.before_page_change()
-                    choice = await ctx.interaction.edit_initial_response(
-                        content=message_link,
-                        embed=warning_embed,
-                        components=view,
-                        attachments=None,
-                    )
-                    await view.start(choice)
-
-                else:
-                    view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
-                    view.clean_items = False
-                    choice = await ctx.interaction.edit_initial_response(
-                        content=message_link,
-                        embed=embed,
-                        components=view,
-                        attachments=None,
-                    )
-                    await view.start(choice)
-                    await view.wait()
-            except Exception as e:
+                low_similarity = float(res["results"][0]["header"]["similarity"]) < 60.0
+            except Exception:
                 logger.error(f"Sauce parser failed, json returned: {res}")
                 embed, view = await _simple_parsing(ctx, res["results"][0])
                 view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
                 choice = await ctx.interaction.edit_initial_response(
-                    content=None, embed=embed, components=view, attachments=None
+                    content=message_link, embed=embed, components=view, attachments=None
                 )
-                # await ctx.respond(e)
+                await view.start(choice)
+                await view.wait()
+                return
+
+            if low_similarity:
+                warning_embed = hk.Embed(
+                    title="Possible false match",
+                    description=(
+                        "We might have encountered a false match."
+                        "\n\nFalse matches often contain NSFW matches or "
+                        "in rarer cases, what you're actually looking for."
+                        "\nPlease use the ❌ or Go Back button should that happen."
+                    ),
+                    color=colors.WARN,
+                    timestamp=datetime.now().astimezone(),
+                )
+                view = AuthorNavi(
+                    pages=[
+                        nav.Page(content=message_link, embed=warning_embed),
+                        nav.Page(
+                            content=message_link,
+                            embed=embed,
+                        ),
+                    ],
+                    buttons=[
+                        SwapNaviButton(
+                            labels=["Show anyway", "Go Back"],
+                            emojis=[
+                                None,
+                                hk.Emoji.parse("<:previous:1136984315415236648>"),
+                            ],
+                        ),
+                        NavButton(
+                            url=f"https://yandex.com/images/search?url={quote(url['url'])}&rpt=imageview",
+                            label="Search Yandex",
+                        ),
+                        KillNavButton(style=hk.ButtonStyle.SECONDARY),
+                    ],
+                    user_id=ctx.author.id,
+                )
+                # What view.send() does, but on the existing message
+                for item in view.children:
+                    if isinstance(item, nav.NavItem):
+                        await item.before_page_change()
+                choice = await ctx.interaction.edit_initial_response(
+                    content=message_link,
+                    embed=warning_embed,
+                    components=view,
+                    attachments=None,
+                )
+                await view.start(choice)
+
+            else:
+                view.add_item(KillButton(style=hk.ButtonStyle.SECONDARY, label="❌"))
+                view.clean_items = False
+                choice = await ctx.interaction.edit_initial_response(
+                    content=message_link,
+                    embed=embed,
+                    components=view,
+                    attachments=None,
+                )
                 await view.start(choice)
                 await view.wait()
         else:
