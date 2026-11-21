@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 
 import feedparser
 import hikari as hk
-import isodate
 # if t.TYPE_CHECKING:
 from aiohttp_client_cache import CachedSession
 from bs4 import BeautifulSoup
@@ -164,14 +163,12 @@ def verbose_timedelta(delta: timedelta) -> str:
     h, s = divmod(delta.seconds, 3600)
     m, s = divmod(s, 60)
     labels = ["day", "hour", "minute", "second"]
-    dhms = [f"{i} {lbl}{'s' if i!=1 else ''}" for i, lbl in zip([d, h, m, s], labels)]
-    for start in range(len(dhms)):
-        if not dhms[start].startswith("0"):
-            break
-    for end in range(len(dhms) - 1, -1, -1):
-        if not dhms[end].startswith("0"):
-            break
-    return ", ".join(dhms[start : end + 1])
+    dhms = [
+        f"{i} {lbl}{'s' if i!=1 else ''}"
+        for i, lbl in zip([d, h, m, s], labels)
+        if i
+    ]
+    return ", ".join(dhms)
 
 
 def verbose_date(*args) -> str:
@@ -206,7 +203,7 @@ def verbose_date(*args) -> str:
     return verbose_date
 
 
-def iso_to_timestamp(iso_date: isodate.Duration) -> int:
+def iso_to_timestamp(iso_date: str) -> int:
     """Convert ISO datetime to timestamp"""
     try:
         return int(parse_datetime(iso_date).astimezone().timestamp())
@@ -214,7 +211,7 @@ def iso_to_timestamp(iso_date: isodate.Duration) -> int:
         # datetime.fromisoformat(iso_date[:-1] + "+00:00").astimezone().timestamp()
         # )
 
-    except ValueError:  # Incase the datetime is not in the iso format, return it as is
+    except (ValueError, TypeError):  # Incase the datetime is not in the iso format, return it as is
         return iso_date
 
 

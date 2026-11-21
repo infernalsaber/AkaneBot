@@ -43,7 +43,8 @@ class YTVideo:
             isodate.parse_duration(ytapi2["items"][0]["contentDetails"]["duration"])
         )
         if self.vid_duration.startswith("0:"):
-            return self.vid_duration[2:]
+            minutes, seconds = self.vid_duration[2:].split(":")
+            return f"{int(minutes)}:{seconds}"
         return self.vid_duration
 
 
