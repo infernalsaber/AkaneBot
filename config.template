@@ -5,6 +5,7 @@
     },
     "LOGS_CHANNEL": "CHANNEL_ID",
     "UPDATE_CHANNELS": ["CHANNEL_ID_LIST"],
+    "EMBEDFIX_ENABLED": false,
     "EMOTES": {
         "SIP": "\ud83e\udd64",
         "SMILE": "\ud83d\ude04",

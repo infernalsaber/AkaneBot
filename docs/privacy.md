@@ -1,6 +1,6 @@
 # Akane Bot Privacy Policy
 
-_Effective: 22 November 2026 · Last updated: 22 November 2026_
+_Effective: 22 November 2026 · Last updated: 23 November 2026_
 
 Hi! This page explains, in plain words, what Akane Bot ("Akane", "the bot", "we") does with your information when you use it on Discord.
 
@@ -12,9 +12,12 @@ Akane is run by fenix.er and is open source under the AGPL-3.0 licence. You can 
 
 ## 1. Messages
 
-Akane can see messages in channels it has access to. It only looks at them to spot when someone is talking to it, meaning a message that starts with its prefix or mentions it.
+Akane can see messages in channels it has access to. It only looks at them for two things:
 
-**Akane does not store, log, or read through your conversations.** Once it has decided whether a message is a command, the message is forgotten.
+- to spot when someone is talking to it, meaning a message that starts with its prefix or mentions it
+- to spot links from supported sites whose previews don't show properly on Discord (such as MangaPlus or Miyoushe), so it can reply with a proper preview
+
+**Akane does not store, log, or read through your conversations.** Once it has checked a message for a command or a supported link, the message is forgotten.
 
 ---
 
@@ -54,6 +57,7 @@ If you haven't linked an account, Akane may ask once whether you'd like to. If y
 We use the data above only to:
 
 - run the commands you ask for
+- fix the previews of supported links
 - remember your preferences (your AniList link, your server's prefixes)
 - fix bugs and keep the bot running smoothly
 - understand which features are popular
@@ -70,7 +74,7 @@ Under the GDPR and UK GDPR, we need a legal reason to use your data. Ours are:
 | "Not now" / "Don't ask again" choice | **Legitimate interest:** respecting your choice so we don't keep asking |
 | Server prefixes | **Legitimate interest:** making the bot work the way the server's admins set it up |
 | Logs and cache | **Legitimate interest:** keeping the bot working, fast and bug-free |
-| Messages, images and searches | **Legitimate interest:** running the commands you ask for |
+| Messages, images and searches | **Legitimate interest:** running the commands you ask for, and fixing the previews of supported links |
 
 Command usage counts aren't about anyone, so they aren't personal data.
 
@@ -80,7 +84,7 @@ Command usage counts aren't about anyone, so they aren't personal data.
 
 **We don't sell, rent or trade your data.**
 
-To answer your commands, Akane asks other services for help. It only sends what each request needs, such as the anime you searched for or the link to an image you want the source of. **It never sends your Discord ID or anything else about you.**
+To answer your commands and fix link previews, Akane asks other services for help. It only sends what each request needs, such as the anime you searched for or the link to an image you want the source of. **It never sends your Discord ID or anything else about you.**
 
 | Service | Used for | What it receives |
 | --- | --- | --- |
@@ -88,6 +92,7 @@ To answer your commands, Akane asks other services for help. It only sends what 
 | [SauceNAO](https://saucenao.com) and [trace.moe](https://trace.moe) | Finding the source of an image or anime scene | A link to the image or frame |
 | [VNDB](https://vndb.org) | Visual novel lookups | Your search |
 | [MangaDex](https://mangadex.org) and [ComicK](https://comick.io) | Manga chapters and updates | Series names or IDs |
+| [MangaPlus](https://mangaplus.shueisha.co.jp) and [Miyoushe](https://www.miyoushe.com) | Fixing link previews | The chapter, series or post ID from the link |
 | [YouTube](https://youtube.com) | Trailers and videos | Your search |
 | [Steam](https://store.steampowered.com) and [Hakushin](https://hakush.in) | Game info | Your search |
 | [7TV](https://7tv.app) | Finding emotes to add to a server | The emote name or link |

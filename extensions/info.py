@@ -39,7 +39,7 @@ PRIVACY_POLICY_URL = "https://gist.github.com/infernalsaber/25f7067b02b291f432f9
 @lb.add_checks(lb.guild_only)
 @lb.option("role", "The role", modifier=lb.OptionModifier.CONSUME_REST)
 @lb.command("inrole", "List of users in role", pass_options=True)
-@lb.implements(lb.PrefixCommand)
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
 async def inrole_cmd(ctx: lb.Context, role: str) -> None:
     """List of members in a role or interested in an event
 
@@ -146,7 +146,10 @@ async def inrole_cmd(ctx: lb.Context, role: str) -> None:
 
         view = AuthorNavi(pages=pages, user_id=ctx.author.id, buttons="default")
 
-        await view.send(ctx.channel_id)
+        if isinstance(ctx, lb.SlashContext):
+            await view.send(ctx.interaction)
+        else:
+            await view.send(ctx.channel_id)
         return
     except Exception as e:
         await ctx.respond(e)
@@ -388,8 +391,10 @@ def _git(cmd: str) -> t.Optional[str]:
 @info_plugin.command
 @lb.add_cooldown(10, 1, lb.UserBucket)
 @lb.add_cooldown(15, 2, lb.ChannelBucket)
-@lb.command("botinfo", "Get general info about the bot", aliases=["info"])
-@lb.implements(lb.PrefixCommand)
+@lb.command(
+    "botinfo", "Get general info about the bot", aliases=["info"], auto_defer=True
+)
+@lb.implements(lb.PrefixCommand, lb.SlashCommand)
 async def botinfo(ctx: lb.Context) -> None:
     """Get info about the bot"""
 
