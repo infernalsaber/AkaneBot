@@ -8,6 +8,7 @@ from subprocess import PIPE, Popen
 
 import hikari as hk
 import lightbulb as lb
+import miru
 import pandas as pd
 import psutil
 from miru.ext import nav
@@ -29,6 +30,8 @@ info_plugin = lb.Plugin("Utility", "Utility and info commands", include_datastor
 info_plugin.d.help = True
 info_plugin.d.help_emoji = "⚙️"
 info_plugin.d.help_image = "https://i.imgur.com/nsg3lZJ.png"
+
+PRIVACY_POLICY_URL = "https://gist.github.com/infernalsaber/25f7067b02b291f432f9195094daab35"
 
 
 
@@ -455,6 +458,14 @@ async def botinfo(ctx: lb.Context) -> None:
                 emoji2=hk.Emoji.parse("ℹ️"),
                 original_page=pages[0],
                 swap_page=pages[1],
+            )
+        )
+        view.add_item(
+            miru.Button(
+                style=hk.ButtonStyle.LINK,
+                url=PRIVACY_POLICY_URL,
+                label="Privacy Policy",
+                emoji="🔒",
             )
         )
 
