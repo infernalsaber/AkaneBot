@@ -18,6 +18,23 @@ jobs:
         # --ff-only never overwrites local edits on the server; it fails instead.
         run: git pull --ff-only origin main
 
+      - name: Tag new version
+        # git-cliff prints the latest tag when there's nothing to bump
+        run: |
+          git fetch --tags origin
+          version=$(git-cliff --bumped-version)
+          if ! git rev-parse -q --verify "refs/tags/$version" > /dev/null; then
+            git tag "$version"
+            git push origin "$version"
+          fi
+
+      - name: Write build info
+        # Read by botinfo for the version and recent changelog
+        run: |
+          git log -5 --format="%at %s" | jq -Rn --arg version "$(git describe --tags --abbrev=0)" \
+            '{version: $version, changes: [inputs | capture("^(?<timestamp>[0-9]+) (?<message>.*)$") | .timestamp |= tonumber]}' \
+            > build_info.json
+
       - name: Rebuild and restart the bot
         run: docker compose up -d --build
 

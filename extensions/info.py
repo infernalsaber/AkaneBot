@@ -1,9 +1,10 @@
 """Get information about a role, server, user, bot etc."""
+import asyncio
 import io
 import json
 import typing as t
 from datetime import datetime
-from math import floor
+from pathlib import Path
 from subprocess import PIPE, Popen
 
 import hikari as hk
@@ -24,6 +25,7 @@ from utils.buttons import (
     SwapButton,
 )
 from utils.models import ColorPalette as colors
+from utils.models import EmoteCollection as emotes
 from utils.views import AuthorNavi, AuthorView
 
 info_plugin = lb.Plugin("Utility", "Utility and info commands", include_datastore=True)
@@ -399,6 +401,10 @@ async def botinfo(ctx: lb.Context) -> None:
     """Get info about the bot"""
 
     try:
+        bot_process = psutil.Process()
+        # First call only starts the measurement window, it always returns 0.0
+        bot_process.cpu_percent()
+
         user = ctx.bot.get_me()
         data = await ctx.bot.rest.fetch_application()
         guilds = list(ctx.bot.cache.get_guilds_view().values())
@@ -408,14 +414,17 @@ async def botinfo(ctx: lb.Context) -> None:
             guild_obj = ctx.bot.cache.get_guild(guild)
             member = member + guild_obj.member_count
 
-        num_commits = _git("git rev-list --count main")
-        changes = _git('git log -5 --format="<t:%at:D>: %s"')
-
-        if num_commits and num_commits.isdigit():
-            num_commits = int(num_commits)
-            version = f"0.{floor(num_commits/100)}.{floor((num_commits%100)/10)}"
+        build_info = Path("build_info.json")
+        if build_info.exists():
+            info = json.loads(build_info.read_text())
+            version = info["version"]
+            changes = "\n".join(
+                f"<t:{change['timestamp']}:D>: {change['message']}"
+                for change in info["changes"]
+            )
         else:
-            version = "unknown"
+            version = _git("git describe --tags --abbrev=0") or "unknown"
+            changes = _git('git log -5 --format="<t:%at:D>: %s"')
 
         if changes:
             changes = "\n".join(
@@ -444,7 +453,8 @@ async def botinfo(ctx: lb.Context) -> None:
             )
             .add_field(
                 "System Usage",
-                f"RAM: {psutil.virtual_memory()[2]}%\nCPU: {psutil.cpu_percent(4)}%",
+                f"RAM: {bot_process.memory_info().rss / 1024**2:.0f} MB\n"
+                f"CPU: measuring… {hk.Emoji.parse(emotes.LOADING.value)}",
             )
             .set_author(name=f"{user.username} Bot")
             .set_thumbnail(user.avatar_url)
@@ -479,6 +489,14 @@ async def botinfo(ctx: lb.Context) -> None:
             components=view,
         )
         await view.start(choice)
+
+        await asyncio.sleep(3)
+        # Edit the same embed object so the swap button keeps the updated usage
+        pages[0].fields[-1].value = (
+            f"RAM: {bot_process.memory_info().rss / 1024**2:.0f} MB\n"
+            f"CPU: {bot_process.cpu_percent()}%"
+        )
+        await ctx.edit_last_response(embed=pages[0])
         await view.wait()
 
         # if hasattr(view, "answer"):

@@ -11,6 +11,7 @@ services:
     env_file: .env
     # Host network so it can reach Postgres on 127.0.0.1:5432 (firewall blocks bridge -> host)
     network_mode: host
+    mem_limit: 512m
     volumes:
       - ./akane_db.db:/app/akane_db.db
       - ./logs:/app/logs

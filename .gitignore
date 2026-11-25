@@ -14,3 +14,5 @@ extensions/x.py
 key value pair.pem
 db_ops.py
 config.json
+
+build_info.json
