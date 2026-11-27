@@ -1,0 +1,32 @@
+name: Release
+
+# Tags are created by the Forgejo deploy workflow and arrive here through the push mirror;
+# a GitHub release per tag is what gets the "Latest" badge on the repo page
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build Changelog
+        id: github_release
+        uses: mikepenz/release-changelog-builder-action@v6
+        with:
+          mode: "COMMIT"
+          failOnError: "true"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "$CHANGELOG"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG: ${{ steps.github_release.outputs.changelog }}

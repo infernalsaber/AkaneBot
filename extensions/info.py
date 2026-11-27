@@ -705,12 +705,13 @@ class QuoteSelect(miru.TextSelect):
 @lb.command("Quote", "Quote a message as Keven, Grok or Battler", auto_defer=False)
 @lb.implements(lb.MessageCommand)
 async def quote_menu(ctx: lb.MessageContext) -> None:
-    """Render the target message into a template picked from a dropdown only the invoker sees"""
+    """Render the target message into a template picked from a dropdown; the dropdown message becomes the image"""
 
+    message_link = ctx.options["target"].make_link(ctx.guild_id)
     text = ctx.options["target"].content or "(There's nothing in here)"
     view = AuthorView(user_id=ctx.author.id, timeout=60, clean_items=False)
     view.add_item(QuoteSelect(options=[miru.SelectOption(label=mode) for mode in ECHO_MODES], placeholder="Quote as..."))
-    response = await ctx.respond("Select Mode:", components=view, flags=hk.MessageFlag.EPHEMERAL)
+    response = await ctx.respond("Select Mode:", components=view)
     await view.start(response)
     await view.wait()
 
@@ -718,8 +719,10 @@ async def quote_menu(ctx: lb.MessageContext) -> None:
         await ctx.interaction.edit_initial_response("Timed out", components=[])
         return
 
-    await ctx.respond(attachment=await render_mode(ctx, view.answer, text))
-    await ctx.interaction.delete_initial_response()
+    image = await render_mode(ctx, view.answer, text)
+    link_view = miru.View()
+    link_view.add_item(miru.Button(style=hk.ButtonStyle.LINK, url=message_link, label="Original Message"))
+    await ctx.interaction.edit_initial_response(content=None, attachment=image, components=link_view)
 
 
 def load(bot: lb.BotApp) -> None:
