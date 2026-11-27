@@ -614,7 +614,7 @@ ECHO_MODES = {"Keven": "keven", "Grok": "grok", "Ushiromiya Battler": "umineko"}
 MENTION = re.compile(r"<(@!?|#|@&)(\d+)>")
 
 
-async def plain_mentions(ctx: lb.SlashContext, text: str) -> str:
+async def plain_mentions(ctx: lb.Context, text: str) -> str:
     """Mentions as Discord shows them (@display name, #channel, @role), since they'd show up raw in an image"""
     names = {}
     for kind, snowflake in set(MENTION.findall(text)):
@@ -635,7 +635,7 @@ async def plain_mentions(ctx: lb.SlashContext, text: str) -> str:
     return MENTION.sub(lambda match: names[match.groups()], text)
 
 
-async def member_or_user(ctx: lb.SlashContext, user_id: int) -> hk.User:
+async def member_or_user(ctx: lb.Context, user_id: int) -> hk.User:
     """The guild member (for their nickname) if they're in this server, else the user"""
     if ctx.guild_id:
         member = ctx.bot.cache.get_member(ctx.guild_id, user_id)
@@ -648,7 +648,7 @@ async def member_or_user(ctx: lb.SlashContext, user_id: int) -> hk.User:
     return ctx.bot.cache.get_user(user_id) or await ctx.bot.rest.fetch_user(user_id)
 
 
-async def fetch_custom_emoji(ctx: lb.SlashContext, text: str) -> dict[str, bytes]:
+async def fetch_custom_emoji(ctx: lb.Context, text: str) -> dict[str, bytes]:
     """Images of the custom emoji in `text` keyed by id; animated ones come as their first frame"""
 
     async def fetch(emoji_id: str) -> tuple[str, bytes | None]:
@@ -663,6 +663,14 @@ async def fetch_custom_emoji(ctx: lb.SlashContext, text: str) -> dict[str, bytes
     return {emoji_id: data for emoji_id, data in results if data}
 
 
+async def render_mode(ctx: lb.Context, mode: str, text: str) -> hk.Bytes:
+    """`text` rendered into the template for `mode` (an ECHO_MODES label), mentions and custom emoji resolved"""
+    text = await plain_mentions(ctx, text)
+    custom_emoji = await fetch_custom_emoji(ctx, text)
+    image = await asyncio.to_thread(render, ECHO_MODES[mode], text, custom_emoji)
+    return hk.Bytes(image, f"{ECHO_MODES[mode]}.png")
+
+
 @info_plugin.command
 @lb.option("mode", "Say it as someone else", required=False, choices=list(ECHO_MODES))
 @lb.option("message", "What to say")
@@ -673,10 +681,7 @@ async def echo_cmd(ctx: lb.SlashContext, message: str, mode: str | None) -> None
 
     if mode:
         await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
-        message = await plain_mentions(ctx, message)
-        custom_emoji = await fetch_custom_emoji(ctx, message)
-        image = await asyncio.to_thread(render, ECHO_MODES[mode], message, custom_emoji)
-        await ctx.respond(attachment=hk.Bytes(image, f"{ECHO_MODES[mode]}.png"))
+        await ctx.respond(attachment=await render_mode(ctx, mode, message))
         return
 
     await ctx.respond(
@@ -685,6 +690,36 @@ async def echo_cmd(ctx: lb.SlashContext, message: str, mode: str | None) -> None
         role_mentions=False,
         mentions_everyone=False,
     )
+
+
+class QuoteSelect(miru.TextSelect):
+    """Dropdown to pick who Quote renders the message as"""
+
+    async def callback(self, ctx: miru.ViewContext) -> None:
+        self.view.answer = self.values[0]
+        await ctx.edit_response(content=f"Quoting as **{self.view.answer}**...", components=[])
+        self.view.stop()
+
+
+@info_plugin.command
+@lb.command("Quote", "Quote a message as Keven, Grok or Battler", auto_defer=False)
+@lb.implements(lb.MessageCommand)
+async def quote_menu(ctx: lb.MessageContext) -> None:
+    """Render the target message into a template picked from a dropdown only the invoker sees"""
+
+    text = ctx.options["target"].content or "(There's nothing in here)"
+    view = AuthorView(user_id=ctx.author.id, timeout=60, clean_items=False)
+    view.add_item(QuoteSelect(options=[miru.SelectOption(label=mode) for mode in ECHO_MODES], placeholder="Quote as..."))
+    response = await ctx.respond("Select Mode:", components=view, flags=hk.MessageFlag.EPHEMERAL)
+    await view.start(response)
+    await view.wait()
+
+    if view.answer is None:
+        await ctx.interaction.edit_initial_response("Timed out", components=[])
+        return
+
+    await ctx.respond(attachment=await render_mode(ctx, view.answer, text))
+    await ctx.interaction.delete_initial_response()
 
 
 def load(bot: lb.BotApp) -> None:

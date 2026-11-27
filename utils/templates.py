@@ -3,6 +3,7 @@
 import io
 import json
 import math
+import random
 import re
 from dataclasses import dataclass, field
 from functools import cache
@@ -239,24 +240,26 @@ def render_screenshot(cfg: dict, text: str, custom: dict[str, Image.Image]) -> b
 
 
 def render_discord(cfg: dict, text: str, custom: dict[str, Image.Image]) -> bytes:
-    """`text` as a Discord message, with the avatar, name and timestamp drawn from config"""
+    """`text` as a Discord message from a profile picked by its `rng` weight, with the header drawn from config"""
     body = cfg["body"]
+    profiles = cfg["profiles"]
+    profile = random.choices(profiles, weights=[profile["rng"] for profile in profiles])[0]
     rf, lines, extra_h = layout_body(body, text, custom)
     img = Image.new("RGB", (cfg["width"], cfg["height"] + extra_h), hex_to_rgb(cfg["background"]))
 
     avatar_cfg = cfg["avatar"]
     size = avatar_cfg["size"]
-    avatar = ImageOps.fit(Image.open(TEMPLATE_DIR / avatar_cfg["image"]).convert("RGBA"), (size * SUPERSAMPLE,) * 2)
+    avatar = ImageOps.fit(Image.open(TEMPLATE_DIR / profile["avatar"]).convert("RGBA"), (size * SUPERSAMPLE,) * 2)
     mask = Image.new("L", avatar.size, 0)
     ImageDraw.Draw(mask).ellipse((0, 0, *avatar.size), fill=255)
     avatar.putalpha(ImageChops.multiply(avatar.getchannel("A"), mask))
     avatar = avatar.resize((size, size), Image.Resampling.LANCZOS)
     img.paste(avatar, (avatar_cfg["x"], avatar_cfg["y"]), avatar)
 
-    name, stamp = cfg["name"], cfg["timestamp"]
-    name_font = rich_font(name["font"])
-    name_font.draw(img, body["left"], cfg["header_baseline"], name["text"], hex_to_rgb(name["colour"]))
-    stamp_x = body["left"] + name_font.width(name["text"]) + stamp["gap"]
+    stamp = cfg["timestamp"]
+    name_font = rich_font(cfg["name_font"])
+    name_font.draw(img, body["left"], cfg["header_baseline"], profile["name"], hex_to_rgb(profile["colour"]))
+    stamp_x = body["left"] + name_font.width(profile["name"]) + stamp["gap"]
     rich_font(stamp["font"]).draw(img, stamp_x, cfg["header_baseline"], stamp["text"], hex_to_rgb(stamp["colour"]))
 
     draw_body(img, rf, lines, body)

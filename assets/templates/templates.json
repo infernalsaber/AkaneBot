@@ -20,13 +20,15 @@
     "width": 996,
     "height": 140,
     "background": "#313338",
-    "avatar": {"image": "keven_avatar.png", "x": 32, "y": 24, "size": 80},
+    "profiles": [
+      {"name": "keven", "avatar": "keven_avatar.png", "colour": "#006A4E", "rng": 4},
+      {"name": "leven", "avatar": "leven_avatar.png", "colour": "#000000", "rng": 2},
+      {"name": "geven", "avatar": "geven_avatar.png", "colour": "#F1C40F", "rng": 3},
+      {"name": "Noiven", "avatar": "noiven_avatar.png", "colour": "#D4AF37", "rng": 1}
+    ],
+    "avatar": {"x": 32, "y": 24, "size": 80},
     "header_baseline": 55.5,
-    "name": {
-      "text": "keven",
-      "colour": "#006A4E",
-      "font": {"file": "vendor/ggsans-Medium.woff2", "fallback": "Figtree-VariableFont_wght.ttf", "size": 35, "weight": 500}
-    },
+    "name_font": {"file": "vendor/ggsans-Medium.woff2", "fallback": "Figtree-VariableFont_wght.ttf", "size": 35, "weight": 500},
     "timestamp": {
       "text": "12/11/2024, 10:31",
       "colour": "#949BA4",
