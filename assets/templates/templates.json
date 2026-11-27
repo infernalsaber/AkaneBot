@@ -1,0 +1,60 @@
+{
+  "grok": {
+    "style": "screenshot",
+    "background": "grok.png",
+    "split_y": 66,
+    "fill": "#000000",
+    "body": {
+      "font": {"file": "vendor/Chirp-Regular.woff2", "fallback": "Roboto-VariableFont_wdth,wght.ttf", "size": 19, "weight": 400},
+      "colour": "#E7E9EA",
+      "left": 80,
+      "right": 733,
+      "baseline": 52.5,
+      "line_height": 25.3,
+      "max_lines": 3,
+      "emoji": {"scale": 1.2, "drop": 0.267}
+    }
+  },
+  "keven": {
+    "style": "discord",
+    "width": 996,
+    "height": 140,
+    "background": "#313338",
+    "avatar": {"image": "keven_avatar.png", "x": 32, "y": 24, "size": 80},
+    "header_baseline": 55.5,
+    "name": {
+      "text": "keven",
+      "colour": "#006A4E",
+      "font": {"file": "vendor/ggsans-Medium.woff2", "fallback": "Figtree-VariableFont_wght.ttf", "size": 35, "weight": 500}
+    },
+    "timestamp": {
+      "text": "12/11/2024, 10:31",
+      "colour": "#949BA4",
+      "gap": 12.5,
+      "font": {"file": "vendor/ggsans-Normal.woff2", "fallback": "Figtree-VariableFont_wght.ttf", "size": 26, "weight": 400}
+    },
+    "body": {
+      "font": {"file": "vendor/ggsans-Normal.woff2", "fallback": "Figtree-VariableFont_wght.ttf", "size": 35, "weight": 400},
+      "colour": "#DBDEE1",
+      "left": 144,
+      "right": 900,
+      "baseline": 103.5,
+      "line_height": 48,
+      "max_lines": 3,
+      "emoji": {"scale": 1.375, "drop": 0.344}
+    }
+  },
+  "umineko": {
+    "style": "dialogue",
+    "background": "umineko.png",
+    "box": [74, 422, 900, 584],
+    "sizes": [30, 27, 24, 21, 18],
+    "line_gap": 1.3,
+    "shadow": 2,
+    "body": {
+      "font": {"file": "SourceSans3-VariableFont_wght.ttf", "fallback": "SourceSans3-VariableFont_wght.ttf", "weight": 400},
+      "colour": "#FFFFFF",
+      "emoji": {"scale": 1.2, "drop": 0.25}
+    }
+  }
+}

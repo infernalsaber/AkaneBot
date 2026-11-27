@@ -2,11 +2,13 @@
 import asyncio
 import io
 import json
+import re
 import typing as t
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, Popen
 
+import aiohttp
 import hikari as hk
 import lightbulb as lb
 import miru
@@ -26,6 +28,7 @@ from utils.buttons import (
 )
 from utils.models import ColorPalette as colors
 from utils.models import EmoteCollection as emotes
+from utils.templates import CUSTOM_EMOJI, render
 from utils.views import AuthorNavi, AuthorView
 
 info_plugin = lb.Plugin("Utility", "Utility and info commands", include_datastore=True)
@@ -607,12 +610,74 @@ async def sticker_removal(ctx: lb.MessageContext):
         await ctx.respond("A hiccup from discord's side, please try again")
 
 
+ECHO_MODES = {"Keven": "keven", "Grok": "grok", "Ushiromiya Battler": "umineko"}
+MENTION = re.compile(r"<(@!?|#|@&)(\d+)>")
+
+
+async def plain_mentions(ctx: lb.SlashContext, text: str) -> str:
+    """Mentions as Discord shows them (@display name, #channel, @role), since they'd show up raw in an image"""
+    names = {}
+    for kind, snowflake in set(MENTION.findall(text)):
+        entity_id = int(snowflake)
+        prefix = "#" if kind == "#" else "@"
+        try:
+            if kind == "#":
+                entity = ctx.bot.cache.get_guild_channel(entity_id) or await ctx.bot.rest.fetch_channel(entity_id)
+                name = entity.name
+            elif kind == "@&":
+                name = ctx.bot.cache.get_role(entity_id).name
+            else:
+                name = (await member_or_user(ctx, entity_id)).display_name
+        except (AttributeError, hk.HTTPError):
+            name = "unknown"
+        # @everyone's role name already carries the @
+        names[kind, snowflake] = f"{prefix}{(name or 'unknown').lstrip('@')}"
+    return MENTION.sub(lambda match: names[match.groups()], text)
+
+
+async def member_or_user(ctx: lb.SlashContext, user_id: int) -> hk.User:
+    """The guild member (for their nickname) if they're in this server, else the user"""
+    if ctx.guild_id:
+        member = ctx.bot.cache.get_member(ctx.guild_id, user_id)
+        if member:
+            return member
+        try:
+            return await ctx.bot.rest.fetch_member(ctx.guild_id, user_id)
+        except hk.NotFoundError:
+            pass
+    return ctx.bot.cache.get_user(user_id) or await ctx.bot.rest.fetch_user(user_id)
+
+
+async def fetch_custom_emoji(ctx: lb.SlashContext, text: str) -> dict[str, bytes]:
+    """Images of the custom emoji in `text` keyed by id; animated ones come as their first frame"""
+
+    async def fetch(emoji_id: str) -> tuple[str, bytes | None]:
+        try:
+            resp = await ctx.bot.d.aio_session.get(f"https://cdn.discordapp.com/emojis/{emoji_id}.webp")
+            return emoji_id, await resp.read() if resp.ok else None
+        except aiohttp.ClientError:
+            return emoji_id, None
+
+    ids = {match[2] for match in CUSTOM_EMOJI.finditer(text)}
+    results = await asyncio.gather(*(fetch(emoji_id) for emoji_id in ids))
+    return {emoji_id: data for emoji_id, data in results if data}
+
+
 @info_plugin.command
+@lb.option("mode", "Say it as someone else", required=False, choices=list(ECHO_MODES))
 @lb.option("message", "What to say")
 @lb.command("echo", "Echo a message back", pass_options=True)
 @lb.implements(lb.SlashCommand)
-async def echo_cmd(ctx: lb.SlashContext, message: str) -> None:
-    """Echo the invoking user's message"""
+async def echo_cmd(ctx: lb.SlashContext, message: str, mode: str | None) -> None:
+    """Echo the invoking user's message, optionally rendered into a template"""
+
+    if mode:
+        await ctx.respond(hk.ResponseType.DEFERRED_MESSAGE_CREATE)
+        message = await plain_mentions(ctx, message)
+        custom_emoji = await fetch_custom_emoji(ctx, message)
+        image = await asyncio.to_thread(render, ECHO_MODES[mode], message, custom_emoji)
+        await ctx.respond(attachment=hk.Bytes(image, f"{ECHO_MODES[mode]}.png"))
+        return
 
     await ctx.respond(
         f"{ctx.author.mention} said: {message}",

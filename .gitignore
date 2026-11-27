@@ -16,3 +16,5 @@ db_ops.py
 config.json
 
 build_info.json
+
+assets/fonts/vendor/
